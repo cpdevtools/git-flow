@@ -1,0 +1,40 @@
+{
+  "name": "create-release-pr",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "description": "GitHub composite action to create release PRs",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "github-actions",
+    "release",
+    "pr",
+    "versioning"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
+    "@cpdevtools/git-flow": "^0.0.1",
+    "@cpdevtools/ts-dev-utilities": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "@vercel/ncc": "^0.38.3",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

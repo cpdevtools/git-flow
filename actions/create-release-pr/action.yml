@@ -1,0 +1,45 @@
+name: 'Create Release PR'
+description: 'Creates or updates a release PR with metadata for version resolution'
+author: 'CPDevTools'
+
+branding:
+  icon: 'git-pull-request'
+  color: 'blue'
+
+inputs:
+  branch:
+    description: 'Source branch name (default: current branch)'
+    required: false
+    default: ${{ github.ref_name }}
+  
+  token:
+    description: 'GitHub token with PR permissions'
+    required: false
+    default: ${{ github.token }}
+  
+  versions-file:
+    description: 'Path to versions configuration file (JSON/YAML)'
+    required: false
+    default: '.github/versions.json'
+  
+  run-number:
+    description: 'CI run number for build suffix'
+    required: false
+    default: ${{ github.run_number }}
+
+outputs:
+  pr-number:
+    description: 'Pull request number'
+    value: ${{ steps.create-pr.outputs.pr-number }}
+  
+  pr-url:
+    description: 'Pull request URL'
+    value: ${{ steps.create-pr.outputs.pr-url }}
+  
+  release-branch:
+    description: 'Name of the release branch'
+    value: ${{ steps.create-pr.outputs.release-branch }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
