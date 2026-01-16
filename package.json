@@ -1,0 +1,37 @@
+{
+  "name": "@cpdevtools/git-flow-monorepo",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "description": "Git-based versioning and release workflow automation",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,js,json,md,yml}\"",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "keywords": [
+    "git",
+    "versioning",
+    "release",
+    "workflow",
+    "github-actions"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cpdevtools/git-flow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cpdevtools/git-flow/issues"
+  },
+  "homepage": "https://github.com/cpdevtools/git-flow#readme",
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

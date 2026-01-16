@@ -1,0 +1,63 @@
+{
+  "name": "@cpdevtools/git-flow",
+  "version": "0.0.0-DEFAULT",
+  "description": "Core library for Git-based versioning and release workflows",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./version": {
+      "types": "./dist/version/index.d.ts",
+      "import": "./dist/version/index.js"
+    },
+    "./branch": {
+      "types": "./dist/branch/index.d.ts",
+      "import": "./dist/branch/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "git",
+    "versioning",
+    "semver",
+    "release",
+    "branch"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cpdevtools/git-flow.git",
+    "directory": "packages/git-flow"
+  },
+  "dependencies": {
+    "@cpdevtools/ts-dev-utilities": "^0.0.1",
+    "semver": "^7.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "@types/semver": "^7.5.8",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
