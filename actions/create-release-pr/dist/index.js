@@ -45340,6 +45340,32 @@ ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` → \`${p.resolv
             base: branch,
             state: 'open',
         });
+        // Check if branches have differences
+        const { data: comparison } = await octokit.rest.repos.compareCommitsWithBasehead({
+            owner,
+            repo,
+            basehead: `${branch}...${releaseBranch}`,
+        });
+        const hasDifferences = comparison.ahead_by > 0 || comparison.behind_by > 0;
+        if (!hasDifferences) {
+            core.info('No differences between branches');
+            // Close any existing PR since there are no changes
+            if (existingPRs.length > 0) {
+                const pr = existingPRs[0];
+                await octokit.rest.pulls.update({
+                    owner,
+                    repo,
+                    pull_number: pr.number,
+                    state: 'closed',
+                });
+                core.info(`Closed PR #${pr.number} (no differences)`);
+            }
+            core.info('✅ No PR needed - branches are identical');
+            core.setOutput('pr-number', '');
+            core.setOutput('pr-url', '');
+            core.setOutput('release-branch', releaseBranch);
+            return;
+        }
         let prNumber;
         let prUrl;
         if (existingPRs.length > 0) {
