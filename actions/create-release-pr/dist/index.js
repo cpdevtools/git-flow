@@ -45331,15 +45331,15 @@ ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` → \`${p.resolv
         const { data: existingPRs } = await octokit.rest.pulls.list({
             owner,
             repo,
-            head: `${owner}:${releaseBranch}`,
-            base: branch,
+            head: `${owner}:${branch}`,
+            base: releaseBranch,
             state: 'open',
         });
         // Check if branches have differences
         const { data: comparison } = await octokit.rest.repos.compareCommitsWithBasehead({
             owner,
             repo,
-            basehead: `${branch}...${releaseBranch}`,
+            basehead: `${releaseBranch}...${branch}`,
         });
         const hasDifferences = comparison.ahead_by > 0 || comparison.behind_by > 0;
         if (!hasDifferences) {
@@ -45382,8 +45382,8 @@ ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` → \`${p.resolv
                 owner,
                 repo,
                 title: `Release from ${branch}`,
-                head: releaseBranch,
-                base: branch,
+                head: branch,
+                base: releaseBranch,
                 body: prBody,
                 draft: true,
             });
