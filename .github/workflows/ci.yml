@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'actions/**'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'actions/**'
 
 jobs:
   test:
@@ -29,16 +33,16 @@ jobs:
           cache: 'pnpm'
       
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --filter=!create-release-pr
+        run: pnpm install --frozen-lockfile
       
       - name: Lint
-        run: pnpm run lint --filter=!create-release-pr
+        run: pnpm run lint
       
       - name: Type check
-        run: pnpm run typecheck --filter=!create-release-pr
+        run: pnpm run typecheck
       
       - name: Test
-        run: pnpm test --filter=!create-release-pr
+        run: pnpm test
       
       - name: Build
-        run: pnpm run build --filter=!create-release-pr
+        run: pnpm run build
