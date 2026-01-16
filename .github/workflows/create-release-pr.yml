@@ -1,0 +1,77 @@
+name: Create Release PR
+
+on:
+  workflow_call:
+    inputs:
+      branch:
+        description: 'Branch to create release from'
+        required: false
+        type: string
+        default: ${{ github.ref_name }}
+      
+      versions-file:
+        description: 'Path to versions configuration file'
+        required: false
+        type: string
+        default: '.github/versions.json'
+      
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+    
+    outputs:
+      pr-number:
+        description: 'Pull request number'
+        value: ${{ jobs.create-release-pr.outputs.pr-number }}
+      
+      pr-url:
+        description: 'Pull request URL'
+        value: ${{ jobs.create-release-pr.outputs.pr-url }}
+      
+      release-branch:
+        description: 'Name of the release branch'
+        value: ${{ jobs.create-release-pr.outputs.release-branch }}
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      pr-number: ${{ steps.create-pr.outputs.pr-number }}
+      pr-url: ${{ steps.create-pr.outputs.pr-url }}
+      release-branch: ${{ steps.create-pr.outputs.release-branch }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'pnpm'
+      
+      - name: Create Release PR
+        id: create-pr
+        uses: cpdevtools/git-flow/actions/create-release-pr@main
+        with:
+          branch: ${{ inputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          versions-file: ${{ inputs.versions-file }}
+          run-number: ${{ github.run_number }}
+      
+      - name: Output PR details
+        run: |
+          echo "✅ Release PR created successfully!"
+          echo "PR Number: ${{ steps.create-pr.outputs.pr-number }}"
+          echo "PR URL: ${{ steps.create-pr.outputs.pr-url }}"
+          echo "Release Branch: ${{ steps.create-pr.outputs.release-branch }}"
