@@ -4,6 +4,7 @@ import { discoverProjects } from '@cpdevtools/ts-dev-utilities/project';
 import { parseJson } from '@cpdevtools/ts-dev-utilities/json';
 import { resolveVersion } from '@cpdevtools/git-flow/version';
 import { readFile } from 'node:fs/promises';
+import { parse as parseYaml } from 'yaml';
 
 interface VersionsConfig {
   [placeholder: string]: string;
@@ -27,10 +28,13 @@ async function run() {
     core.info(`Creating release PR for branch: ${branch}`);
     core.info(`Run number: ${runNumber}`);
 
-    // Load versions configuration
+    // Load versions configuration (supports both JSON and YAML)
     const versionsContent = await readFile(versionsFile, 'utf-8');
-    const versionsByPlaceholder = parseJson(versionsContent) as VersionsConfig;
-    core.info(`Loaded versions: ${JSON.stringify(versionsByPlaceholder)}`);
+    const isYaml = versionsFile.endsWith('.yml') || versionsFile.endsWith('.yaml');
+    const versionsByPlaceholder = (isYaml
+      ? parseYaml(versionsContent)
+      : parseJson(versionsContent)) as VersionsConfig;
+    core.info(`Loaded versions from ${versionsFile}: ${JSON.stringify(versionsByPlaceholder)}`);
 
     // Discover projects in workspace
     const projects = await discoverProjects({

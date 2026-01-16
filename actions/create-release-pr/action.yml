@@ -18,9 +18,9 @@ inputs:
     default: ${{ github.token }}
   
   versions-file:
-    description: 'Path to versions configuration file (JSON/YAML)'
+    description: 'Path to versions configuration file (supports .json, .yml, .yaml)'
     required: false
-    default: '.github/versions.json'
+    default: '.github/versions.yml'
   
   run-number:
     description: 'CI run number for build suffix'

@@ -9,7 +9,7 @@ GitHub composite action to create release pull requests with version metadata.
   with:
     branch: main
     token: ${{ secrets.GITHUB_TOKEN }}
-    versions-file: .github/versions.json
+    versions-file: .github/versions.yml
     run-number: ${{ github.run_number }}
 ```
 
@@ -17,7 +17,7 @@ GitHub composite action to create release pull requests with version metadata.
 
 - `branch` - Source branch name (default: current branch)
 - `token` - GitHub token with PR permissions (default: `${{ github.token }}`)
-- `versions-file` - Path to versions configuration file (default: `.github/versions.json`)
+- `versions-file` - Path to versions configuration file (supports .json, .yml, .yaml) (default: `.github/versions.yml`)
 - `run-number` - CI run number for build suffix (default: `${{ github.run_number }}`)
 
 ## Outputs
@@ -28,6 +28,16 @@ GitHub composite action to create release pull requests with version metadata.
 
 ## Versions File Format
 
+Supports both JSON and YAML formats:
+
+**YAML (.yml or .yaml):**
+```yaml
+"0.0.0-DEFAULT": "2.0.0"
+"0.0.0-V1_8_LTS": "1.8.5"
+"0.0.0-BETA": "2.0.0-beta.0"
+```
+
+**JSON (.json):**
 ```json
 {
   "0.0.0-DEFAULT": "2.0.0",
