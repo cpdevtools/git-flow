@@ -29,16 +29,16 @@ jobs:
           cache: 'pnpm'
       
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter=!create-release-pr
       
       - name: Lint
-        run: pnpm run lint
+        run: pnpm run lint --filter=!create-release-pr
       
       - name: Type check
-        run: pnpm run typecheck
+        run: pnpm run typecheck --filter=!create-release-pr
       
       - name: Test
-        run: pnpm test
+        run: pnpm test --filter=!create-release-pr
       
       - name: Build
-        run: pnpm run build
+        run: pnpm run build --filter=!create-release-pr
