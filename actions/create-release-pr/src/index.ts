@@ -91,7 +91,8 @@ async function run() {
     const sha = refData.object.sha;
     core.info(`Current SHA: ${sha}`);
 
-    // Create or update release branch
+    // Create or get reference to release branch
+    let releaseBranchCreated = false;
     try {
       await octokit.rest.git.createRef({
         owner,
@@ -100,17 +101,11 @@ async function run() {
         sha,
       });
       core.info(`Created release branch: ${releaseBranch}`);
+      releaseBranchCreated = true;
     } catch (error: any) {
       if (error.status === 422) {
-        // Branch already exists, update it
-        await octokit.rest.git.updateRef({
-          owner,
-          repo,
-          ref: `heads/${releaseBranch}`,
-          sha,
-          force: true,
-        });
-        core.info(`Updated existing release branch: ${releaseBranch}`);
+        // Branch already exists - don't update it
+        core.info(`Release branch already exists: ${releaseBranch}`);
       } else {
         throw error;
       }
