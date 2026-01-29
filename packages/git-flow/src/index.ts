@@ -3,3 +3,4 @@
  */
 
 export * from './version/index.js';
+export * from './build-pack/index.js';

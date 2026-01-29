@@ -1,0 +1,81 @@
+/**
+ * Type definitions for Phase 2 Build & Pack workflow
+ */
+
+import type { Project } from '@cpdevtools/ts-dev-utilities/project';
+
+/**
+ * Project configuration for build & pack workflow
+ */
+export interface ProjectConfig extends Project {
+  /** Project name - inherited from Project but explicitly declared for type safety */
+  name: string;
+  /** Working directory (absolute path) - same as directory from Project */
+  cwd: string;
+  /** Project version to build */
+  version: string;
+  /** Whether this is a prerelease version */
+  prerelease: boolean;
+}
+
+/**
+ * Execution result for a project
+ */
+export interface ExecutionResult {
+  /** Project name */
+  project: string;
+  /** Whether execution succeeded */
+  success: boolean;
+  /** Error message if failed */
+  error?: string;
+  /** Exit code if available */
+  exitCode?: number;
+}
+
+/**
+ * Build & Pack workflow context
+ */
+export interface BuildPackContext {
+  /** Workspace root directory */
+  workspaceRoot: string;
+  /** Artifact output directory (for artifact.yml files) */
+  artifactOutputDir: string;
+  /** GitHub token for API access */
+  githubToken: string;
+  /** Pull request number */
+  prNumber: number;
+  /** Git commit SHA */
+  sha: string;
+  /** Workflow run number */
+  runNumber: number;
+}
+
+/**
+ * PR metadata from PR body YAML block
+ */
+export interface PRMetadata {
+  /** Workflow run number */
+  runNumber: number;
+  /** Git commit SHA */
+  sha: string;
+  /** ISO timestamp */
+  timestamp: string;
+  /** Source branch that triggered the release PR */
+  sourceBranch: string;
+  /** Projects to build and pack */
+  projects: PRProjectMetadata[];
+}
+
+/**
+ * Project metadata from PR body
+ */
+export interface PRProjectMetadata {
+  /** Project name */
+  name: string;
+  /** Version to build */
+  version: string;
+  /** Whether this is a prerelease */
+  prerelease: boolean;
+  /** Project working directory relative to workspace root */
+  cwd: string;
+}

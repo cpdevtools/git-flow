@@ -15,6 +15,10 @@
     "./branch": {
       "types": "./dist/branch/index.d.ts",
       "import": "./dist/branch/index.js"
+    },
+    "./build-pack": {
+      "types": "./dist/build-pack/index.d.ts",
+      "import": "./dist/build-pack/index.js"
     }
   },
   "files": [
@@ -43,7 +47,7 @@
     "directory": "packages/git-flow"
   },
   "dependencies": {
-    "@cpdevtools/ts-dev-utilities": "^0.0.1",
+    "@cpdevtools/ts-dev-utilities": "link:../../../ts-dev-utilities",
     "semver": "^7.6.3"
   },
   "devDependencies": {
