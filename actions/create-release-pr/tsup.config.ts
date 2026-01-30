@@ -10,6 +10,6 @@ export default defineConfig({
   clean: true,
   dts: false,
   minify: false,
-  external: [],
+  noExternal: [/.*/],
   outExtension: () => ({ js: '.js' }),
 });
