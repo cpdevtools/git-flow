@@ -1,0 +1,71 @@
+name: Build, Pack & Publish Release
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        description: 'Release PR number'
+        required: true
+        type: number
+      
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        type: string
+        default: '20'
+    
+    outputs:
+      published-count:
+        description: 'Number of projects successfully published'
+        value: ${{ jobs.publish.outputs.published-count }}
+      
+      verified-count:
+        description: 'Number of projects verified'
+        value: ${{ jobs.publish.outputs.verified-count }}
+
+jobs:
+  build-pack:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      
+      - name: Build & Pack
+        uses: cpdevtools/git-flow/actions/build-pack@main
+        with:
+          pr-number: ${{ inputs.pr-number }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+  
+  publish:
+    needs: build-pack
+    runs-on: ubuntu-latest
+    
+    outputs:
+      published-count: ${{ steps.publish.outputs.published-count }}
+      verified-count: ${{ steps.publish.outputs.verified-count }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+      
+      - name: Publish Release
+        id: publish
+        uses: cpdevtools/git-flow/actions/publish-release@main
+        with:
+          pr-number: ${{ inputs.pr-number }}
+          token: ${{ secrets.GITHUB_TOKEN }}

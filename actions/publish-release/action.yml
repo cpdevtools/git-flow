@@ -5,7 +5,7 @@ inputs:
   pr-number:
     description: 'Release PR number'
     required: true
-  github-token:
+  token:
     description: 'GitHub token for API access'
     required: true
 

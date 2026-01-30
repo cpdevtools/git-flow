@@ -5,7 +5,7 @@ import { runPublishRelease } from '@cpdevtools/git-flow/publish-release';
 async function run() {
   try {
     const prNumber = parseInt(core.getInput('pr-number', { required: true }));
-    const githubToken = core.getInput('github-token', { required: true });
+    const githubToken = core.getInput('token', { required: true });
 
     // Extract repository info from GitHub context
     const { owner, repo } = github.context.repo;
