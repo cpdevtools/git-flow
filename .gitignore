@@ -5,6 +5,7 @@ coverage/
 .env
 .env.local
 
-# Ignore dist except in actions
+# Ignore dist except in actions and CLI
 dist/
 !actions/*/dist/
+!packages/git-flow/dist/cli/
