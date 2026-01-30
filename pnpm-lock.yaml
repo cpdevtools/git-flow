@@ -80,6 +80,28 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@20.19.30)
 
+  actions/publish-release:
+    dependencies:
+      '@actions/core':
+        specifier: ^1.10.1
+        version: 1.11.1
+      '@actions/github':
+        specifier: ^6.0.0
+        version: 6.0.1
+      '@cpdevtools/git-flow':
+        specifier: file:/devcontainer/repos/git-flow/packages/git-flow
+        version: link:../../packages/git-flow
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.5
+        version: 20.19.30
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/git-flow:
     dependencies:
       '@actions/core':
@@ -100,6 +122,9 @@ importers:
       '@oclif/plugin-help':
         specifier: ^6.2.37
         version: 6.2.37
+      globby:
+        specifier: ^14.0.2
+        version: 14.1.0
       semver:
         specifier: ^7.6.3
         version: 7.7.3

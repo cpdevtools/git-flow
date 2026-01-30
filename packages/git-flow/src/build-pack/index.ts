@@ -35,3 +35,14 @@ export {
 
 // Options parsing
 export { extractPRMetadata } from './options.js';
+
+// Workspace dependency rewriting (for Phase 2)
+export {
+  rewriteWorkspaceDependencies,
+  restoreProjectFiles,
+  rewriteNpmWorkspaceDependencies,
+  restorePackageJson,
+  rewriteNugetProjectReferences,
+  restoreCsprojFiles,
+  verifyDockerImageTags,
+} from './workspace-deps/index.js';

@@ -1,0 +1,105 @@
+import { writeFile, mkdir } from 'fs/promises';
+import { dirname, join } from 'path';
+import { $ } from 'zx';
+import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';
+
+/**
+ * Publish NPM package to registry
+ */
+export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
+  const { artifactPath, registry, token } = options;
+
+  // Create temporary .npmrc
+  const npmrcPath = join(dirname(artifactPath), '.npmrc');
+  const registryUrl = new URL(registry.url);
+  
+  let npmrcContent = `//${registryUrl.host}${registryUrl.pathname}:_authToken=${token}\n`;
+  
+  if (registry.scope) {
+    npmrcContent += `${registry.scope}:registry=${registry.url}\n`;
+  }
+  
+  await writeFile(npmrcPath, npmrcContent);
+
+  try {
+    // Publish the tarball
+    await $`npm publish ${artifactPath} --registry ${registry.url}`;
+  } finally {
+    // Clean up temporary .npmrc
+    await $`rm -f ${npmrcPath}`.catch(() => {});
+  }
+}
+
+/**
+ * Publish NuGet package to registry
+ */
+export async function publishToNuget(options: NugetPublishOptions): Promise<void> {
+  const { artifactPath, registry, apiKey } = options;
+
+  await $`dotnet nuget push ${artifactPath} --source ${registry.url} --api-key ${apiKey}`;
+}
+
+/**
+ * Publish Docker image to registry
+ */
+export async function publishToDocker(options: DockerPublishOptions): Promise<void> {
+  const { imageName, tempTag, finalTag, digest, registry, username, token } = options;
+
+  // Authenticate
+  if (username) {
+    await $`echo ${token} | docker login ${registry.registry} -u ${username} --password-stdin`;
+  } else {
+    await $`echo ${token} | docker login ${registry.registry} --password-stdin`;
+  }
+
+  try {
+    const fullTempImage = `${imageName}:${tempTag}`;
+    
+    // Pull temp image from Phase 2
+    await $`docker pull ${fullTempImage}`;
+    
+    // Verify digest matches
+    const actualDigest = (await $`docker inspect --format='{{.Id}}' ${fullTempImage}`).stdout.trim();
+    
+    if (actualDigest !== digest) {
+      throw new Error(
+        `Docker image digest mismatch!\n` +
+        `Expected: ${digest}\n` +
+        `Actual:   ${actualDigest}\n` +
+        `This may indicate the image was modified after being built in Phase 2.`
+      );
+    }
+
+    // Build final image name with namespace if provided
+    let finalImageBase = imageName;
+    if (registry.namespace && !imageName.includes('/')) {
+      finalImageBase = `${registry.registry}/${registry.namespace}/${imageName}`;
+    } else if (!imageName.includes(registry.registry)) {
+      finalImageBase = `${registry.registry}/${imageName}`;
+    }
+
+    const finalVersionImage = `${finalImageBase}:${finalTag}`;
+    const finalLatestImage = `${finalImageBase}:latest`;
+
+    // Retag with final version
+    await $`docker tag ${fullTempImage} ${finalVersionImage}`;
+    await $`docker tag ${fullTempImage} ${finalLatestImage}`;
+
+    // Push final tags
+    await $`docker push ${finalVersionImage}`;
+    await $`docker push ${finalLatestImage}`;
+
+    // Delete temp tag from local
+    await $`docker rmi ${fullTempImage}`.catch(() => {
+      // Ignore errors - cleanup is best-effort
+    });
+
+    // TODO: Delete temp tag from remote registry
+    // This is registry-specific and can be added later
+    // For now, temp tags will remain in the registry
+  } finally {
+    await $`docker logout ${registry.registry}`.catch(() => {
+      // Best effort logout
+    });
+  }
+}

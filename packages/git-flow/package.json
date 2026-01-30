@@ -20,6 +20,14 @@
       "types": "./dist/build-pack/index.d.ts",
       "import": "./dist/build-pack/index.js"
     },
+    "./publishing": {
+      "types": "./dist/publishing/index.d.ts",
+      "import": "./dist/publishing/index.js"
+    },
+    "./publish-release": {
+      "types": "./dist/publish-release/index.d.ts",
+      "import": "./dist/publish-release/index.js"
+    },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "import": "./dist/cli/index.js"
@@ -71,6 +79,7 @@
     "@oclif/core": "^4.8.0",
     "@oclif/plugin-autocomplete": "^3.2.40",
     "@oclif/plugin-help": "^6.2.37",
+    "globby": "^14.0.2",
     "semver": "^7.6.3",
     "yaml": "^2.8.2",
     "zx": "^8.2.4"

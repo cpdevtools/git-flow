@@ -204,3 +204,155 @@ export async function uploadArtifact(
 
   console.log(`  ✓ Uploaded ${fileName}`);
 }
+
+/**
+ * Delete draft release (for "Start fresh" functionality)
+ */
+export async function deleteDraftRelease(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  projectName: string,
+  version: string
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+  const tag = getReleaseTag(projectName, version);
+
+  try {
+    // Find release by tag
+    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+      owner,
+      repo,
+      tag,
+    });
+
+    if (release && release.draft) {
+      // Delete draft release (published releases are protected)
+      await octokit.rest.repos.deleteRelease({
+        owner,
+        repo,
+        release_id: release.id,
+      });
+
+      console.log(`  🗑️  Deleted draft release: ${tag}`);
+    }
+  } catch (error: any) {
+    if (error.status === 404) {
+      // Release doesn't exist, that's fine
+      return;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Detect if draft releases exist for any projects
+ */
+export async function detectDraftReleases(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  projects: Array<{ name: string; version: string }>
+): Promise<boolean> {
+  const octokit = getOctokit(githubToken);
+
+  for (const project of projects) {
+    const tag = getReleaseTag(project.name, project.version);
+
+    try {
+      const { data: release } = await octokit.rest.repos.getReleaseByTag({
+        owner,
+        repo,
+        tag,
+      });
+
+      if (release && release.draft) {
+        return true; // Found at least one draft
+      }
+    } catch (error: any) {
+      if (error.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  return false; // No drafts found
+}
+
+/**
+ * Finalize release (convert draft to published)
+ */
+export async function finalizeRelease(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  projectName: string,
+  version: string
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+  const tag = getReleaseTag(projectName, version);
+
+  try {
+    // Find release by tag
+    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+      owner,
+      repo,
+      tag,
+    });
+
+    if (!release.draft) {
+      console.log(`  ✓ Release ${tag} already published`);
+      return;
+    }
+
+    // Update to published
+    await octokit.rest.repos.updateRelease({
+      owner,
+      repo,
+      release_id: release.id,
+      draft: false,
+    });
+
+    console.log(`  ✅ Published release: ${tag}`);
+  } catch (error: any) {
+    if (error.status === 404) {
+      throw new Error(`Release not found: ${tag}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create git tag for released version
+ */
+export async function createGitTag(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  projectName: string,
+  version: string,
+  sha: string
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+  const tag = getReleaseTag(projectName, version);
+
+  try {
+    // Create tag reference
+    await octokit.rest.git.createRef({
+      owner,
+      repo,
+      ref: `refs/tags/${tag}`,
+      sha,
+    });
+
+    console.log(`  🏷️  Created git tag: ${tag}`);
+  } catch (error: any) {
+    if (error.status === 422) {
+      // Tag already exists
+      console.log(`  ✓ Git tag already exists: ${tag}`);
+      return;
+    }
+    throw error;
+  }
+}
+

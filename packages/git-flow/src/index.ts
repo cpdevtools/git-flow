@@ -4,3 +4,4 @@
 
 export * from './version/index.js';
 export * from './build-pack/index.js';
+export * from './publish-release/index.js';

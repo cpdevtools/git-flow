@@ -50,6 +50,8 @@ export interface BuildPackContext {
   runNumber: number;
   /** Skip upload phase (useful for local testing) */
   skipUpload?: boolean;
+  /** All projects in the workspace (for workspace dependency resolution) */
+  allProjects?: ProjectConfig[];
 }
 
 /**

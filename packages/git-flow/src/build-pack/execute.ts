@@ -14,6 +14,10 @@ import {
     uploadArtifact
 } from './github.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
+import {
+    rewriteWorkspaceDependencies,
+    restoreProjectFiles
+} from './workspace-deps/index.js';
 
 // Get the directory of the installed package
 const __filename = fileURLToPath(import.meta.url);
@@ -109,6 +113,12 @@ export async function executeBuild(
  * @param context - Workflow context
  * @returns Execution result
  */
+/**
+ * Execute pack script for a project with workspace dependency rewriting
+ * @param project - Project configuration
+ * @param context - Workflow context (must include allProjects for dependency resolution)
+ * @returns Execution result
+ */
 export async function executePack(
   project: ProjectConfig,
   context: BuildPackContext
@@ -135,8 +145,22 @@ export async function executePack(
       GITHUB_SHA: context.sha,
     };
 
+    // Rewrite workspace dependencies before packing
+    console.log(`  🔄 Rewriting workspace dependencies...`);
+    await rewriteWorkspaceDependencies({
+      project,
+      allProjects: context.allProjects || [project],
+    });
+
     // Execute pack script
-    const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.pack`;
+    let result;
+    try {
+      result = await $({ cwd: project.cwd, env })`pnpm run github.actions.pack`;
+    } finally {
+      // Always restore files, even if pack fails
+      console.log(`  ↩️  Restoring original project files...`);
+      await restoreProjectFiles(project.cwd);
+    }
 
     // Verify artifact.yml was generated
     const artifactPath = join(context.artifactOutputDir, `${artifactFilename}.artifact.yml`);

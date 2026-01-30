@@ -1,0 +1,22 @@
+name: 'Publish Release'
+description: 'Publish artifacts to registries and finalize GitHub releases'
+
+inputs:
+  pr-number:
+    description: 'Release PR number'
+    required: true
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+
+outputs:
+  published-count:
+    description: 'Number of projects successfully published'
+  verified-count:
+    description: 'Number of projects verified'
+  failed-count:
+    description: 'Number of projects that failed'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
