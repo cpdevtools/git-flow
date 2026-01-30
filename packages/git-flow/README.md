@@ -1,6 +1,6 @@
 # @cpdevtools/git-flow
 
-Core library for Git-based versioning and release workflows.
+Core library for Git-based versioning and release workflows with a unified CLI tool.
 
 ## Installation
 
@@ -9,6 +9,42 @@ pnpm add @cpdevtools/git-flow
 ```
 
 ## Features
+
+### CLI Tool (`cpdt-gitflow`)
+
+A modern CLI with autocomplete support for build and pack operations:
+
+```bash
+# Display all available commands
+cpdt-gitflow --help
+
+# Pack project artifacts
+cpdt-gitflow pack
+
+# Apply version to project files
+cpdt-gitflow apply-version 1.2.3
+
+# Enable autocomplete (bash/zsh)
+cpdt-gitflow autocomplete
+```
+
+**Subcommands:**
+- `pack` - Automatically detect project type (NPM/NuGet) and create artifacts
+- `apply-version` - Apply version to package.json or .csproj files
+- `autocomplete` - Setup shell autocomplete
+- `help` - Display help for any command
+
+**Integration in projects:**
+```json
+{
+  "scripts": {
+    "github.actions.pack": "cpdt-gitflow pack",
+    "github.actions.build": "npm run build"
+  }
+}
+```
+
+See [CLI-TOOLS.md](./CLI-TOOLS.md) for complete documentation, hook system, and configuration options.
 
 ### Version Resolution
 

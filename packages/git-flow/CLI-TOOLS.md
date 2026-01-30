@@ -1,17 +1,26 @@
 # CLI Tools Documentation
 
-The `@cpdevtools/git-flow` package provides reusable CLI tools for standardizing build and pack operations across projects.
+The `@cpdevtools/git-flow` package provides a unified CLI tool (`cpdt-gitflow`) with subcommands for standardizing build and pack operations across projects.
 
 ## Overview
 
-Instead of requiring every project to write custom scripts, these CLI tools provide:
+Instead of requiring every project to write custom scripts, the CLI provides:
 - **Default implementations** for common tasks (pack npm/nuget packages, apply versions)
 - **Hook system** for customization without rewriting logic  
 - **Configuration override** via `cpdevtools.config.ts`
+- **Modern CLI** with autocomplete support and modular architecture
 
-## CLI Tools
+## Installation
 
-### cpdevtools-pack
+The CLI is automatically available when you install `@cpdevtools/git-flow`:
+
+```bash
+pnpm add -D @cpdevtools/git-flow
+```
+
+## CLI Commands
+
+### cpdt-gitflow pack
 
 Automatically detects project type and creates distribution artifacts with descriptors.
 
@@ -19,14 +28,31 @@ Automatically detects project type and creates distribution artifacts with descr
 - **NPM**: Runs `pnpm pack`, generates artifact.yml
 - **NuGet**: Runs `dotnet pack`, generates artifact.yml
 
-**Usage:**
+**Usage in package.json:**
 ```json
 {
   "scripts": {
-    "github.actions.pack": "cpdevtools-pack"
+    "github.actions.pack": "cpdt-gitflow pack"
   }
 }
 ```
+
+**Direct usage:**
+```bash
+# Using environment variables
+PROJECT_NAME=my-package PROJECT_VERSION=1.0.0 cpdt-gitflow pack
+
+# Using flags
+cpdt-gitflow pack --project-name my-package --version 1.0.0
+
+# With custom output directory
+cpdt-gitflow pack --output-dir ./dist
+```
+
+**Flags:**
+- `-n, --project-name` - Project name (overrides PROJECT_NAME env var)
+- `-v, --version` - Project version (overrides PROJECT_VERSION env var)
+- `-o, --output-dir` - Output directory for artifacts (overrides ARTIFACT_OUTPUT_DIR)
 
 **Environment variables (automatically provided by workflow):**
 - `PROJECT_NAME` - Package name (e.g., @cpdevtools/package)
@@ -35,7 +61,7 @@ Automatically detects project type and creates distribution artifacts with descr
 - `ARTIFACT_FILENAME` - Sanitized filename (@ and / removed)
 - `GITHUB_SHA` - Git commit SHA
 
-### cpdevtools-apply-version
+### cpdt-gitflow apply-version
 
 Applies version to project files before building.
 
@@ -44,6 +70,22 @@ Applies version to project files before building.
 - `*.csproj` (NuGet projects)
 
 **Usage:**
+```bash
+# Using environment variable
+PROJECT_VERSION=1.2.3 cpdt-gitflow apply-version
+
+# Using argument
+cpdt-gitflow apply-version 1.2.3
+
+# Using flag
+cpdt-gitflow apply-version --version 1.2.3
+```
+
+**Flags:**
+- `-v, --version` - Version to apply (overrides PROJECT_VERSION env var)
+- `-n, --project-name` - Project name (overrides PROJECT_NAME env var)
+
+**Integration (automatic via build workflow):**
 ```json
 {
   "scripts": {

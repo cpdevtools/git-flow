@@ -26,11 +26,21 @@
     }
   },
   "bin": {
-    "cpdevtools-pack": "./dist/cli/pack.js",
-    "cpdevtools-apply-version": "./dist/cli/apply-version.js"
+    "cpdt-gitflow": "./dist/cli/bin.js"
+  },
+  "oclif": {
+    "bin": "cpdt-gitflow",
+    "dirname": "cpdt-gitflow",
+    "commands": "./dist/cli/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-autocomplete"
+    ]
   },
   "files": [
-    "dist"
+    "dist",
+    "oclif.manifest.json"
   ],
   "scripts": {
     "build": "tsup",
@@ -58,6 +68,9 @@
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/ts-dev-utilities": "link:../../../ts-dev-utilities",
+    "@oclif/core": "^4.8.0",
+    "@oclif/plugin-autocomplete": "^3.2.40",
+    "@oclif/plugin-help": "^6.2.37",
     "semver": "^7.6.3",
     "yaml": "^2.8.2",
     "zx": "^8.2.4"

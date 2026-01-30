@@ -19,7 +19,7 @@ import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.j
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageRoot = join(__dirname, '../..');
-const applyVersionCli = join(packageRoot, 'dist/cli/apply-version.js');
+const gitflowCli = join(packageRoot, 'dist/cli/bin.js');
 
 /**
  * Read package.json for a project
@@ -28,25 +28,8 @@ async function readPackageJson(cwd: string): Promise<any> {
   const pkgPath = join(cwd, 'package.json');
   const content = await readFile(pkgPath, 'utf-8');
   return JSON.parse(content);
-}+++++++++++++++++++++
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
---0
-7410
 /**
  * Check if project has a build script
  */
@@ -95,7 +78,7 @@ export async function executeBuild(
 
     // Apply version to project files before building
     console.log(`  📝 Applying version ${project.version}...`);
-    await $({ cwd: project.cwd, env })`node ${applyVersionCli}`;
+    await $({ cwd: project.cwd, env })`node ${gitflowCli} apply-version`;
 
     // Execute build script
     const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.build`;
