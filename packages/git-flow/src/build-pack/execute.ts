@@ -2,44 +2,40 @@
  * Build and pack execution functions
  */
 
+import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { $ } from 'zx';
 import { parseDocument } from 'yaml';
-import type { ProjectConfig, ExecutionResult, BuildPackContext } from './types.js';
-import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+import { $ } from 'zx';
 import {
-  findOrCreateDraftRelease,
-  uploadArtifact,
-  isArtifactUploaded,
+    findOrCreateDraftRelease,
+    uploadArtifact
 } from './github.js';
+import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 
 /**
- * Read package.json synchronously
+ * Read package.json for a project
  */
-function readPackageJsonSync(cwd: string): any {
+async function readPackageJson(cwd: string): Promise<any> {
   const pkgPath = join(cwd, 'package.json');
-  if (!existsSync(pkgPath)) {
-    throw new Error(`package.json not found at ${pkgPath}`);
-  }
-  // In real implementation, use proper JSON parsing
-  return JSON.parse(require('fs').readFileSync(pkgPath, 'utf-8'));
+  const content = await readFile(pkgPath, 'utf-8');
+  return JSON.parse(content);
 }
 
 /**
  * Check if project has a build script
  */
-function hasBuildScript(project: ProjectConfig): boolean {
-  const packageJson = readPackageJsonSync(project.cwd);
+async function hasBuildScript(project: ProjectConfig): Promise<boolean> {
+  const packageJson = await readPackageJson(project.cwd);
   return !!packageJson.scripts?.['github.actions.build'];
 }
 
 /**
  * Check if project has a pack script
  */
-function hasPackScript(project: ProjectConfig): boolean {
-  const packageJson = readPackageJsonSync(project.cwd);
+async function hasPackScript(project: ProjectConfig): Promise<boolean> {
+  const packageJson = await readPackageJson(project.cwd);
   return !!packageJson.scripts?.['github.actions.pack'];
 }
 
@@ -53,7 +49,7 @@ export async function executeBuild(
   project: ProjectConfig,
   context: BuildPackContext
 ): Promise<ExecutionResult> {
-  if (!hasBuildScript(project)) {
+  if (!(await hasBuildScript(project))) {
     console.log(`⊘ ${project.name}: No build script, skipping...`);
     return {
       project: project.name,
@@ -106,7 +102,7 @@ export async function executePack(
   project: ProjectConfig,
   context: BuildPackContext
 ): Promise<ExecutionResult> {
-  if (!hasPackScript(project)) {
+  if (!(await hasPackScript(project))) {
     console.log(`⊘ ${project.name}: No pack script, skipping...`);
     return {
       project: project.name,
@@ -118,11 +114,13 @@ export async function executePack(
 
   try {
     // Set environment variables
+    const artifactFilename = project.name.replace(/@/g, '').replace(/\//g, '-');
     const env = {
       ...process.env,
       PROJECT_VERSION: project.version,
       PROJECT_NAME: project.name,
       ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
+      ARTIFACT_FILENAME: artifactFilename,
       GITHUB_SHA: context.sha,
     };
 
@@ -130,7 +128,7 @@ export async function executePack(
     const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.pack`;
 
     // Verify artifact.yml was generated
-    const artifactPath = join(context.artifactOutputDir, `${project.name}.artifact.yml`);
+    const artifactPath = join(context.artifactOutputDir, `${artifactFilename}.artifact.yml`);
 
     if (!existsSync(artifactPath)) {
       throw new Error(
@@ -172,7 +170,8 @@ export async function executeUpload(
   console.log(`⬆️  ${project.name}: Uploading artifacts...`);
 
   try {
-    const artifactPath = join(context.artifactOutputDir, `${project.name}.artifact.yml`);
+    const artifactFilename = project.name.replace(/@/g, '').replace(/\//g, '-');
+    const artifactPath = join(context.artifactOutputDir, `${artifactFilename}.artifact.yml`);
 
     if (!existsSync(artifactPath)) {
       console.log(`  ⊘ No artifact descriptor found, skipping upload`);
