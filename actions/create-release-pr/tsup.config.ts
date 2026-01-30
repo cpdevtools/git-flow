@@ -17,7 +17,7 @@ export default defineConfig({
   outExtension: () => ({ js: '.js' }),
   shims: true,
   banner: {
-    js: `import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);`,
+    js: `import { createRequire as __createRequire } from 'node:module';
+const require = __createRequire(import.meta.url);`,
   },
 });
