@@ -46,15 +46,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Build git-flow CLI
+      - name: Setup git-flow CLI
         run: |
-          cd /home/runner/work/_actions/cpdevtools/git-flow/main
-          pnpm install --no-frozen-lockfile
-          cd packages/git-flow
-          pnpm run build
-      
-      - name: Add git-flow CLI to PATH
-        run: echo "/home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/node_modules/.bin" >> $GITHUB_PATH
+          # The build-pack action already has git-flow built and bundled
+          # Just symlink the CLI binary to a directory in PATH
+          mkdir -p /home/runner/.local/bin
+          ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js /home/runner/.local/bin/cpdt-gitflow
+          chmod +x /home/runner/.local/bin/cpdt-gitflow
+          echo "/home/runner/.local/bin" >> $GITHUB_PATH
       
       - name: Build & Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
