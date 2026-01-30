@@ -62020,12 +62020,26 @@ async function createDraftRelease(githubToken, owner, repo, tag, name, body, pre
     upload_url: release.upload_url
   };
 }
-async function findOrCreateDraftRelease(project, context) {
+async function updateDraftReleaseBody(githubToken, owner, repo, releaseId, body) {
+  const octokit = (0, import_github.getOctokit)(githubToken);
+  await octokit.rest.repos.updateRelease({
+    owner,
+    repo,
+    release_id: releaseId,
+    body
+  });
+}
+async function findOrCreateDraftRelease(project, context, artifactMetadata) {
   const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";
   const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
   const tag = getReleaseTag(project.name, project.version);
   const name = `${project.name} ${project.version}`;
-  const body = `Draft release for ${project.name} v${project.version}`;
+  const body = artifactMetadata ? `# ${project.name} v${project.version}
+
+## Artifact Metadata
+\`\`\`yaml
+${artifactMetadata}
+\`\`\`` : `Draft release for ${project.name} v${project.version}`;
   const existing = await findDraftReleaseByTag(
     context.githubToken,
     owner,
@@ -62034,6 +62048,15 @@ async function findOrCreateDraftRelease(project, context) {
   );
   if (existing) {
     console.log(`  \u2713 Found existing draft release: ${tag}`);
+    if (artifactMetadata) {
+      await updateDraftReleaseBody(
+        context.githubToken,
+        owner,
+        repo,
+        existing.id,
+        body
+      );
+    }
     return existing;
   }
   console.log(`  \u{1F4DD} Creating draft release: ${tag}`);
@@ -62242,17 +62265,9 @@ async function executeUpload(project, context) {
     const doc = (0, import_yaml.parseDocument)(artifactYml);
     const descriptor = doc.toJSON();
     console.log(`  \u{1F4C4} Found ${descriptor.artifacts.length} artifact(s) to upload`);
-    const release = await findOrCreateDraftRelease(project, context);
+    const release = await findOrCreateDraftRelease(project, context, artifactYml);
     const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";
     const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
-    await uploadArtifact(
-      context.githubToken,
-      owner,
-      repo,
-      release.id,
-      release.upload_url,
-      artifactPath
-    );
     for (const artifact of descriptor.artifacts) {
       switch (artifact.type) {
         case "npm":
@@ -62289,7 +62304,7 @@ async function executeUpload(project, context) {
           );
           break;
         case "docker":
-          console.log(`  \u2139\uFE0F  Docker artifact: ${artifact.name} (metadata only, no file upload)`);
+          console.log(`  \u2139\uFE0F  Docker artifact: ${artifact.name} (metadata in release body)`);
           break;
         default:
           console.warn(`  \u26A0\uFE0F  Unknown artifact type: ${artifact.type}`);

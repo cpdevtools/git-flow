@@ -28,9 +28,11 @@ export {
   getReleaseTag,
   findDraftReleaseByTag,
   createDraftRelease,
+  updateDraftReleaseBody,
   findOrCreateDraftRelease,
   isArtifactUploaded,
   uploadArtifact,
+  getDraftReleaseMetadata,
 } from './github.js';
 
 // Options parsing

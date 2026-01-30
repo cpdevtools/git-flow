@@ -80,11 +80,32 @@ export async function createDraftRelease(
 }
 
 /**
+ * Update draft release body
+ */
+export async function updateDraftReleaseBody(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  releaseId: number,
+  body: string
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+
+  await octokit.rest.repos.updateRelease({
+    owner,
+    repo,
+    release_id: releaseId,
+    body,
+  });
+}
+
+/**
  * Find or create draft release for a project
  */
 export async function findOrCreateDraftRelease(
   project: ProjectConfig,
-  context: BuildPackContext
+  context: BuildPackContext,
+  artifactMetadata?: string
 ): Promise<{ id: number; upload_url: string }> {
   // Extract owner/repo from GitHub context (would come from environment in real action)
   // For now, using placeholders
@@ -93,7 +114,11 @@ export async function findOrCreateDraftRelease(
 
   const tag = getReleaseTag(project.name, project.version);
   const name = `${project.name} ${project.version}`;
-  const body = `Draft release for ${project.name} v${project.version}`;
+  
+  // Include artifact metadata in release body if provided
+  const body = artifactMetadata 
+    ? `# ${project.name} v${project.version}\n\n## Artifact Metadata\n\`\`\`yaml\n${artifactMetadata}\n\`\`\``
+    : `Draft release for ${project.name} v${project.version}`;
 
   // Try to find existing draft release
   const existing = await findDraftReleaseByTag(
@@ -105,6 +130,18 @@ export async function findOrCreateDraftRelease(
 
   if (existing) {
     console.log(`  ✓ Found existing draft release: ${tag}`);
+    
+    // Update release body with artifact metadata if provided
+    if (artifactMetadata) {
+      await updateDraftReleaseBody(
+        context.githubToken,
+        owner,
+        repo,
+        existing.id,
+        body
+      );
+    }
+    
     return existing;
   }
 
@@ -353,6 +390,40 @@ export async function createGitTag(
       return;
     }
     throw error;
+  }
+}
+
+/**
+ * Get draft release by tag and extract artifact metadata from body
+ */
+export async function getDraftReleaseMetadata(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  tag: string
+): Promise<string | null> {
+  const octokit = getOctokit(githubToken);
+
+  try {
+    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+      owner,
+      repo,
+      tag,
+    });
+
+    if (!release.draft || !release.body) {
+      return null;
+    }
+
+    // Extract YAML from markdown code block
+    const yamlMatch = release.body.match(/```yaml\n([\s\S]*?)\n```/);
+    return yamlMatch ? yamlMatch[1] : null;
+  } catch (error: any) {
+    if (error.status === 404) {
+      return null;
+    }
+    console.error(`Error getting draft release metadata ${tag}:`, error);
+    return null;
   }
 }
 

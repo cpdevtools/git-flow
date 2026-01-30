@@ -223,24 +223,14 @@ export async function executeUpload(
 
     console.log(`  📄 Found ${descriptor.artifacts.length} artifact(s) to upload`);
 
-    // Find or create draft release
-    const release = await findOrCreateDraftRelease(project, context);
+    // Find or create draft release with artifact metadata in body
+    const release = await findOrCreateDraftRelease(project, context, artifactYml);
 
     // Get owner/repo from environment
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
 
-    // Always upload artifact.yml file itself
-    await uploadArtifact(
-      context.githubToken,
-      owner,
-      repo,
-      release.id,
-      release.upload_url,
-      artifactPath
-    );
-
-    // Upload artifacts based on type
+    // Upload artifacts based on type (but NOT the artifact.yml file itself)
     for (const artifact of descriptor.artifacts) {
       switch (artifact.type) {
         case 'npm':
@@ -283,8 +273,8 @@ export async function executeUpload(
           break;
 
         case 'docker':
-          // Docker artifacts don't need file uploads - just metadata in artifact.yml
-          console.log(`  ℹ️  Docker artifact: ${artifact.name} (metadata only, no file upload)`);
+          // Docker artifacts don't need file uploads - just metadata in release body
+          console.log(`  ℹ️  Docker artifact: ${artifact.name} (metadata in release body)`);
           break;
 
         default:

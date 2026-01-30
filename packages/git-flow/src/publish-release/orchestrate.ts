@@ -3,8 +3,6 @@
  */
 
 import type { ProjectArtifactDescriptor, Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { parseDocument } from 'yaml';
 import {
   loadRegistryConfig,
@@ -23,7 +21,12 @@ import {
   type PublishReleaseResult,
   type ProjectPublishResult,
 } from '../publishing/index.js';
-import { finalizeRelease, createGitTag } from '../build-pack/github.js';
+import { 
+  finalizeRelease, 
+  createGitTag, 
+  getReleaseTag,
+  getDraftReleaseMetadata 
+} from '../build-pack/github.js';
 
 /**
  * Main orchestration function for publishing and releasing
@@ -46,15 +49,22 @@ export async function runPublishRelease(
       try {
         console.log(`📦 Publishing ${project.name}...`);
 
-        // Download artifact.yml from GitHub Release
-        const artifactFilename = project.name.replace(/@/g, '').replace(/\//g, '-');
-        const artifactYmlPath = join(
-          options.workspaceRoot,
-          '.artifacts',
-          `${artifactFilename}.artifact.yml`
+        // Get artifact metadata from draft release body
+        const tag = getReleaseTag(project.name, project.version);
+        const artifactYml = await getDraftReleaseMetadata(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          tag
         );
 
-        const artifactYml = await readFile(artifactYmlPath, 'utf-8');
+        if (!artifactYml) {
+          throw new Error(
+            `No artifact metadata found in draft release ${tag}. ` +
+            `Make sure the build-pack phase completed successfully.`
+          );
+        }
+
         const doc = parseDocument(artifactYml);
         const descriptor = doc.toJSON() as ProjectArtifactDescriptor;
 

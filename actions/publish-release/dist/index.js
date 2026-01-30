@@ -54059,7 +54059,7 @@ var github = __toESM(require_github(), 1);
 init_esm_shims();
 var import_yaml = __toESM(require_dist(), 1);
 import { readFile, writeFile } from "fs/promises";
-import { join, dirname } from "path";
+import { join as join$1, dirname } from "path";
 
 // ../../node_modules/.pnpm/zx@8.8.5/node_modules/zx/build/index.js
 init_esm_shims();
@@ -54138,7 +54138,7 @@ var {
 // ../../packages/git-flow/dist/publish-release/index.js
 var import_github = __toESM(require_github(), 1);
 async function loadRegistryConfig(workspaceRoot) {
-  const configPath = join(workspaceRoot, ".github", "registries.yml");
+  const configPath = join$1(workspaceRoot, ".github", "registries.yml");
   try {
     const content = await readFile(configPath, "utf-8");
     const config = (0, import_yaml.parse)(content);
@@ -54202,7 +54202,7 @@ function getToken(registry) {
 }
 async function publishToNpm(options) {
   const { artifactPath, registry, token } = options;
-  const npmrcPath = join(dirname(artifactPath), ".npmrc");
+  const npmrcPath = join$1(dirname(artifactPath), ".npmrc");
   const registryUrl = new URL(registry.url);
   let npmrcContent = `//${registryUrl.host}${registryUrl.pathname}:_authToken=${token}
 `;
@@ -54370,6 +54370,27 @@ async function createGitTag(githubToken, owner, repo, projectName, version2, sha
     throw error;
   }
 }
+async function getDraftReleaseMetadata(githubToken, owner, repo, tag) {
+  const octokit = (0, import_github.getOctokit)(githubToken);
+  try {
+    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+      owner,
+      repo,
+      tag
+    });
+    if (!release.draft || !release.body) {
+      return null;
+    }
+    const yamlMatch = release.body.match(/```yaml\n([\s\S]*?)\n```/);
+    return yamlMatch ? yamlMatch[1] : null;
+  } catch (error) {
+    if (error.status === 404) {
+      return null;
+    }
+    console.error(`Error getting draft release metadata ${tag}:`, error);
+    return null;
+  }
+}
 async function runPublishRelease(options) {
   const result = {
     published: [],
@@ -54381,13 +54402,18 @@ async function runPublishRelease(options) {
     for (const project of options.projects) {
       try {
         console.log(`\u{1F4E6} Publishing ${project.name}...`);
-        const artifactFilename = project.name.replace(/@/g, "").replace(/\//g, "-");
-        const artifactYmlPath = join(
-          options.workspaceRoot,
-          ".artifacts",
-          `${artifactFilename}.artifact.yml`
+        const tag = getReleaseTag(project.name, project.version);
+        const artifactYml = await getDraftReleaseMetadata(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          tag
         );
-        const artifactYml = await readFile(artifactYmlPath, "utf-8");
+        if (!artifactYml) {
+          throw new Error(
+            `No artifact metadata found in draft release ${tag}. Make sure the build-pack phase completed successfully.`
+          );
+        }
         const doc = (0, import_yaml.parseDocument)(artifactYml);
         const descriptor = doc.toJSON();
         const publishResult = await publishProjectArtifacts(
