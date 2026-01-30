@@ -38,10 +38,6 @@ export function validateRegistryConfig(config: RegistryConfig): void {
       throw new Error(`Registry "${name}" missing required field: type`);
     }
 
-    if (!registry.url) {
-      throw new Error(`Registry "${name}" missing required field: url`);
-    }
-
     if (!registry.auth) {
       throw new Error(`Registry "${name}" missing required field: auth`);
     }
@@ -49,11 +45,15 @@ export function validateRegistryConfig(config: RegistryConfig): void {
     // Type-specific validation
     switch (registry.type) {
       case 'npm':
-        // NPM registries are valid with just base fields
+        if (!('url' in registry) || !registry.url) {
+          throw new Error(`NPM registry "${name}" missing required field: url`);
+        }
         break;
 
       case 'nuget':
-        // NuGet registries are valid with just base fields
+        if (!('url' in registry) || !registry.url) {
+          throw new Error(`NuGet registry "${name}" missing required field: url`);
+        }
         break;
 
       case 'docker':

@@ -14,8 +14,6 @@ export interface RegistryConfig {
  * Base registry configuration
  */
 export interface BaseRegistry {
-  /** Registry URL */
-  url: string;
   /** Environment variable name for authentication token */
   auth: string;
 }
@@ -25,6 +23,8 @@ export interface BaseRegistry {
  */
 export interface NpmRegistry extends BaseRegistry {
   type: 'npm';
+  /** Registry URL */
+  url: string;
   /** NPM scope (e.g., '@cpdevtools') */
   scope?: string;
 }
@@ -34,6 +34,8 @@ export interface NpmRegistry extends BaseRegistry {
  */
 export interface NugetRegistry extends BaseRegistry {
   type: 'nuget';
+  /** Registry URL */
+  url: string;
 }
 
 /**

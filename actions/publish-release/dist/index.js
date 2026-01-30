@@ -54158,16 +54158,19 @@ function validateRegistryConfig(config) {
     if (!registry.type) {
       throw new Error(`Registry "${name}" missing required field: type`);
     }
-    if (!registry.url) {
-      throw new Error(`Registry "${name}" missing required field: url`);
-    }
     if (!registry.auth) {
       throw new Error(`Registry "${name}" missing required field: auth`);
     }
     switch (registry.type) {
       case "npm":
+        if (!("url" in registry) || !registry.url) {
+          throw new Error(`NPM registry "${name}" missing required field: url`);
+        }
         break;
       case "nuget":
+        if (!("url" in registry) || !registry.url) {
+          throw new Error(`NuGet registry "${name}" missing required field: url`);
+        }
         break;
       case "docker":
         if (!("registry" in registry) || !registry.registry) {
