@@ -41288,17 +41288,17 @@ ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` \u2192 \`${p.res
 }
 function generateYamlMetadata(metadata) {
   const yaml = [
-    `branch: ${metadata.branch}`,
+    `sourceBranch: ${metadata.branch}`,
     `runNumber: ${metadata.runNumber}`,
     `sha: ${metadata.sha}`,
-    `generatedAt: ${metadata.generatedAt}`,
+    `timestamp: ${metadata.generatedAt}`,
     "projects:"
   ];
   for (const project of metadata.projects) {
     yaml.push(`  - name: ${project.name}`);
-    yaml.push(`    version: ${project.version}`);
-    yaml.push(`    resolvedVersion: ${project.resolvedVersion}`);
-    yaml.push(`    isPreRelease: ${project.isPreRelease}`);
+    yaml.push(`    version: ${project.resolvedVersion}`);
+    yaml.push(`    prerelease: ${project.isPreRelease}`);
+    yaml.push(`    cwd: .`);
   }
   return yaml.join("\n");
 }
