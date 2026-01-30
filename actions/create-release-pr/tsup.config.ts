@@ -1,4 +1,6 @@
 import { defineConfig } from 'tsup';
+import { builtinModules } from 'node:module';
+import { createRequire } from 'node:module';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -11,5 +13,11 @@ export default defineConfig({
   dts: false,
   minify: false,
   noExternal: [/.*/],
+  external: [...builtinModules, ...builtinModules.map(m => `node:${m}`)],
   outExtension: () => ({ js: '.js' }),
+  shims: true,
+  banner: {
+    js: `import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);`,
+  },
 });

@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup';
+import { builtinModules } from 'node:module';
 
 export default defineConfig({
   entry: {
@@ -14,4 +15,10 @@ export default defineConfig({
   minify: false,
   splitting: false,
   noExternal: [/.*/],
+  external: [...builtinModules, ...builtinModules.map(m => `node:${m}`)],
+  shims: true,
+  banner: {
+    js: `import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);`,
+  },
 });
