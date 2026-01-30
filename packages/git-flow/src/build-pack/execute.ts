@@ -4,9 +4,8 @@
 
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { parseDocument } from 'yaml';
 import { $ } from 'zx';
 import {
@@ -19,11 +18,62 @@ import {
     restoreProjectFiles
 } from './workspace-deps/index.js';
 
-// Get the directory of the installed package
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageRoot = join(__dirname, '../..');
-const gitflowCli = join(packageRoot, 'dist/cli/bin.js');
+/**
+ * Apply version to package.json
+ */
+async function applyVersionToPackageJson(cwd: string, version: string): Promise<void> {
+  const pkgPath = join(cwd, 'package.json');
+  
+  if (!existsSync(pkgPath)) {
+    return;
+  }
+  
+  const content = await readFile(pkgPath, 'utf-8');
+  const pkg = JSON.parse(content);
+  
+  pkg.version = version;
+  
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+}
+
+/**
+ * Apply version to .csproj files
+ */
+async function applyVersionToCsproj(cwd: string, version: string): Promise<void> {
+  // Find all .csproj files
+  try {
+    const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj"`;
+    const csprojFiles = stdout.trim().split('\n').filter(Boolean);
+    
+    for (const csprojFile of csprojFiles) {
+      const csprojPath = join(cwd, csprojFile);
+      let content = await readFile(csprojPath, 'utf-8');
+      
+      // Update <Version> tag
+      if (content.includes('<Version>')) {
+        content = content.replace(/<Version>.*?<\/Version>/, `<Version>${version}</Version>`);
+      } else {
+        // Add Version tag if not present
+        content = content.replace(
+          /<PropertyGroup>/,
+          `<PropertyGroup>\n    <Version>${version}</Version>`
+        );
+      }
+      
+      await writeFile(csprojPath, content);
+    }
+  } catch (error) {
+    // No .csproj files found, that's OK
+  }
+}
+
+/**
+ * Apply version to project files
+ */
+async function applyVersion(cwd: string, version: string): Promise<void> {
+  await applyVersionToPackageJson(cwd, version);
+  await applyVersionToCsproj(cwd, version);
+}
 
 /**
  * Read package.json for a project
@@ -82,7 +132,7 @@ export async function executeBuild(
 
     // Apply version to project files before building
     console.log(`  📝 Applying version ${project.version}...`);
-    await $({ cwd: project.cwd, env })`node ${gitflowCli} apply-version`;
+    await applyVersion(project.cwd, project.version);
 
     // Execute build script
     const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.build`;

@@ -39529,9 +39529,9 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
       if (!match) {
         return false;
       }
-      const dirname3 = match[1];
-      const hasWildcards = /[*?[\]{}]/.test(dirname3);
-      const hasExtension = import_node_path22.default.extname(dirname3) && !dirname3.startsWith(".");
+      const dirname2 = match[1];
+      const hasWildcards = /[*?[\]{}]/.test(dirname2);
+      const hasExtension = import_node_path22.default.extname(dirname2) && !dirname2.startsWith(".");
       return !hasWildcards && !hasExtension;
     };
     var getDirectoryGlob2 = ({ directoryPath, files, extensions }) => {
@@ -60101,7 +60101,7 @@ var github = __toESM(require_github(), 1);
 // ../../packages/git-flow/dist/build-pack/index.js
 init_esm_shims();
 import { readFile as readFile2, writeFile } from "fs/promises";
-import { dirname as dirname2, join, basename as basename2 } from "path";
+import { join, basename as basename2 } from "path";
 
 // ../../node_modules/.pnpm/zx@8.8.5/node_modules/zx/build/index.js
 init_esm_shims();
@@ -61818,7 +61818,6 @@ function buildDependencyGraph(projects, workspaceProjects) {
 var import_yaml = __toESM(require_dist(), 1);
 var import_github = __toESM(require_github(), 1);
 import { existsSync } from "fs";
-import { fileURLToPath as fileURLToPath3 } from "url";
 var __defProp2 = Object.defineProperty;
 var __getOwnPropNames2 = Object.getOwnPropertyNames;
 var __esm2 = (fn, res) => function __init() {
@@ -62141,10 +62140,41 @@ async function restoreProjectFiles(projectCwd) {
   await restoreCsprojFiles2(projectCwd).catch(() => {
   });
 }
-var __filename$1 = fileURLToPath3(import.meta.url);
-var __dirname$1 = dirname2(__filename$1);
-var packageRoot = join(__dirname$1, "../..");
-var gitflowCli = join(packageRoot, "dist/cli/bin.js");
+async function applyVersionToPackageJson(cwd, version2) {
+  const pkgPath = join(cwd, "package.json");
+  if (!existsSync(pkgPath)) {
+    return;
+  }
+  const content = await readFile2(pkgPath, "utf-8");
+  const pkg = JSON.parse(content);
+  pkg.version = version2;
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+}
+async function applyVersionToCsproj(cwd, version2) {
+  try {
+    const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj"`;
+    const csprojFiles = stdout.trim().split("\n").filter(Boolean);
+    for (const csprojFile of csprojFiles) {
+      const csprojPath = join(cwd, csprojFile);
+      let content = await readFile2(csprojPath, "utf-8");
+      if (content.includes("<Version>")) {
+        content = content.replace(/<Version>.*?<\/Version>/, `<Version>${version2}</Version>`);
+      } else {
+        content = content.replace(
+          /<PropertyGroup>/,
+          `<PropertyGroup>
+    <Version>${version2}</Version>`
+        );
+      }
+      await writeFile(csprojPath, content);
+    }
+  } catch (error) {
+  }
+}
+async function applyVersion(cwd, version2) {
+  await applyVersionToPackageJson(cwd, version2);
+  await applyVersionToCsproj(cwd, version2);
+}
 async function readPackageJson(cwd) {
   const pkgPath = join(cwd, "package.json");
   const content = await readFile2(pkgPath, "utf-8");
@@ -62176,7 +62206,7 @@ async function executeBuild(project, context) {
       GITHUB_SHA: context.sha
     };
     console.log(`  \u{1F4DD} Applying version ${project.version}...`);
-    await $({ cwd: project.cwd, env })`node ${gitflowCli} apply-version`;
+    await applyVersion(project.cwd, project.version);
     const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.build`;
     console.log(`\u2713 ${project.name}: Build completed`);
     return {
