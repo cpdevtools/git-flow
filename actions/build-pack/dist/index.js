@@ -62342,8 +62342,7 @@ async function runBuildPack(context, prBody) {
 `);
   const projectsToRelease = buildProjectConfigs(
     metadata,
-    discoveredProjects,
-    context
+    discoveredProjects
   );
   console.log("\u{1F50D} Checking for existing artifacts...");
   const projectsToSkip = await findCompletedProjects(projectsToRelease, context);
@@ -62464,7 +62463,8 @@ function buildProjectConfigs(metadata, discoveredProjects, context) {
     configs.push({
       ...discovered,
       name: prProject.name,
-      cwd: join(context.workspaceRoot, prProject.cwd),
+      cwd: discovered.directory,
+      // Use the discovered project's actual directory
       version: prProject.version,
       prerelease: prProject.prerelease
     });

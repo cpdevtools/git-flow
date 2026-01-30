@@ -204,7 +204,7 @@ function buildProjectConfigs(
     configs.push({
       ...discovered,
       name: prProject.name,
-      cwd: join(context.workspaceRoot, prProject.cwd),
+      cwd: discovered.directory, // Use the discovered project's actual directory
       version: prProject.version,
       prerelease: prProject.prerelease,
     });
