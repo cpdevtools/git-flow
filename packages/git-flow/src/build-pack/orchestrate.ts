@@ -3,16 +3,18 @@
  */
 
 import { join } from 'node:path';
-import { discoverProjects, buildDependencyGraph } from '@cpdevtools/ts-dev-utilities/project';
+import { discoverProjects, buildDependencyGraph, DependencyGraph } from '@cpdevtools/ts-dev-utilities/project';
 import type { Project } from '@cpdevtools/ts-dev-utilities/project';
 import { extractPRMetadata } from './options.js';
 import { executeBuild, executePack, executeUpload } from './execute.js';
+import { getReleaseTag, findDraftReleaseByTag, isArtifactUploaded } from './github.js';
 import type {
   BuildPackContext,
   ProjectConfig,
   ExecutionResult,
   PRMetadata,
   PRProjectMetadata,
+  BuildPackResult,
 } from './types.js';
 
 /**
@@ -23,7 +25,7 @@ import type {
 export async function runBuildPack(
   context: BuildPackContext,
   prBody: string
-): Promise<void> {
+): Promise<BuildPackResult> {
   console.log('🚀 Starting Phase 2: Build & Pack\n');
 
   // Extract metadata from PR body
@@ -67,7 +69,13 @@ export async function runBuildPack(
 
   if (projectsToProcess.length === 0) {
     console.log('✅ All projects already have artifacts uploaded. Nothing to do.');
-    return;
+    return {
+      built: [],
+      packed: [],
+      uploaded: [],
+      skipped: projectsToSkip.map(p => p.name),
+      failed: [],
+    };
   }
 
   console.log(`📦 Projects remaining to release: ${projectsToProcess.map(p => p.name).join(', ')}\n`);
@@ -100,8 +108,10 @@ export async function runBuildPack(
   displayExecutionPlan(batches, allProjectsToProcess, projectsToProcess);
 
   // Execute batches
-  let totalSuccess = 0;
-  let totalFailed = 0;
+  let allResults: ExecutionResult[] = [];
+  const builtProjects: string[] = [];
+  const packedProjects: string[] = [];
+  const uploadedProjects: string[] = [];
 
   for (let i = 0; i < batches.length; i++) {
     const batchNum = i + 1;
@@ -116,12 +126,23 @@ export async function runBuildPack(
 
     // Execute batch in parallel
     const results = await executeBatch(batchProjects, projectsToProcess, context);
+    allResults.push(...results);
+
+    // Track what was done
+    for (const result of results) {
+      if (result.success) {
+        builtProjects.push(result.project);
+        const isRelease = projectsToProcess.find(p => p.name === result.project);
+        if (isRelease) {
+          packedProjects.push(result.project);
+          uploadedProjects.push(result.project);
+        }
+      }
+    }
 
     // Count results
     const succeeded = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
-    totalSuccess += succeeded;
-    totalFailed += failed;
 
     console.log(`\n✓ Batch ${batchNum} completed: ${succeeded} succeeded, ${failed} failed`);
 
@@ -129,14 +150,29 @@ export async function runBuildPack(
     if (failed > 0) {
       console.error(`\n❌ Build & Pack failed. Stopping execution.\n`);
       displayFailures(results.filter((r) => !r.success));
-      process.exit(1);
+      break;
     }
   }
 
+  const failedResults = allResults.filter(r => !r.success);
+  const totalSuccess = allResults.filter(r => r.success).length;
+
   // Final summary
   console.log(`\n${'='.repeat(80)}`);
-  console.log(`✅ Phase 2 Complete: ${totalSuccess} projects succeeded`);
+  if (failedResults.length === 0) {
+    console.log(`✅ Phase 2 Complete: ${totalSuccess} projects succeeded`);
+  } else {
+    console.log(`⚠️  Phase 2 Completed with errors: ${totalSuccess} succeeded, ${failedResults.length} failed`);
+  }
   console.log(`${'='.repeat(80)}\n`);
+
+  return {
+    built: builtProjects,
+    packed: packedProjects,
+    uploaded: uploadedProjects,
+    skipped: projectsToSkip.map(p => p.name),
+    failed: failedResults,
+  };
 }
 
 /**
@@ -180,28 +216,49 @@ async function findCompletedProjects(
   context: BuildPackContext
 ): Promise<ProjectConfig[]> {
   const completed: ProjectConfig[] = [];
+  const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
+  const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || '';
 
-  // PLACEHOLDER: Check GitHub releases for existing artifacts
-  // In real implementation:
-  // 1. For each project, construct release tag: `${project.name}-v${project.version}`
-  // 2. Call GitHub API to get draft release by tag
-  // 3. Check if release has an asset named `${project.name}.artifact.yml`
-  // 4. If found, add to completed list
+  if (!repo) {
+    console.log('  ⚠️  GITHUB_REPOSITORY not set, skipping resumability check');
+    return completed;
+  }
 
-  console.log('  [PLACEHOLDER] Would check GitHub API for existing draft releases and artifacts');
-  
+  console.log('  📋 Checking for completed projects in draft releases...');
+
   for (const project of projectsToRelease) {
-    const releaseTag = `${project.name}-v${project.version}`;
-    console.log(`    • Checking ${releaseTag}...`);
+    const tag = getReleaseTag(project.name, project.version);
     
-    // Simulating check - in real code:
-    // const release = await findDraftReleaseByTag(context.githubToken, releaseTag);
-    // if (release) {
-    //   const hasArtifact = release.assets.some(a => a.name === `${project.name}.artifact.yml`);
-    //   if (hasArtifact) {
-    //     completed.push(project);
-    //   }
-    // }
+    try {
+      const release = await findDraftReleaseByTag(context.githubToken, owner, repo, tag);
+      
+      if (release) {
+        const artifactFileName = `${project.name}.artifact.yml`;
+        const hasArtifact = await isArtifactUploaded(
+          context.githubToken,
+          owner,
+          repo,
+          release.id,
+          artifactFileName
+        );
+        
+        if (hasArtifact) {
+          console.log(`    ✅ ${project.name} already completed (found ${artifactFileName})`);
+          completed.push(project);
+        } else {
+          console.log(`    ⏭️  ${project.name} has draft release but missing artifact`);
+        }
+      } else {
+        console.log(`    🆕 ${project.name} - no existing draft release`);
+      }
+    } catch (error) {
+      // Log but don't fail - proceed as if not completed
+      console.log(`    ⚠️  Error checking ${project.name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (completed.length > 0) {
+    console.log(`  ✨ Found ${completed.length} completed project(s), will skip`);
   }
 
   return completed;

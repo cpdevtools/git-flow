@@ -1,0 +1,24 @@
+{
+  "name": "@cpdevtools/git-flow-action-build-pack",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Action for Phase 2 Build & Pack workflow",
+  "author": "CPDevTools",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
+    "@cpdevtools/git-flow": "link:../../packages/git-flow"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.11",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}

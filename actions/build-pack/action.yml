@@ -1,0 +1,44 @@
+name: 'Build & Pack Projects'
+description: 'Phase 2: Builds and packages projects from release PR, creates draft releases with artifacts'
+author: 'CPDevTools'
+
+branding:
+  icon: 'package'
+  color: 'purple'
+
+inputs:
+  pr-number:
+    description: 'Pull request number containing release metadata'
+    required: true
+  
+  token:
+    description: 'GitHub token with release permissions'
+    required: false
+    default: ${{ github.token }}
+  
+  workspace-root:
+    description: 'Workspace root directory'
+    required: false
+    default: ${{ github.workspace }}
+  
+  artifact-output-dir:
+    description: 'Directory for artifact output files'
+    required: false
+    default: '.artifacts'
+
+outputs:
+  projects-built:
+    description: 'Number of projects successfully built'
+  
+  projects-packed:
+    description: 'Number of projects successfully packed'
+  
+  projects-uploaded:
+    description: 'Number of projects successfully uploaded'
+  
+  projects-skipped:
+    description: 'Number of projects skipped (already completed)'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

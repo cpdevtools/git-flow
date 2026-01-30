@@ -5,7 +5,15 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { $ } from 'zx';
+import { parseDocument } from 'yaml';
 import type { ProjectConfig, ExecutionResult, BuildPackContext } from './types.js';
+import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+import {
+  findOrCreateDraftRelease,
+  uploadArtifact,
+  isArtifactUploaded,
+} from './github.js';
 
 /**
  * Read package.json synchronously
@@ -56,27 +64,24 @@ export async function executeBuild(
   console.log(`🔨 ${project.name}: Building...`);
 
   try {
-    // PLACEHOLDER: This is where we would execute the build script
-    // In real implementation:
-    // - Set environment variables (PROJECT_VERSION, PROJECT_NAME, etc.)
-    // - Execute: pnpm run github.actions.build
-    // - Stream output to console
-    // - Capture exit code
-    // - Handle errors
+    // Set environment variables
+    const env = {
+      ...process.env,
+      PROJECT_VERSION: project.version,
+      PROJECT_NAME: project.name,
+      ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
+      GITHUB_SHA: context.sha,
+    };
 
-    console.log(`  📝 Would execute: pnpm run github.actions.build`);
-    console.log(`  📂 Working directory: ${project.cwd}`);
-    console.log(`  🔢 PROJECT_VERSION: ${project.version}`);
-    console.log(`  🏷️  PROJECT_NAME: ${project.name}`);
-    console.log(`  📦 ARTIFACT_OUTPUT_DIR: ${context.artifactOutputDir}`);
+    // Execute build script
+    const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.build`;
 
-    // Simulate success
     console.log(`✓ ${project.name}: Build completed`);
 
     return {
       project: project.name,
       success: true,
-      exitCode: 0,
+      exitCode: result.exitCode ?? 0,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -112,26 +117,20 @@ export async function executePack(
   console.log(`📦 ${project.name}: Packing & generating artifact descriptor...`);
 
   try {
-    // PLACEHOLDER: This is where we would execute the pack script
-    // In real implementation:
-    // - Set environment variables (PROJECT_VERSION, PROJECT_NAME, ARTIFACT_OUTPUT_DIR, etc.)
-    // - Execute: pnpm run github.actions.pack
-    // - Stream output to console
-    // - Capture exit code
-    // - Handle errors
+    // Set environment variables
+    const env = {
+      ...process.env,
+      PROJECT_VERSION: project.version,
+      PROJECT_NAME: project.name,
+      ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
+      GITHUB_SHA: context.sha,
+    };
 
-    console.log(`  📝 Would execute: pnpm run github.actions.pack`);
-    console.log(`  📂 Working directory: ${project.cwd}`);
-    console.log(`  🔢 PROJECT_VERSION: ${project.version}`);
-    console.log(`  🏷️  PROJECT_NAME: ${project.name}`);
-    console.log(`  📦 ARTIFACT_OUTPUT_DIR: ${context.artifactOutputDir}`);
-    console.log(`  📄 GITHUB_SHA: ${context.sha}`);
+    // Execute pack script
+    const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.pack`;
 
     // Verify artifact.yml was generated
     const artifactPath = join(context.artifactOutputDir, `${project.name}.artifact.yml`);
-
-    // PLACEHOLDER: In real implementation, this check happens after actual script execution
-    console.log(`  🔍 Would verify artifact file exists: ${artifactPath}`);
 
     if (!existsSync(artifactPath)) {
       throw new Error(
@@ -145,7 +144,7 @@ export async function executePack(
     return {
       project: project.name,
       success: true,
-      exitCode: 0,
+      exitCode: result.exitCode ?? 0,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -173,14 +172,6 @@ export async function executeUpload(
   console.log(`⬆️  ${project.name}: Uploading artifacts...`);
 
   try {
-    // PLACEHOLDER: This is where we would upload artifacts
-    // In real implementation:
-    // - Read artifact.yml to discover what to upload
-    // - Create/find draft release
-    // - Upload artifact.yml file (always)
-    // - Upload package files (npm, nuget, release-attachments)
-    // - Skip large file uploads for Docker (just upload artifact.yml with metadata)
-
     const artifactPath = join(context.artifactOutputDir, `${project.name}.artifact.yml`);
 
     if (!existsSync(artifactPath)) {
@@ -191,10 +182,81 @@ export async function executeUpload(
       };
     }
 
-    console.log(`  📝 Would read artifact descriptor: ${artifactPath}`);
-    console.log(`  🏷️  Would create/find draft release: ${project.name}-v${project.version}`);
-    console.log(`  📤 Would upload artifact.yml to release`);
-    console.log(`  📤 Would upload artifact files based on type`);
+    // Read artifact descriptor
+    const artifactYml = await readFile(artifactPath, 'utf-8');
+    const doc = parseDocument(artifactYml);
+    const descriptor = doc.toJSON() as ProjectArtifactDescriptor;
+
+    console.log(`  📄 Found ${descriptor.artifacts.length} artifact(s) to upload`);
+
+    // Find or create draft release
+    const release = await findOrCreateDraftRelease(project, context);
+
+    // Get owner/repo from environment
+    const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
+    const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
+
+    // Always upload artifact.yml file itself
+    await uploadArtifact(
+      context.githubToken,
+      owner,
+      repo,
+      release.id,
+      release.upload_url,
+      artifactPath
+    );
+
+    // Upload artifacts based on type
+    for (const artifact of descriptor.artifacts) {
+      switch (artifact.type) {
+        case 'npm':
+          // Upload npm package file
+          const npmPath = join(project.cwd, artifact.path);
+          await uploadArtifact(
+            context.githubToken,
+            owner,
+            repo,
+            release.id,
+            release.upload_url,
+            npmPath
+          );
+          break;
+
+        case 'nuget':
+          // Upload nuget package file
+          const nugetPath = join(project.cwd, artifact.path);
+          await uploadArtifact(
+            context.githubToken,
+            owner,
+            repo,
+            release.id,
+            release.upload_url,
+            nugetPath
+          );
+          break;
+
+        case 'release-attachment':
+          // Upload release attachment file
+          const attachmentPath = join(project.cwd, artifact.path);
+          await uploadArtifact(
+            context.githubToken,
+            owner,
+            repo,
+            release.id,
+            release.upload_url,
+            attachmentPath
+          );
+          break;
+
+        case 'docker':
+          // Docker artifacts don't need file uploads - just metadata in artifact.yml
+          console.log(`  ℹ️  Docker artifact: ${artifact.name} (metadata only, no file upload)`);
+          break;
+
+        default:
+          console.warn(`  ⚠️  Unknown artifact type: ${(artifact as any).type}`);
+      }
+    }
 
     console.log(`✓ ${project.name}: Upload completed`);
 

@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     'version/index': 'src/version/index.ts',
     'branch/index': 'src/branch/index.ts',
+    'build-pack/index': 'src/build-pack/index.ts',
   },
   format: ['esm'],
   dts: true,

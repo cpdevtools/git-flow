@@ -18,6 +18,28 @@ importers:
         specifier: ^3.4.2
         version: 3.8.0
 
+  actions/build-pack:
+    dependencies:
+      '@actions/core':
+        specifier: ^1.11.1
+        version: 1.11.1
+      '@actions/github':
+        specifier: ^6.0.0
+        version: 6.0.1
+      '@cpdevtools/git-flow':
+        specifier: file:/devcontainer/repos/git-flow/packages/git-flow
+        version: link:../../packages/git-flow
+    devDependencies:
+      '@types/node':
+        specifier: ^20.17.11
+        version: 20.19.30
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   actions/create-release-pr:
     dependencies:
       '@actions/core':
@@ -60,12 +82,24 @@ importers:
 
   packages/git-flow:
     dependencies:
+      '@actions/core':
+        specifier: ^1.11.1
+        version: 1.11.1
+      '@actions/github':
+        specifier: ^6.0.0
+        version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
         specifier: file:/devcontainer/repos/ts-dev-utilities
         version: file:../ts-dev-utilities
       semver:
         specifier: ^7.6.3
         version: 7.7.3
+      yaml:
+        specifier: ^2.8.2
+        version: 2.8.2
+      zx:
+        specifier: ^8.2.4
+        version: 8.8.5
     devDependencies:
       '@types/node':
         specifier: ^20.17.10
@@ -1503,6 +1537,11 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zx@8.8.5:
+    resolution: {integrity: sha512-SNgDF5L0gfN7FwVOdEFguY3orU5AkfFZm9B5YSHog/UDHv+lvmd82ZAsOenOkQixigwH2+yyH198AwNdKhj+RA==}
+    engines: {node: '>= 12.17.0'}
+    hasBin: true
+
 snapshots:
 
   '@actions/core@1.11.1':
@@ -2765,3 +2804,5 @@ snapshots:
   yaml@2.8.2: {}
 
   yocto-queue@0.1.0: {}
+
+  zx@8.8.5: {}

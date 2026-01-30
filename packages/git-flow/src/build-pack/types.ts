@@ -79,3 +79,19 @@ export interface PRProjectMetadata {
   /** Project working directory relative to workspace root */
   cwd: string;
 }
+
+/**
+ * Result of build & pack workflow
+ */
+export interface BuildPackResult {
+  /** Projects that were built */
+  built: string[];
+  /** Projects that were packed */
+  packed: string[];
+  /** Projects that were uploaded */
+  uploaded: string[];
+  /** Projects that were skipped (already complete) */
+  skipped: string[];
+  /** Projects that failed */
+  failed: ExecutionResult[];
+}

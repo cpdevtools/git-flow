@@ -1,8 +1,37 @@
 /**
- * Phase 2 Build & Pack workflow
+ * Phase 2: Build & Pack
+ * 
+ * Orchestrates building and packaging projects from a GitHub PR description.
+ * Creates draft releases with artifacts for projects marked for release.
+ * 
+ * @module build-pack
  */
 
-export * from './types.js';
-export * from './options.js';
-export * from './execute.js';
-export * from './orchestrate.js';
+// Main orchestration entry point
+export { runBuildPack } from './orchestrate.js';
+
+// Types
+export type {
+  BuildPackContext,
+  ProjectConfig,
+  ExecutionResult,
+  PRMetadata,
+  PRProjectMetadata,
+  BuildPackResult,
+} from './types.js';
+
+// Execution functions (for advanced usage/testing)
+export { executeBuild, executePack, executeUpload } from './execute.js';
+
+// GitHub API operations (for advanced usage/testing)
+export {
+  getReleaseTag,
+  findDraftReleaseByTag,
+  createDraftRelease,
+  findOrCreateDraftRelease,
+  isArtifactUploaded,
+  uploadArtifact,
+} from './github.js';
+
+// Options parsing
+export { extractPRMetadata } from './options.js';

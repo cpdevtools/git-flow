@@ -47,8 +47,12 @@
     "directory": "packages/git-flow"
   },
   "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0",
     "@cpdevtools/ts-dev-utilities": "link:../../../ts-dev-utilities",
-    "semver": "^7.6.3"
+    "semver": "^7.6.3",
+    "yaml": "^2.8.2",
+    "zx": "^8.2.4"
   },
   "devDependencies": {
     "@types/node": "^20.17.10",
