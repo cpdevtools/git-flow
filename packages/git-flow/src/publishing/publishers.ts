@@ -1,4 +1,4 @@
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { $ } from 'zx';
 import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';

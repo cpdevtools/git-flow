@@ -63,7 +63,7 @@ export function validateRegistryConfig(config: RegistryConfig): void {
         break;
 
       default:
-        throw new Error(`Registry "${name}" has invalid type: ${(registry as any).type}`);
+        throw new Error(`Registry "${name}" has invalid type: ${(registry as unknown as { type: string }).type}`);
     }
   }
 }

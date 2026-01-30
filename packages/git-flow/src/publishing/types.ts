@@ -2,8 +2,6 @@
  * Type definitions for Phase 3 Publishing
  */
 
-import type { ProjectArtifactDescriptor, ArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
-
 /**
  * Registry configuration (loaded from .github/registries.yml)
  */

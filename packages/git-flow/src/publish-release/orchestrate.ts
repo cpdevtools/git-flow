@@ -249,7 +249,7 @@ async function publishArtifact(
       break;
 
     default:
-      throw new Error(`Unknown artifact type: ${(artifact as any).type}`);
+      throw new Error(`Unknown artifact type: ${(artifact as unknown as { type: string }).type}`);
   }
 }
 

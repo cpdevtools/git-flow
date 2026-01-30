@@ -108,6 +108,6 @@ export async function verifyPublication(
       return isDockerPublished(artifactName, version, registry);
 
     default:
-      throw new Error(`Unknown registry type: ${(registry as any).type}`);
+      throw new Error(`Unknown registry type: ${(registry as unknown as { type: string }).type}`);
   }
 }

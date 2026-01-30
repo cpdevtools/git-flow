@@ -1,5 +1,4 @@
 import { readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
 import { $ } from 'zx';
 import { globby } from 'globby';
 

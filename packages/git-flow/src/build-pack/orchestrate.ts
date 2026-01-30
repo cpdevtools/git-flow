@@ -98,6 +98,12 @@ export async function runBuildPack(
   }
   console.log();
 
+  // Add allProjects to context for workspace dependency resolution
+  const contextWithProjects: BuildPackContext = {
+    ...context,
+    allProjects: allProjectsToProcess,
+  };
+
   // Build dependency graph and get topological batches (all projects)
   console.log('📊 Building dependency graph...');
   const graph = buildDependencyGraph(allProjectsToProcess);
@@ -125,7 +131,7 @@ export async function runBuildPack(
     console.log(`${'='.repeat(80)}\n`);
 
     // Execute batch in parallel
-    const results = await executeBatch(batchProjects, projectsToProcess, context);
+    const results = await executeBatch(batchProjects, projectsToProcess, contextWithProjects);
     allResults.push(...results);
 
     // Track what was done
