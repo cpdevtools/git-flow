@@ -41133,8 +41133,16 @@ async function run() {
       patterns: ["**/package.json", "packages/*/package.json"]
     });
     core.info(`Found ${projects.length} projects`);
+    const buildableProjects = projects.filter((project) => {
+      const hasBuildScript = !!project.packageJson.scripts?.["github.actions.build"];
+      if (!hasBuildScript) {
+        core.info(`Skipping ${project.packageJson.name}: no github.actions.build script`);
+      }
+      return hasBuildScript;
+    });
+    core.info(`${buildableProjects.length} projects have github.actions.build script`);
     const projectMetadata = [];
-    for (const project of projects) {
+    for (const project of buildableProjects) {
       const packageVersion = project.packageJson.version;
       if (!packageVersion) {
         core.warning(`Skipping ${project.packageJson.name}: no version in package.json`);
