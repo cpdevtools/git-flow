@@ -49,7 +49,7 @@ jobs:
       - name: Build git-flow CLI
         run: |
           cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
-          pnpm install
+          pnpm install --no-frozen-lockfile
           pnpm run build
       
       - name: Add git-flow CLI to PATH
