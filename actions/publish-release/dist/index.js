@@ -54209,7 +54209,7 @@ async function publishToNpm(options) {
   }
   await writeFile(npmrcPath, npmrcContent);
   try {
-    await $`npm publish ${artifactPath} --registry ${registry.url}`;
+    await $`pnpm publish ${artifactPath} --registry ${registry.url} --no-git-checks`;
   } finally {
     await $`rm -f ${npmrcPath}`.catch(() => {
     });

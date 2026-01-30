@@ -23,7 +23,7 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
 
   try {
     // Publish the tarball
-    await $`npm publish ${artifactPath} --registry ${registry.url}`;
+    await $`pnpm publish ${artifactPath} --registry ${registry.url} --no-git-checks`;
   } finally {
     // Clean up temporary .npmrc
     await $`rm -f ${npmrcPath}`.catch(() => {});
