@@ -48,6 +48,8 @@ export interface BuildPackContext {
   sha: string;
   /** Workflow run number */
   runNumber: number;
+  /** Skip upload phase (useful for local testing) */
+  skipUpload?: boolean;
 }
 
 /**

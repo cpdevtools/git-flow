@@ -5,7 +5,8 @@
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseDocument } from 'yaml';
 import { $ } from 'zx';
 import {
@@ -14,6 +15,12 @@ import {
 } from './github.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 
+// Get the directory of the installed package
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageRoot = join(__dirname, '../..');
+const applyVersionCli = join(packageRoot, 'dist/cli/apply-version.js');
+
 /**
  * Read package.json for a project
  */
@@ -21,8 +28,25 @@ async function readPackageJson(cwd: string): Promise<any> {
   const pkgPath = join(cwd, 'package.json');
   const content = await readFile(pkgPath, 'utf-8');
   return JSON.parse(content);
-}
+}+++++++++++++++++++++
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--0
+7410
 /**
  * Check if project has a build script
  */
@@ -68,6 +92,10 @@ export async function executeBuild(
       ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
       GITHUB_SHA: context.sha,
     };
+
+    // Apply version to project files before building
+    console.log(`  📝 Applying version ${project.version}...`);
+    await $({ cwd: project.cwd, env })`node ${applyVersionCli}`;
 
     // Execute build script
     const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.build`;

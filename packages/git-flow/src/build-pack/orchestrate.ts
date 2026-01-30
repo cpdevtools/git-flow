@@ -381,7 +381,12 @@ async function executeBatch(
         return packResult;
       }
 
-      // Upload
+      // Upload (skip if configured)
+      if (context.skipUpload) {
+        console.log(`⊘ ${project.name}: Skipping upload (SKIP_UPLOAD enabled)`);
+        return packResult;
+      }
+
       const uploadResult = await executeUpload(project, context);
       return uploadResult;
     } else {

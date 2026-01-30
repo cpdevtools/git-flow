@@ -19,7 +19,15 @@
     "./build-pack": {
       "types": "./dist/build-pack/index.d.ts",
       "import": "./dist/build-pack/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "import": "./dist/cli/index.js"
     }
+  },
+  "bin": {
+    "cpdevtools-pack": "./dist/cli/pack.js",
+    "cpdevtools-apply-version": "./dist/cli/apply-version.js"
   },
   "files": [
     "dist"
