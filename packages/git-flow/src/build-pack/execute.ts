@@ -205,7 +205,20 @@ export async function executePack(
     // Execute pack script
     let result;
     try {
-      result = await $({ cwd: project.cwd, env })`pnpm run github.actions.pack`;
+      // Verify CLI is available
+      try {
+        await $({ cwd: project.cwd, env })`which cpdt-gitflow`;
+        console.log(`  ✓ cpdt-gitflow CLI found in PATH`);
+      } catch {
+        console.error(`  ⚠️  cpdt-gitflow not found in PATH`);
+        console.error(`  PATH: ${env.PATH}`);
+      }
+      
+      result = await $({ cwd: project.cwd, env, verbose: true })`pnpm run github.actions.pack`;
+      console.log(`  ✓ Pack script completed`);
+    } catch (error) {
+      console.error(`  ✗ Pack script failed:`, error);
+      throw error;
     } finally {
       // Always restore files, even if pack fails
       console.log(`  ↩️  Restoring original project files...`);
