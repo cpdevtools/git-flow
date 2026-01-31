@@ -52,7 +52,7 @@ async function packNpm(context) {
         type: "npm",
         name: context.projectName,
         path: relativePath,
-        registries: ["github"]
+        registries: ["github-npm"]
       }
     ]
   };
@@ -74,7 +74,7 @@ async function packNuget(context) {
         type: "nuget",
         name: context.projectName,
         path: relativePath,
-        registries: ["github"]
+        registries: ["ghcr"]
       }
     ]
   };
