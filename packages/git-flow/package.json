@@ -1,6 +1,6 @@
 {
   "name": "@cpdevtools/git-flow",
-  "version": "0.0.0-DEFAULT",
+  "version": "1.0.0",
   "description": "Core library for Git-based versioning and release workflows",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
