@@ -18,6 +18,8 @@ export interface ProjectArtifactDescriptor {
 export interface Artifact {
   /** Artifact name */
   name: string;
+  /** Artifact type */
+  type: string;
   /** Artifact file path */
   path: string;
   /** Artifact content */
