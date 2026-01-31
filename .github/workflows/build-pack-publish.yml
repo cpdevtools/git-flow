@@ -23,6 +23,11 @@ on:
         description: 'Number of projects verified'
         value: ${{ jobs.publish.outputs.verified-count }}
 
+# Required for publishing to GitHub Packages and creating releases/tags
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build-pack:
     runs-on: ubuntu-latest
