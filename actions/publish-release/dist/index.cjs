@@ -62757,7 +62757,8 @@ This may indicate the image was modified after being built in Phase 2.`
             const publishResult = await publishProjectArtifacts(
               descriptor,
               registryConfig,
-              options.workspaceRoot
+              options.workspaceRoot,
+              project.version
             );
             if (!publishResult.success) {
               throw new Error(publishResult.error || "Unknown error");
@@ -62805,7 +62806,7 @@ This may indicate the image was modified after being built in Phase 2.`
         throw error;
       }
     }
-    async function publishProjectArtifacts(descriptor, registryConfig, workspaceRoot) {
+    async function publishProjectArtifacts(descriptor, registryConfig, workspaceRoot, projectVersion) {
       const result = {
         project: descriptor.project,
         success: true,
@@ -62819,7 +62820,7 @@ This may indicate the image was modified after being built in Phase 2.`
             const registry = getRegistry(registryConfig, registryId);
             const token = getToken(registry);
             const artifactName = getArtifactName(artifact);
-            const artifactVersion = getArtifactVersion(artifact, descriptor.project);
+            const artifactVersion = getArtifactVersion(artifact, projectVersion);
             const verification = await verifyPublication(artifactName, artifactVersion, registry, token);
             if (verification.published) {
               console.log(

@@ -73,7 +73,8 @@ export async function runPublishRelease(
         const publishResult = await publishProjectArtifacts(
           descriptor,
           registryConfig,
-          options.workspaceRoot
+          options.workspaceRoot,
+          project.version
         );
 
         if (!publishResult.success) {
@@ -140,7 +141,8 @@ export async function runPublishRelease(
 async function publishProjectArtifacts(
   descriptor: ProjectArtifactDescriptor,
   registryConfig: RegistryConfig,
-  workspaceRoot: string
+  workspaceRoot: string,
+  projectVersion: string
 ): Promise<ProjectPublishResult> {
   const result: ProjectPublishResult = {
     project: descriptor.project,
@@ -159,7 +161,7 @@ async function publishProjectArtifacts(
 
         // Skip if already published
         const artifactName = getArtifactName(artifact);
-        const artifactVersion = getArtifactVersion(artifact, descriptor.project);
+        const artifactVersion = getArtifactVersion(artifact, projectVersion);
 
         const verification = await verifyPublication(artifactName, artifactVersion, registry, token);
 
