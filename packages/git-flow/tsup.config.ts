@@ -20,15 +20,16 @@ export default defineConfig([
     bundle: false, // Don't bundle - just transpile TypeScript to CommonJS
     platform: 'node',
   },
-  // CLI outputs - ESM format (for top-level await support)
+  // CLI outputs - CommonJS format (compatible with library)
   {
     entry: {
       'cli/index': 'src/cli/index.ts',
       'cli/bin': 'src/cli/bin.ts',
+      'cli/config-loader': 'src/cli/config-loader.ts',
       'cli/commands/pack': 'src/cli/commands/pack.ts',
       'cli/commands/apply-version': 'src/cli/commands/apply-version.ts',
     },
-    format: ['esm'],
+    format: ['cjs'],
     target: 'node20',
     dts: true,
     sourcemap: true,
