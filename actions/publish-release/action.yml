@@ -18,5 +18,21 @@ outputs:
     description: 'Number of projects that failed'
 
 runs:
-  using: 'node20'
-  main: 'dist/index.cjs'
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+    
+    - name: Run Publish Release
+      shell: bash
+      run: node ${{ github.action_path }}/dist/index.cjs
+      env:
+        INPUT_PR-NUMBER: ${{ inputs.pr-number }}
+        INPUT_TOKEN: ${{ inputs.token }}

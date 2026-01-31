@@ -40,5 +40,27 @@ outputs:
     description: 'Number of projects skipped (already completed)'
 
 runs:
-  using: 'node20'
-  main: 'dist/index.cjs'
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+    
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install
+    
+    - name: Run Build & Pack
+      shell: bash
+      run: node ${{ github.action_path }}/dist/index.cjs
+      env:
+        INPUT_PR-NUMBER: ${{ inputs.pr-number }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_WORKSPACE-ROOT: ${{ inputs.workspace-root }}
+        INPUT_ARTIFACT-OUTPUT-DIR: ${{ inputs.artifact-output-dir }}
