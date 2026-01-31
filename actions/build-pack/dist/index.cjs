@@ -2619,7 +2619,7 @@ var require_parseParams = __commonJS({
 var require_basename = __commonJS({
   "../../node_modules/.pnpm/@fastify+busboy@2.1.1/node_modules/@fastify/busboy/lib/utils/basename.js"(exports2, module2) {
     "use strict";
-    module2.exports = function basename2(path4) {
+    module2.exports = function basename(path4) {
       if (typeof path4 !== "string") {
         return "";
       }
@@ -2646,7 +2646,7 @@ var require_multipart = __commonJS({
     var Dicer = require_Dicer();
     var parseParams = require_parseParams();
     var decodeText = require_decodeText();
-    var basename2 = require_basename();
+    var basename = require_basename();
     var getLimit = require_getLimit();
     var RE_BOUNDARY = /^boundary$/i;
     var RE_FIELD = /^form-data$/i;
@@ -2763,7 +2763,7 @@ var require_multipart = __commonJS({
               } else if (RE_FILENAME.test(parsed[i][0])) {
                 filename = parsed[i][1];
                 if (!preservePath) {
-                  filename = basename2(filename);
+                  filename = basename(filename);
                 }
               }
             }
@@ -20467,7 +20467,7 @@ function parse(options) {
   if (!isBinaryRequest) {
     if (options.mediaType.format) {
       headers.accept = headers.accept.split(/,/).map(
-        (format2) => format2.replace(
+        (format) => format.replace(
           /application\/vnd(\.\w+)(\.v3)?(\.\w+)?(\+json)?$/,
           `application/vnd$1$2.${options.mediaType.format}`
         )
@@ -20477,8 +20477,8 @@ function parse(options) {
       if (options.mediaType.previews?.length) {
         const previewsFromAcceptHeader = headers.accept.match(/(?<![\w-])[\w-]+(?=-preview)/g) || [];
         headers.accept = previewsFromAcceptHeader.concat(options.mediaType.previews).map((preview) => {
-          const format2 = options.mediaType.format ? `.${options.mediaType.format}` : "+json";
-          return `application/vnd.github.${preview}-preview${format2}`;
+          const format = options.mediaType.format ? `.${options.mediaType.format}` : "+json";
+          return `application/vnd.github.${preview}-preview${format}`;
         }).join(",");
       }
     }
@@ -24819,7 +24819,7 @@ var require_fill_range = __commonJS({
       let padded = zeros(startString) || zeros(endString) || zeros(stepString);
       let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
       let toNumber = padded === false && stringify(start, end, options) === false;
-      let format2 = options.transform || transform(toNumber);
+      let format = options.transform || transform(toNumber);
       if (options.toRegex && step === 1) {
         return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
       }
@@ -24831,7 +24831,7 @@ var require_fill_range = __commonJS({
         if (options.toRegex === true && step > 1) {
           push(a);
         } else {
-          range.push(pad(format2(a, index), maxLen, toNumber));
+          range.push(pad(format(a, index), maxLen, toNumber));
         }
         a = descending ? a - step : a + step;
         index++;
@@ -24845,7 +24845,7 @@ var require_fill_range = __commonJS({
       if (!isNumber(start) && start.length > 1 || !isNumber(end) && end.length > 1) {
         return invalidRange(start, end, options);
       }
-      let format2 = options.transform || ((val) => String.fromCharCode(val));
+      let format = options.transform || ((val) => String.fromCharCode(val));
       let a = `${start}`.charCodeAt(0);
       let b = `${end}`.charCodeAt(0);
       let descending = a > b;
@@ -24857,7 +24857,7 @@ var require_fill_range = __commonJS({
       let range = [];
       let index = 0;
       while (descending ? a >= b : a <= b) {
-        range.push(format2(a, index));
+        range.push(format(a, index));
         a = descending ? a - step : a + step;
         index++;
       }
@@ -25176,7 +25176,7 @@ var require_parse2 = __commonJS({
       CHAR_NO_BREAK_SPACE,
       CHAR_ZERO_WIDTH_NOBREAK_SPACE
     } = require_constants6();
-    var parse4 = (input, options = {}) => {
+    var parse2 = (input, options = {}) => {
       if (typeof input !== "string") {
         throw new TypeError("Expected a string");
       }
@@ -25376,7 +25376,7 @@ var require_parse2 = __commonJS({
       push({ type: "eos" });
       return ast;
     };
-    module2.exports = parse4;
+    module2.exports = parse2;
   }
 });
 
@@ -25387,7 +25387,7 @@ var require_braces = __commonJS({
     var stringify = require_stringify();
     var compile = require_compile();
     var expand2 = require_expand();
-    var parse4 = require_parse2();
+    var parse2 = require_parse2();
     var braces = (input, options = {}) => {
       let output = [];
       if (Array.isArray(input)) {
@@ -25407,7 +25407,7 @@ var require_braces = __commonJS({
       }
       return output;
     };
-    braces.parse = (input, options = {}) => parse4(input, options);
+    braces.parse = (input, options = {}) => parse2(input, options);
     braces.stringify = (input, options = {}) => {
       if (typeof input === "string") {
         return stringify(braces.parse(input, options), options);
@@ -26060,7 +26060,7 @@ var require_parse3 = __commonJS({
     var syntaxError = (type, char) => {
       return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
     };
-    var parse4 = (input, options) => {
+    var parse2 = (input, options) => {
       if (typeof input !== "string") {
         throw new TypeError("Expected a string");
       }
@@ -26209,7 +26209,7 @@ var require_parse3 = __commonJS({
             output = token.close = `)$))${extglobStar}`;
           }
           if (token.inner.includes("*") && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
-            const expression = parse4(rest, { ...options, fastpaths: false }).output;
+            const expression = parse2(rest, { ...options, fastpaths: false }).output;
             output = token.close = `)${expression})${extglobStar})`;
           }
           if (token.prev.type === "bos") {
@@ -26734,7 +26734,7 @@ var require_parse3 = __commonJS({
       }
       return state;
     };
-    parse4.fastpaths = (input, options) => {
+    parse2.fastpaths = (input, options) => {
       const opts = { ...options };
       const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
       const len = input.length;
@@ -26800,7 +26800,7 @@ var require_parse3 = __commonJS({
       }
       return source;
     };
-    module2.exports = parse4;
+    module2.exports = parse2;
   }
 });
 
@@ -26810,7 +26810,7 @@ var require_picomatch = __commonJS({
     "use strict";
     var path4 = require("path");
     var scan = require_scan();
-    var parse4 = require_parse3();
+    var parse2 = require_parse3();
     var utils = require_utils6();
     var constants = require_constants7();
     var isObject = (val) => val && typeof val === "object" && !Array.isArray(val);
@@ -26875,11 +26875,11 @@ var require_picomatch = __commonJS({
         return { isMatch: false, output: "" };
       }
       const opts = options || {};
-      const format2 = opts.format || (posix ? utils.toPosixSlashes : null);
+      const format = opts.format || (posix ? utils.toPosixSlashes : null);
       let match = input === glob2;
-      let output = match && format2 ? format2(input) : input;
+      let output = match && format ? format(input) : input;
       if (match === false) {
-        output = format2 ? format2(input) : input;
+        output = format ? format(input) : input;
         match = output === glob2;
       }
       if (match === false || opts.capture === true) {
@@ -26898,7 +26898,7 @@ var require_picomatch = __commonJS({
     picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
     picomatch.parse = (pattern, options) => {
       if (Array.isArray(pattern)) return pattern.map((p) => picomatch.parse(p, options));
-      return parse4(pattern, { ...options, fastpaths: false });
+      return parse2(pattern, { ...options, fastpaths: false });
     };
     picomatch.scan = (input, options) => scan(input, options);
     picomatch.compileRe = (state, options, returnOutput = false, returnState = false) => {
@@ -26924,10 +26924,10 @@ var require_picomatch = __commonJS({
       }
       let parsed = { negated: false, fastpaths: true };
       if (options.fastpaths !== false && (input[0] === "." || input[0] === "*")) {
-        parsed.output = parse4.fastpaths(input, options);
+        parsed.output = parse2.fastpaths(input, options);
       }
       if (!parsed.output) {
-        parsed = parse4(input, options);
+        parsed = parse2(input, options);
       }
       return picomatch.compileRe(parsed, options, returnOutput, returnState);
     };
@@ -27215,8 +27215,8 @@ var require_pattern = __commonJS({
     }
     exports2.endsWithSlashGlobStar = endsWithSlashGlobStar;
     function isAffectDepthOfReadingPattern(pattern) {
-      const basename2 = path4.basename(pattern);
-      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename2);
+      const basename = path4.basename(pattern);
+      return endsWithSlashGlobStar(pattern) || isStaticPattern(basename);
     }
     exports2.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
     function expandPatternsWithBraceExpansion(patterns) {
@@ -30431,1157 +30431,6 @@ var init_globby = __esm({
   }
 });
 
-// ../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
-function createScanner(text, ignoreTrivia = false) {
-  const len = text.length;
-  let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
-  function scanHexDigits(count, exact) {
-    let digits = 0;
-    let value2 = 0;
-    while (digits < count || !exact) {
-      let ch = text.charCodeAt(pos);
-      if (ch >= 48 && ch <= 57) {
-        value2 = value2 * 16 + ch - 48;
-      } else if (ch >= 65 && ch <= 70) {
-        value2 = value2 * 16 + ch - 65 + 10;
-      } else if (ch >= 97 && ch <= 102) {
-        value2 = value2 * 16 + ch - 97 + 10;
-      } else {
-        break;
-      }
-      pos++;
-      digits++;
-    }
-    if (digits < count) {
-      value2 = -1;
-    }
-    return value2;
-  }
-  function setPosition(newPosition) {
-    pos = newPosition;
-    value = "";
-    tokenOffset = 0;
-    token = 16;
-    scanError = 0;
-  }
-  function scanNumber() {
-    let start = pos;
-    if (text.charCodeAt(pos) === 48) {
-      pos++;
-    } else {
-      pos++;
-      while (pos < text.length && isDigit(text.charCodeAt(pos))) {
-        pos++;
-      }
-    }
-    if (pos < text.length && text.charCodeAt(pos) === 46) {
-      pos++;
-      if (pos < text.length && isDigit(text.charCodeAt(pos))) {
-        pos++;
-        while (pos < text.length && isDigit(text.charCodeAt(pos))) {
-          pos++;
-        }
-      } else {
-        scanError = 3;
-        return text.substring(start, pos);
-      }
-    }
-    let end = pos;
-    if (pos < text.length && (text.charCodeAt(pos) === 69 || text.charCodeAt(pos) === 101)) {
-      pos++;
-      if (pos < text.length && text.charCodeAt(pos) === 43 || text.charCodeAt(pos) === 45) {
-        pos++;
-      }
-      if (pos < text.length && isDigit(text.charCodeAt(pos))) {
-        pos++;
-        while (pos < text.length && isDigit(text.charCodeAt(pos))) {
-          pos++;
-        }
-        end = pos;
-      } else {
-        scanError = 3;
-      }
-    }
-    return text.substring(start, end);
-  }
-  function scanString() {
-    let result = "", start = pos;
-    while (true) {
-      if (pos >= len) {
-        result += text.substring(start, pos);
-        scanError = 2;
-        break;
-      }
-      const ch = text.charCodeAt(pos);
-      if (ch === 34) {
-        result += text.substring(start, pos);
-        pos++;
-        break;
-      }
-      if (ch === 92) {
-        result += text.substring(start, pos);
-        pos++;
-        if (pos >= len) {
-          scanError = 2;
-          break;
-        }
-        const ch2 = text.charCodeAt(pos++);
-        switch (ch2) {
-          case 34:
-            result += '"';
-            break;
-          case 92:
-            result += "\\";
-            break;
-          case 47:
-            result += "/";
-            break;
-          case 98:
-            result += "\b";
-            break;
-          case 102:
-            result += "\f";
-            break;
-          case 110:
-            result += "\n";
-            break;
-          case 114:
-            result += "\r";
-            break;
-          case 116:
-            result += "	";
-            break;
-          case 117:
-            const ch3 = scanHexDigits(4, true);
-            if (ch3 >= 0) {
-              result += String.fromCharCode(ch3);
-            } else {
-              scanError = 4;
-            }
-            break;
-          default:
-            scanError = 5;
-        }
-        start = pos;
-        continue;
-      }
-      if (ch >= 0 && ch <= 31) {
-        if (isLineBreak(ch)) {
-          result += text.substring(start, pos);
-          scanError = 2;
-          break;
-        } else {
-          scanError = 6;
-        }
-      }
-      pos++;
-    }
-    return result;
-  }
-  function scanNext() {
-    value = "";
-    scanError = 0;
-    tokenOffset = pos;
-    lineStartOffset = lineNumber;
-    prevTokenLineStartOffset = tokenLineStartOffset;
-    if (pos >= len) {
-      tokenOffset = len;
-      return token = 17;
-    }
-    let code = text.charCodeAt(pos);
-    if (isWhiteSpace(code)) {
-      do {
-        pos++;
-        value += String.fromCharCode(code);
-        code = text.charCodeAt(pos);
-      } while (isWhiteSpace(code));
-      return token = 15;
-    }
-    if (isLineBreak(code)) {
-      pos++;
-      value += String.fromCharCode(code);
-      if (code === 13 && text.charCodeAt(pos) === 10) {
-        pos++;
-        value += "\n";
-      }
-      lineNumber++;
-      tokenLineStartOffset = pos;
-      return token = 14;
-    }
-    switch (code) {
-      // tokens: []{}:,
-      case 123:
-        pos++;
-        return token = 1;
-      case 125:
-        pos++;
-        return token = 2;
-      case 91:
-        pos++;
-        return token = 3;
-      case 93:
-        pos++;
-        return token = 4;
-      case 58:
-        pos++;
-        return token = 6;
-      case 44:
-        pos++;
-        return token = 5;
-      // strings
-      case 34:
-        pos++;
-        value = scanString();
-        return token = 10;
-      // comments
-      case 47:
-        const start = pos - 1;
-        if (text.charCodeAt(pos + 1) === 47) {
-          pos += 2;
-          while (pos < len) {
-            if (isLineBreak(text.charCodeAt(pos))) {
-              break;
-            }
-            pos++;
-          }
-          value = text.substring(start, pos);
-          return token = 12;
-        }
-        if (text.charCodeAt(pos + 1) === 42) {
-          pos += 2;
-          const safeLength = len - 1;
-          let commentClosed = false;
-          while (pos < safeLength) {
-            const ch = text.charCodeAt(pos);
-            if (ch === 42 && text.charCodeAt(pos + 1) === 47) {
-              pos += 2;
-              commentClosed = true;
-              break;
-            }
-            pos++;
-            if (isLineBreak(ch)) {
-              if (ch === 13 && text.charCodeAt(pos) === 10) {
-                pos++;
-              }
-              lineNumber++;
-              tokenLineStartOffset = pos;
-            }
-          }
-          if (!commentClosed) {
-            pos++;
-            scanError = 1;
-          }
-          value = text.substring(start, pos);
-          return token = 13;
-        }
-        value += String.fromCharCode(code);
-        pos++;
-        return token = 16;
-      // numbers
-      case 45:
-        value += String.fromCharCode(code);
-        pos++;
-        if (pos === len || !isDigit(text.charCodeAt(pos))) {
-          return token = 16;
-        }
-      // found a minus, followed by a number so
-      // we fall through to proceed with scanning
-      // numbers
-      case 48:
-      case 49:
-      case 50:
-      case 51:
-      case 52:
-      case 53:
-      case 54:
-      case 55:
-      case 56:
-      case 57:
-        value += scanNumber();
-        return token = 11;
-      // literals and unknown symbols
-      default:
-        while (pos < len && isUnknownContentCharacter(code)) {
-          pos++;
-          code = text.charCodeAt(pos);
-        }
-        if (tokenOffset !== pos) {
-          value = text.substring(tokenOffset, pos);
-          switch (value) {
-            case "true":
-              return token = 8;
-            case "false":
-              return token = 9;
-            case "null":
-              return token = 7;
-          }
-          return token = 16;
-        }
-        value += String.fromCharCode(code);
-        pos++;
-        return token = 16;
-    }
-  }
-  function isUnknownContentCharacter(code) {
-    if (isWhiteSpace(code) || isLineBreak(code)) {
-      return false;
-    }
-    switch (code) {
-      case 125:
-      case 93:
-      case 123:
-      case 91:
-      case 34:
-      case 58:
-      case 44:
-      case 47:
-        return false;
-    }
-    return true;
-  }
-  function scanNextNonTrivia() {
-    let result;
-    do {
-      result = scanNext();
-    } while (result >= 12 && result <= 15);
-    return result;
-  }
-  return {
-    setPosition,
-    getPosition: () => pos,
-    scan: ignoreTrivia ? scanNextNonTrivia : scanNext,
-    getToken: () => token,
-    getTokenValue: () => value,
-    getTokenOffset: () => tokenOffset,
-    getTokenLength: () => pos - tokenOffset,
-    getTokenStartLine: () => lineStartOffset,
-    getTokenStartCharacter: () => tokenOffset - prevTokenLineStartOffset,
-    getTokenError: () => scanError
-  };
-}
-function isWhiteSpace(ch) {
-  return ch === 32 || ch === 9;
-}
-function isLineBreak(ch) {
-  return ch === 10 || ch === 13;
-}
-function isDigit(ch) {
-  return ch >= 48 && ch <= 57;
-}
-var CharacterCodes;
-var init_scanner = __esm({
-  "../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js"() {
-    "use strict";
-    (function(CharacterCodes2) {
-      CharacterCodes2[CharacterCodes2["lineFeed"] = 10] = "lineFeed";
-      CharacterCodes2[CharacterCodes2["carriageReturn"] = 13] = "carriageReturn";
-      CharacterCodes2[CharacterCodes2["space"] = 32] = "space";
-      CharacterCodes2[CharacterCodes2["_0"] = 48] = "_0";
-      CharacterCodes2[CharacterCodes2["_1"] = 49] = "_1";
-      CharacterCodes2[CharacterCodes2["_2"] = 50] = "_2";
-      CharacterCodes2[CharacterCodes2["_3"] = 51] = "_3";
-      CharacterCodes2[CharacterCodes2["_4"] = 52] = "_4";
-      CharacterCodes2[CharacterCodes2["_5"] = 53] = "_5";
-      CharacterCodes2[CharacterCodes2["_6"] = 54] = "_6";
-      CharacterCodes2[CharacterCodes2["_7"] = 55] = "_7";
-      CharacterCodes2[CharacterCodes2["_8"] = 56] = "_8";
-      CharacterCodes2[CharacterCodes2["_9"] = 57] = "_9";
-      CharacterCodes2[CharacterCodes2["a"] = 97] = "a";
-      CharacterCodes2[CharacterCodes2["b"] = 98] = "b";
-      CharacterCodes2[CharacterCodes2["c"] = 99] = "c";
-      CharacterCodes2[CharacterCodes2["d"] = 100] = "d";
-      CharacterCodes2[CharacterCodes2["e"] = 101] = "e";
-      CharacterCodes2[CharacterCodes2["f"] = 102] = "f";
-      CharacterCodes2[CharacterCodes2["g"] = 103] = "g";
-      CharacterCodes2[CharacterCodes2["h"] = 104] = "h";
-      CharacterCodes2[CharacterCodes2["i"] = 105] = "i";
-      CharacterCodes2[CharacterCodes2["j"] = 106] = "j";
-      CharacterCodes2[CharacterCodes2["k"] = 107] = "k";
-      CharacterCodes2[CharacterCodes2["l"] = 108] = "l";
-      CharacterCodes2[CharacterCodes2["m"] = 109] = "m";
-      CharacterCodes2[CharacterCodes2["n"] = 110] = "n";
-      CharacterCodes2[CharacterCodes2["o"] = 111] = "o";
-      CharacterCodes2[CharacterCodes2["p"] = 112] = "p";
-      CharacterCodes2[CharacterCodes2["q"] = 113] = "q";
-      CharacterCodes2[CharacterCodes2["r"] = 114] = "r";
-      CharacterCodes2[CharacterCodes2["s"] = 115] = "s";
-      CharacterCodes2[CharacterCodes2["t"] = 116] = "t";
-      CharacterCodes2[CharacterCodes2["u"] = 117] = "u";
-      CharacterCodes2[CharacterCodes2["v"] = 118] = "v";
-      CharacterCodes2[CharacterCodes2["w"] = 119] = "w";
-      CharacterCodes2[CharacterCodes2["x"] = 120] = "x";
-      CharacterCodes2[CharacterCodes2["y"] = 121] = "y";
-      CharacterCodes2[CharacterCodes2["z"] = 122] = "z";
-      CharacterCodes2[CharacterCodes2["A"] = 65] = "A";
-      CharacterCodes2[CharacterCodes2["B"] = 66] = "B";
-      CharacterCodes2[CharacterCodes2["C"] = 67] = "C";
-      CharacterCodes2[CharacterCodes2["D"] = 68] = "D";
-      CharacterCodes2[CharacterCodes2["E"] = 69] = "E";
-      CharacterCodes2[CharacterCodes2["F"] = 70] = "F";
-      CharacterCodes2[CharacterCodes2["G"] = 71] = "G";
-      CharacterCodes2[CharacterCodes2["H"] = 72] = "H";
-      CharacterCodes2[CharacterCodes2["I"] = 73] = "I";
-      CharacterCodes2[CharacterCodes2["J"] = 74] = "J";
-      CharacterCodes2[CharacterCodes2["K"] = 75] = "K";
-      CharacterCodes2[CharacterCodes2["L"] = 76] = "L";
-      CharacterCodes2[CharacterCodes2["M"] = 77] = "M";
-      CharacterCodes2[CharacterCodes2["N"] = 78] = "N";
-      CharacterCodes2[CharacterCodes2["O"] = 79] = "O";
-      CharacterCodes2[CharacterCodes2["P"] = 80] = "P";
-      CharacterCodes2[CharacterCodes2["Q"] = 81] = "Q";
-      CharacterCodes2[CharacterCodes2["R"] = 82] = "R";
-      CharacterCodes2[CharacterCodes2["S"] = 83] = "S";
-      CharacterCodes2[CharacterCodes2["T"] = 84] = "T";
-      CharacterCodes2[CharacterCodes2["U"] = 85] = "U";
-      CharacterCodes2[CharacterCodes2["V"] = 86] = "V";
-      CharacterCodes2[CharacterCodes2["W"] = 87] = "W";
-      CharacterCodes2[CharacterCodes2["X"] = 88] = "X";
-      CharacterCodes2[CharacterCodes2["Y"] = 89] = "Y";
-      CharacterCodes2[CharacterCodes2["Z"] = 90] = "Z";
-      CharacterCodes2[CharacterCodes2["asterisk"] = 42] = "asterisk";
-      CharacterCodes2[CharacterCodes2["backslash"] = 92] = "backslash";
-      CharacterCodes2[CharacterCodes2["closeBrace"] = 125] = "closeBrace";
-      CharacterCodes2[CharacterCodes2["closeBracket"] = 93] = "closeBracket";
-      CharacterCodes2[CharacterCodes2["colon"] = 58] = "colon";
-      CharacterCodes2[CharacterCodes2["comma"] = 44] = "comma";
-      CharacterCodes2[CharacterCodes2["dot"] = 46] = "dot";
-      CharacterCodes2[CharacterCodes2["doubleQuote"] = 34] = "doubleQuote";
-      CharacterCodes2[CharacterCodes2["minus"] = 45] = "minus";
-      CharacterCodes2[CharacterCodes2["openBrace"] = 123] = "openBrace";
-      CharacterCodes2[CharacterCodes2["openBracket"] = 91] = "openBracket";
-      CharacterCodes2[CharacterCodes2["plus"] = 43] = "plus";
-      CharacterCodes2[CharacterCodes2["slash"] = 47] = "slash";
-      CharacterCodes2[CharacterCodes2["formFeed"] = 12] = "formFeed";
-      CharacterCodes2[CharacterCodes2["tab"] = 9] = "tab";
-    })(CharacterCodes || (CharacterCodes = {}));
-  }
-});
-
-// ../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
-var cachedSpaces, maxCachedValues, cachedBreakLinesWithSpaces;
-var init_string_intern = __esm({
-  "../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js"() {
-    cachedSpaces = new Array(20).fill(0).map((_, index) => {
-      return " ".repeat(index);
-    });
-    maxCachedValues = 200;
-    cachedBreakLinesWithSpaces = {
-      " ": {
-        "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-          return "\n" + " ".repeat(index);
-        }),
-        "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
-          return "\r" + " ".repeat(index);
-        }),
-        "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-          return "\r\n" + " ".repeat(index);
-        })
-      },
-      "	": {
-        "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-          return "\n" + "	".repeat(index);
-        }),
-        "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
-          return "\r" + "	".repeat(index);
-        }),
-        "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-          return "\r\n" + "	".repeat(index);
-        })
-      }
-    };
-  }
-});
-
-// ../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/format.js
-var init_format = __esm({
-  "../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/format.js"() {
-    "use strict";
-    init_scanner();
-    init_string_intern();
-  }
-});
-
-// ../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
-function parse2(text, errors = [], options = ParseOptions.DEFAULT) {
-  let currentProperty = null;
-  let currentParent = [];
-  const previousParents = [];
-  function onValue(value) {
-    if (Array.isArray(currentParent)) {
-      currentParent.push(value);
-    } else if (currentProperty !== null) {
-      currentParent[currentProperty] = value;
-    }
-  }
-  const visitor = {
-    onObjectBegin: () => {
-      const object = {};
-      onValue(object);
-      previousParents.push(currentParent);
-      currentParent = object;
-      currentProperty = null;
-    },
-    onObjectProperty: (name) => {
-      currentProperty = name;
-    },
-    onObjectEnd: () => {
-      currentParent = previousParents.pop();
-    },
-    onArrayBegin: () => {
-      const array = [];
-      onValue(array);
-      previousParents.push(currentParent);
-      currentParent = array;
-      currentProperty = null;
-    },
-    onArrayEnd: () => {
-      currentParent = previousParents.pop();
-    },
-    onLiteralValue: onValue,
-    onError: (error, offset, length) => {
-      errors.push({ error, offset, length });
-    }
-  };
-  visit(text, visitor, options);
-  return currentParent[0];
-}
-function visit(text, visitor, options = ParseOptions.DEFAULT) {
-  const _scanner = createScanner(text, false);
-  const _jsonPath = [];
-  let suppressedCallbacks = 0;
-  function toNoArgVisit(visitFunction) {
-    return visitFunction ? () => suppressedCallbacks === 0 && visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter()) : () => true;
-  }
-  function toOneArgVisit(visitFunction) {
-    return visitFunction ? (arg) => suppressedCallbacks === 0 && visitFunction(arg, _scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter()) : () => true;
-  }
-  function toOneArgVisitWithPath(visitFunction) {
-    return visitFunction ? (arg) => suppressedCallbacks === 0 && visitFunction(arg, _scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter(), () => _jsonPath.slice()) : () => true;
-  }
-  function toBeginVisit(visitFunction) {
-    return visitFunction ? () => {
-      if (suppressedCallbacks > 0) {
-        suppressedCallbacks++;
-      } else {
-        let cbReturn = visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter(), () => _jsonPath.slice());
-        if (cbReturn === false) {
-          suppressedCallbacks = 1;
-        }
-      }
-    } : () => true;
-  }
-  function toEndVisit(visitFunction) {
-    return visitFunction ? () => {
-      if (suppressedCallbacks > 0) {
-        suppressedCallbacks--;
-      }
-      if (suppressedCallbacks === 0) {
-        visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter());
-      }
-    } : () => true;
-  }
-  const onObjectBegin = toBeginVisit(visitor.onObjectBegin), onObjectProperty = toOneArgVisitWithPath(visitor.onObjectProperty), onObjectEnd = toEndVisit(visitor.onObjectEnd), onArrayBegin = toBeginVisit(visitor.onArrayBegin), onArrayEnd = toEndVisit(visitor.onArrayEnd), onLiteralValue = toOneArgVisitWithPath(visitor.onLiteralValue), onSeparator = toOneArgVisit(visitor.onSeparator), onComment = toNoArgVisit(visitor.onComment), onError = toOneArgVisit(visitor.onError);
-  const disallowComments = options && options.disallowComments;
-  const allowTrailingComma = options && options.allowTrailingComma;
-  function scanNext() {
-    while (true) {
-      const token = _scanner.scan();
-      switch (_scanner.getTokenError()) {
-        case 4:
-          handleError(
-            14
-            /* ParseErrorCode.InvalidUnicode */
-          );
-          break;
-        case 5:
-          handleError(
-            15
-            /* ParseErrorCode.InvalidEscapeCharacter */
-          );
-          break;
-        case 3:
-          handleError(
-            13
-            /* ParseErrorCode.UnexpectedEndOfNumber */
-          );
-          break;
-        case 1:
-          if (!disallowComments) {
-            handleError(
-              11
-              /* ParseErrorCode.UnexpectedEndOfComment */
-            );
-          }
-          break;
-        case 2:
-          handleError(
-            12
-            /* ParseErrorCode.UnexpectedEndOfString */
-          );
-          break;
-        case 6:
-          handleError(
-            16
-            /* ParseErrorCode.InvalidCharacter */
-          );
-          break;
-      }
-      switch (token) {
-        case 12:
-        case 13:
-          if (disallowComments) {
-            handleError(
-              10
-              /* ParseErrorCode.InvalidCommentToken */
-            );
-          } else {
-            onComment();
-          }
-          break;
-        case 16:
-          handleError(
-            1
-            /* ParseErrorCode.InvalidSymbol */
-          );
-          break;
-        case 15:
-        case 14:
-          break;
-        default:
-          return token;
-      }
-    }
-  }
-  function handleError(error, skipUntilAfter = [], skipUntil = []) {
-    onError(error);
-    if (skipUntilAfter.length + skipUntil.length > 0) {
-      let token = _scanner.getToken();
-      while (token !== 17) {
-        if (skipUntilAfter.indexOf(token) !== -1) {
-          scanNext();
-          break;
-        } else if (skipUntil.indexOf(token) !== -1) {
-          break;
-        }
-        token = scanNext();
-      }
-    }
-  }
-  function parseString(isValue) {
-    const value = _scanner.getTokenValue();
-    if (isValue) {
-      onLiteralValue(value);
-    } else {
-      onObjectProperty(value);
-      _jsonPath.push(value);
-    }
-    scanNext();
-    return true;
-  }
-  function parseLiteral() {
-    switch (_scanner.getToken()) {
-      case 11:
-        const tokenValue = _scanner.getTokenValue();
-        let value = Number(tokenValue);
-        if (isNaN(value)) {
-          handleError(
-            2
-            /* ParseErrorCode.InvalidNumberFormat */
-          );
-          value = 0;
-        }
-        onLiteralValue(value);
-        break;
-      case 7:
-        onLiteralValue(null);
-        break;
-      case 8:
-        onLiteralValue(true);
-        break;
-      case 9:
-        onLiteralValue(false);
-        break;
-      default:
-        return false;
-    }
-    scanNext();
-    return true;
-  }
-  function parseProperty() {
-    if (_scanner.getToken() !== 10) {
-      handleError(3, [], [
-        2,
-        5
-        /* SyntaxKind.CommaToken */
-      ]);
-      return false;
-    }
-    parseString(false);
-    if (_scanner.getToken() === 6) {
-      onSeparator(":");
-      scanNext();
-      if (!parseValue()) {
-        handleError(4, [], [
-          2,
-          5
-          /* SyntaxKind.CommaToken */
-        ]);
-      }
-    } else {
-      handleError(5, [], [
-        2,
-        5
-        /* SyntaxKind.CommaToken */
-      ]);
-    }
-    _jsonPath.pop();
-    return true;
-  }
-  function parseObject() {
-    onObjectBegin();
-    scanNext();
-    let needsComma = false;
-    while (_scanner.getToken() !== 2 && _scanner.getToken() !== 17) {
-      if (_scanner.getToken() === 5) {
-        if (!needsComma) {
-          handleError(4, [], []);
-        }
-        onSeparator(",");
-        scanNext();
-        if (_scanner.getToken() === 2 && allowTrailingComma) {
-          break;
-        }
-      } else if (needsComma) {
-        handleError(6, [], []);
-      }
-      if (!parseProperty()) {
-        handleError(4, [], [
-          2,
-          5
-          /* SyntaxKind.CommaToken */
-        ]);
-      }
-      needsComma = true;
-    }
-    onObjectEnd();
-    if (_scanner.getToken() !== 2) {
-      handleError(7, [
-        2
-        /* SyntaxKind.CloseBraceToken */
-      ], []);
-    } else {
-      scanNext();
-    }
-    return true;
-  }
-  function parseArray() {
-    onArrayBegin();
-    scanNext();
-    let isFirstElement = true;
-    let needsComma = false;
-    while (_scanner.getToken() !== 4 && _scanner.getToken() !== 17) {
-      if (_scanner.getToken() === 5) {
-        if (!needsComma) {
-          handleError(4, [], []);
-        }
-        onSeparator(",");
-        scanNext();
-        if (_scanner.getToken() === 4 && allowTrailingComma) {
-          break;
-        }
-      } else if (needsComma) {
-        handleError(6, [], []);
-      }
-      if (isFirstElement) {
-        _jsonPath.push(0);
-        isFirstElement = false;
-      } else {
-        _jsonPath[_jsonPath.length - 1]++;
-      }
-      if (!parseValue()) {
-        handleError(4, [], [
-          4,
-          5
-          /* SyntaxKind.CommaToken */
-        ]);
-      }
-      needsComma = true;
-    }
-    onArrayEnd();
-    if (!isFirstElement) {
-      _jsonPath.pop();
-    }
-    if (_scanner.getToken() !== 4) {
-      handleError(8, [
-        4
-        /* SyntaxKind.CloseBracketToken */
-      ], []);
-    } else {
-      scanNext();
-    }
-    return true;
-  }
-  function parseValue() {
-    switch (_scanner.getToken()) {
-      case 3:
-        return parseArray();
-      case 1:
-        return parseObject();
-      case 10:
-        return parseString(true);
-      default:
-        return parseLiteral();
-    }
-  }
-  scanNext();
-  if (_scanner.getToken() === 17) {
-    if (options.allowEmptyContent) {
-      return true;
-    }
-    handleError(4, [], []);
-    return false;
-  }
-  if (!parseValue()) {
-    handleError(4, [], []);
-    return false;
-  }
-  if (_scanner.getToken() !== 17) {
-    handleError(9, [], []);
-  }
-  return true;
-}
-var ParseOptions;
-var init_parser = __esm({
-  "../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js"() {
-    "use strict";
-    init_scanner();
-    (function(ParseOptions2) {
-      ParseOptions2.DEFAULT = {
-        allowTrailingComma: false
-      };
-    })(ParseOptions || (ParseOptions = {}));
-  }
-});
-
-// ../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/edit.js
-var init_edit = __esm({
-  "../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/edit.js"() {
-    "use strict";
-    init_format();
-    init_parser();
-  }
-});
-
-// ../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
-function printParseErrorCode(code) {
-  switch (code) {
-    case 1:
-      return "InvalidSymbol";
-    case 2:
-      return "InvalidNumberFormat";
-    case 3:
-      return "PropertyNameExpected";
-    case 4:
-      return "ValueExpected";
-    case 5:
-      return "ColonExpected";
-    case 6:
-      return "CommaExpected";
-    case 7:
-      return "CloseBraceExpected";
-    case 8:
-      return "CloseBracketExpected";
-    case 9:
-      return "EndOfFileExpected";
-    case 10:
-      return "InvalidCommentToken";
-    case 11:
-      return "UnexpectedEndOfComment";
-    case 12:
-      return "UnexpectedEndOfString";
-    case 13:
-      return "UnexpectedEndOfNumber";
-    case 14:
-      return "InvalidUnicode";
-    case 15:
-      return "InvalidEscapeCharacter";
-    case 16:
-      return "InvalidCharacter";
-  }
-  return "<unknown ParseErrorCode>";
-}
-var ScanError, SyntaxKind, parse3, ParseErrorCode;
-var init_main = __esm({
-  "../../node_modules/.pnpm/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js"() {
-    "use strict";
-    init_format();
-    init_edit();
-    init_scanner();
-    init_parser();
-    (function(ScanError2) {
-      ScanError2[ScanError2["None"] = 0] = "None";
-      ScanError2[ScanError2["UnexpectedEndOfComment"] = 1] = "UnexpectedEndOfComment";
-      ScanError2[ScanError2["UnexpectedEndOfString"] = 2] = "UnexpectedEndOfString";
-      ScanError2[ScanError2["UnexpectedEndOfNumber"] = 3] = "UnexpectedEndOfNumber";
-      ScanError2[ScanError2["InvalidUnicode"] = 4] = "InvalidUnicode";
-      ScanError2[ScanError2["InvalidEscapeCharacter"] = 5] = "InvalidEscapeCharacter";
-      ScanError2[ScanError2["InvalidCharacter"] = 6] = "InvalidCharacter";
-    })(ScanError || (ScanError = {}));
-    (function(SyntaxKind2) {
-      SyntaxKind2[SyntaxKind2["OpenBraceToken"] = 1] = "OpenBraceToken";
-      SyntaxKind2[SyntaxKind2["CloseBraceToken"] = 2] = "CloseBraceToken";
-      SyntaxKind2[SyntaxKind2["OpenBracketToken"] = 3] = "OpenBracketToken";
-      SyntaxKind2[SyntaxKind2["CloseBracketToken"] = 4] = "CloseBracketToken";
-      SyntaxKind2[SyntaxKind2["CommaToken"] = 5] = "CommaToken";
-      SyntaxKind2[SyntaxKind2["ColonToken"] = 6] = "ColonToken";
-      SyntaxKind2[SyntaxKind2["NullKeyword"] = 7] = "NullKeyword";
-      SyntaxKind2[SyntaxKind2["TrueKeyword"] = 8] = "TrueKeyword";
-      SyntaxKind2[SyntaxKind2["FalseKeyword"] = 9] = "FalseKeyword";
-      SyntaxKind2[SyntaxKind2["StringLiteral"] = 10] = "StringLiteral";
-      SyntaxKind2[SyntaxKind2["NumericLiteral"] = 11] = "NumericLiteral";
-      SyntaxKind2[SyntaxKind2["LineCommentTrivia"] = 12] = "LineCommentTrivia";
-      SyntaxKind2[SyntaxKind2["BlockCommentTrivia"] = 13] = "BlockCommentTrivia";
-      SyntaxKind2[SyntaxKind2["LineBreakTrivia"] = 14] = "LineBreakTrivia";
-      SyntaxKind2[SyntaxKind2["Trivia"] = 15] = "Trivia";
-      SyntaxKind2[SyntaxKind2["Unknown"] = 16] = "Unknown";
-      SyntaxKind2[SyntaxKind2["EOF"] = 17] = "EOF";
-    })(SyntaxKind || (SyntaxKind = {}));
-    parse3 = parse2;
-    (function(ParseErrorCode2) {
-      ParseErrorCode2[ParseErrorCode2["InvalidSymbol"] = 1] = "InvalidSymbol";
-      ParseErrorCode2[ParseErrorCode2["InvalidNumberFormat"] = 2] = "InvalidNumberFormat";
-      ParseErrorCode2[ParseErrorCode2["PropertyNameExpected"] = 3] = "PropertyNameExpected";
-      ParseErrorCode2[ParseErrorCode2["ValueExpected"] = 4] = "ValueExpected";
-      ParseErrorCode2[ParseErrorCode2["ColonExpected"] = 5] = "ColonExpected";
-      ParseErrorCode2[ParseErrorCode2["CommaExpected"] = 6] = "CommaExpected";
-      ParseErrorCode2[ParseErrorCode2["CloseBraceExpected"] = 7] = "CloseBraceExpected";
-      ParseErrorCode2[ParseErrorCode2["CloseBracketExpected"] = 8] = "CloseBracketExpected";
-      ParseErrorCode2[ParseErrorCode2["EndOfFileExpected"] = 9] = "EndOfFileExpected";
-      ParseErrorCode2[ParseErrorCode2["InvalidCommentToken"] = 10] = "InvalidCommentToken";
-      ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfComment"] = 11] = "UnexpectedEndOfComment";
-      ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfString"] = 12] = "UnexpectedEndOfString";
-      ParseErrorCode2[ParseErrorCode2["UnexpectedEndOfNumber"] = 13] = "UnexpectedEndOfNumber";
-      ParseErrorCode2[ParseErrorCode2["InvalidUnicode"] = 14] = "InvalidUnicode";
-      ParseErrorCode2[ParseErrorCode2["InvalidEscapeCharacter"] = 15] = "InvalidEscapeCharacter";
-      ParseErrorCode2[ParseErrorCode2["InvalidCharacter"] = 16] = "InvalidCharacter";
-    })(ParseErrorCode || (ParseErrorCode = {}));
-  }
-});
-
-// ../../node_modules/.pnpm/@cpdevtools+ts-dev-utilities@file+..+ts-dev-utilities/node_modules/@cpdevtools/ts-dev-utilities/dist/project/index.js
-var project_exports = {};
-__export(project_exports, {
-  DependencyGraph: () => DependencyGraph,
-  buildDependencyGraph: () => buildDependencyGraph,
-  discoverProjects: () => discoverProjects
-});
-function parseJson(text) {
-  const errors = [];
-  const result = parse3(text, errors, {
-    allowTrailingComma: true,
-    allowEmptyContent: false
-  });
-  if (errors.length > 0) {
-    const error = errors[0];
-    throw new Error(
-      `JSON parse error at offset ${error.offset}: ${printParseErrorCode(error.error)}`
-    );
-  }
-  return result;
-}
-async function discoverProjects(options = {}) {
-  const {
-    cwd = process.cwd(),
-    patterns = ["**/package.json"],
-    ignore = ["**/node_modules/**", "**/dist/**"]
-  } = options;
-  const packageJsonPaths = await globby2(patterns, {
-    cwd,
-    ignore,
-    absolute: true,
-    onlyFiles: true
-  });
-  const projects = [];
-  for (const packageJsonPath of packageJsonPaths) {
-    try {
-      const content = await (0, import_promises4.readFile)(packageJsonPath, "utf-8");
-      const packageJson = parseJson(content);
-      projects.push({
-        packageJsonPath,
-        directory: (0, import_path.dirname)(packageJsonPath),
-        packageJson,
-        name: packageJson.name || (0, import_path.basename)((0, import_path.dirname)(packageJsonPath)),
-        dependencies: packageJson.dependencies,
-        devDependencies: packageJson.devDependencies
-      });
-    } catch (error) {
-      console.warn(`Failed to parse ${packageJsonPath}:`, error);
-    }
-  }
-  return projects;
-}
-function buildDependencyGraph(projects, workspaceProjects) {
-  const graph = new DependencyGraph();
-  const projectNames = new Set(projects.map((p) => p.name || p.packageJson.name));
-  for (const project of projects) {
-    graph.addProject(project);
-  }
-  for (const project of projects) {
-    const deps = {
-      ...project.packageJson.dependencies,
-      ...project.packageJson.devDependencies
-    };
-    for (const depName of Object.keys(deps || {})) {
-      if (projectNames.has(depName)) {
-        graph.addDependency(project.name || project.packageJson.name, depName);
-      } else if (workspaceProjects?.has(depName)) {
-        console.warn(
-          `Warning: ${project.name || project.packageJson.name} depends on ${depName} which is in workspace but not discovered`
-        );
-      }
-    }
-  }
-  return graph;
-}
-var import_promises4, import_path, DependencyGraph;
-var init_project = __esm({
-  "../../node_modules/.pnpm/@cpdevtools+ts-dev-utilities@file+..+ts-dev-utilities/node_modules/@cpdevtools/ts-dev-utilities/dist/project/index.js"() {
-    init_globby();
-    import_promises4 = require("fs/promises");
-    import_path = require("path");
-    init_main();
-    DependencyGraph = class {
-      nodes = /* @__PURE__ */ new Map();
-      /**
-       * Add a project to the graph
-       */
-      addProject(project) {
-        if (!this.nodes.has(project.name)) {
-          this.nodes.set(project.name, {
-            name: project.name,
-            project,
-            dependencies: /* @__PURE__ */ new Set(),
-            dependents: /* @__PURE__ */ new Set()
-          });
-        }
-      }
-      /**
-       * Add a dependency edge between two projects
-       * @param from - Project that has the dependency
-       * @param to - Project that is depended upon
-       */
-      addDependency(from, to) {
-        const fromNode = this.nodes.get(from);
-        const toNode = this.nodes.get(to);
-        if (!fromNode) {
-          throw new Error(`Project not found in graph: ${from}`);
-        }
-        if (!toNode) {
-          throw new Error(`Project not found in graph: ${to}`);
-        }
-        fromNode.dependencies.add(to);
-        toNode.dependents.add(from);
-      }
-      /**
-       * Get a project node
-       */
-      getNode(name) {
-        return this.nodes.get(name);
-      }
-      /**
-       * Get all project nodes
-       */
-      getAllNodes() {
-        return Array.from(this.nodes.values());
-      }
-      /**
-       * Get all project names
-       */
-      getAllProjectNames() {
-        return Array.from(this.nodes.keys());
-      }
-      /**
-       * Check if graph has a cycle
-       * @returns Array of project names forming a cycle, or undefined if no cycle
-       */
-      detectCycle() {
-        const visited = /* @__PURE__ */ new Set();
-        const recursionStack = /* @__PURE__ */ new Set();
-        const path4 = [];
-        const visit2 = (name) => {
-          if (recursionStack.has(name)) {
-            return true;
-          }
-          if (visited.has(name)) {
-            return false;
-          }
-          visited.add(name);
-          recursionStack.add(name);
-          path4.push(name);
-          const node = this.nodes.get(name);
-          if (node) {
-            for (const dep of node.dependencies) {
-              if (visit2(dep)) {
-                return true;
-              }
-            }
-          }
-          recursionStack.delete(name);
-          path4.pop();
-          return false;
-        };
-        for (const name of this.nodes.keys()) {
-          if (!visited.has(name)) {
-            if (visit2(name)) {
-              return path4;
-            }
-          }
-        }
-        return void 0;
-      }
-      /**
-       * Get projects in topological order (dependencies before dependents)
-       * @returns Array of batches, where each batch contains projects that can be processed in parallel
-       * @throws Error if circular dependency is detected
-       */
-      getTopologicalBatches() {
-        const cycle = this.detectCycle();
-        if (cycle) {
-          throw new Error(
-            `Circular dependency detected: ${cycle.join(" -> ")} -> ${cycle[0]}`
-          );
-        }
-        const batches = [];
-        const processed = /* @__PURE__ */ new Set();
-        const remaining = new Set(this.nodes.keys());
-        while (remaining.size > 0) {
-          const batch = [];
-          for (const name of remaining) {
-            const node = this.nodes.get(name);
-            const hasUnprocessedDeps = Array.from(node.dependencies).some(
-              (dep) => !processed.has(dep)
-            );
-            if (!hasUnprocessedDeps) {
-              batch.push(node.project);
-            }
-          }
-          if (batch.length === 0) {
-            throw new Error(
-              "Unable to determine topological order. Possible circular dependency."
-            );
-          }
-          batches.push(batch);
-          for (const project of batch) {
-            processed.add(project.name);
-            remaining.delete(project.name);
-          }
-        }
-        return batches;
-      }
-    };
-  }
-});
-
 // ../../node_modules/.pnpm/yaml@2.8.2/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
   "../../node_modules/.pnpm/yaml@2.8.2/node_modules/yaml/dist/nodes/identity.js"(exports2) {
@@ -31647,7 +30496,7 @@ var require_visit = __commonJS({
     var BREAK = /* @__PURE__ */ Symbol("break visit");
     var SKIP = /* @__PURE__ */ Symbol("skip children");
     var REMOVE = /* @__PURE__ */ Symbol("remove node");
-    function visit2(node, visitor) {
+    function visit(node, visitor) {
       const visitor_ = initVisitor(visitor);
       if (identity.isDocument(node)) {
         const cd = visit_(null, node.contents, visitor_, Object.freeze([node]));
@@ -31656,9 +30505,9 @@ var require_visit = __commonJS({
       } else
         visit_(null, node, visitor_, Object.freeze([]));
     }
-    visit2.BREAK = BREAK;
-    visit2.SKIP = SKIP;
-    visit2.REMOVE = REMOVE;
+    visit.BREAK = BREAK;
+    visit.SKIP = SKIP;
+    visit.REMOVE = REMOVE;
     function visit_(key, node, visitor, path4) {
       const ctrl = callVisitor(key, node, visitor, path4);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
@@ -31792,7 +30641,7 @@ var require_visit = __commonJS({
         throw new Error(`Cannot replace node with ${pt} parent`);
       }
     }
-    exports2.visit = visit2;
+    exports2.visit = visit;
     exports2.visitAsync = visitAsync;
   }
 });
@@ -31802,7 +30651,7 @@ var require_directives = __commonJS({
   "../../node_modules/.pnpm/yaml@2.8.2/node_modules/yaml/dist/doc/directives.js"(exports2) {
     "use strict";
     var identity = require_identity();
-    var visit2 = require_visit();
+    var visit = require_visit();
     var escapeChars = {
       "!": "%21",
       ",": "%2C",
@@ -31946,7 +30795,7 @@ var require_directives = __commonJS({
         let tagNames;
         if (doc && tagEntries.length > 0 && identity.isNode(doc.contents)) {
           const tags = {};
-          visit2.visit(doc.contents, (_key, node) => {
+          visit.visit(doc.contents, (_key, node) => {
             if (identity.isNode(node) && node.tag)
               tags[node.tag] = true;
           });
@@ -31973,7 +30822,7 @@ var require_anchors = __commonJS({
   "../../node_modules/.pnpm/yaml@2.8.2/node_modules/yaml/dist/doc/anchors.js"(exports2) {
     "use strict";
     var identity = require_identity();
-    var visit2 = require_visit();
+    var visit = require_visit();
     function anchorIsValid(anchor) {
       if (/[\x00-\x19\s,[\]{}]/.test(anchor)) {
         const sa = JSON.stringify(anchor);
@@ -31984,7 +30833,7 @@ var require_anchors = __commonJS({
     }
     function anchorNames(root) {
       const anchors = /* @__PURE__ */ new Set();
-      visit2.visit(root, {
+      visit.visit(root, {
         Value(_key, node) {
           if (node.anchor)
             anchors.add(node.anchor);
@@ -32164,7 +31013,7 @@ var require_Alias = __commonJS({
   "../../node_modules/.pnpm/yaml@2.8.2/node_modules/yaml/dist/nodes/Alias.js"(exports2) {
     "use strict";
     var anchors = require_anchors();
-    var visit2 = require_visit();
+    var visit = require_visit();
     var identity = require_identity();
     var Node = require_Node();
     var toJS = require_toJS();
@@ -32188,7 +31037,7 @@ var require_Alias = __commonJS({
           nodes = ctx.aliasResolveCache;
         } else {
           nodes = [];
-          visit2.visit(doc, {
+          visit.visit(doc, {
             Node: (_key, node) => {
               if (identity.isAlias(node) || identity.hasAnchor(node))
                 nodes.push(node);
@@ -33909,14 +32758,14 @@ var require_bool = __commonJS({
 var require_stringifyNumber = __commonJS({
   "../../node_modules/.pnpm/yaml@2.8.2/node_modules/yaml/dist/stringify/stringifyNumber.js"(exports2) {
     "use strict";
-    function stringifyNumber({ format: format2, minFractionDigits, tag, value }) {
+    function stringifyNumber({ format, minFractionDigits, tag, value }) {
       if (typeof value === "bigint")
         return String(value);
       const num = typeof value === "number" ? value : Number(value);
       if (!isFinite(num))
         return isNaN(num) ? ".nan" : num < 0 ? "-.inf" : ".inf";
       let n = Object.is(value, -0) ? "-0" : JSON.stringify(value);
-      if (!format2 && minFractionDigits && (!tag || tag === "tag:yaml.org,2002:float") && /^\d/.test(n)) {
+      if (!format && minFractionDigits && (!tag || tag === "tag:yaml.org,2002:float") && /^\d/.test(n)) {
         let i = n.indexOf(".");
         if (i < 0) {
           i = n.length;
@@ -37088,15 +35937,15 @@ var require_cst_visit = __commonJS({
     var BREAK = /* @__PURE__ */ Symbol("break visit");
     var SKIP = /* @__PURE__ */ Symbol("skip children");
     var REMOVE = /* @__PURE__ */ Symbol("remove item");
-    function visit2(cst, visitor) {
+    function visit(cst, visitor) {
       if ("type" in cst && cst.type === "document")
         cst = { start: cst.start, value: cst.value };
       _visit(Object.freeze([]), cst, visitor);
     }
-    visit2.BREAK = BREAK;
-    visit2.SKIP = SKIP;
-    visit2.REMOVE = REMOVE;
-    visit2.itemAtPath = (cst, path4) => {
+    visit.BREAK = BREAK;
+    visit.SKIP = SKIP;
+    visit.REMOVE = REMOVE;
+    visit.itemAtPath = (cst, path4) => {
       let item = cst;
       for (const [field, index] of path4) {
         const tok = item?.[field];
@@ -37107,8 +35956,8 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit2.parentCollection = (cst, path4) => {
-      const parent = visit2.itemAtPath(cst, path4.slice(0, -1));
+    visit.parentCollection = (cst, path4) => {
+      const parent = visit.itemAtPath(cst, path4.slice(0, -1));
       const field = path4[path4.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
@@ -37139,7 +35988,7 @@ var require_cst_visit = __commonJS({
       }
       return typeof ctrl === "function" ? ctrl(item, path4) : ctrl;
     }
-    exports2.visit = visit2;
+    exports2.visit = visit;
   }
 });
 
@@ -38771,7 +37620,7 @@ var require_public_api = __commonJS({
       }
       return doc;
     }
-    function parse4(src, reviver, options) {
+    function parse2(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
@@ -38812,7 +37661,7 @@ var require_public_api = __commonJS({
         return value.toString(options);
       return new Document.Document(value, _replacer, options).toString(options);
     }
-    exports2.parse = parse4;
+    exports2.parse = parse2;
     exports2.parseAllDocuments = parseAllDocuments;
     exports2.parseDocument = parseDocument;
     exports2.stringify = stringify;
@@ -38838,7 +37687,7 @@ var require_dist = __commonJS({
     var lineCounter = require_line_counter();
     var parser = require_parser();
     var publicApi = require_public_api();
-    var visit2 = require_visit();
+    var visit = require_visit();
     exports2.Composer = composer.Composer;
     exports2.Document = Document.Document;
     exports2.Schema = Schema.Schema;
@@ -38866,8 +37715,8 @@ var require_dist = __commonJS({
     exports2.parseAllDocuments = publicApi.parseAllDocuments;
     exports2.parseDocument = publicApi.parseDocument;
     exports2.stringify = publicApi.stringify;
-    exports2.visit = visit2.visit;
-    exports2.visitAsync = visit2.visitAsync;
+    exports2.visit = visit.visit;
+    exports2.visitAsync = visit.visitAsync;
   }
 });
 
@@ -39990,9 +38839,9 @@ var require_vendor_core = __commonJS({
       unix: parseUnixGrid,
       win: parseWinGrid
     };
-    var parse4 = (input, { format: format2 = "unix", debug: debug2 = false } = {}) => {
-      const parser = parsers[format2];
-      if (!parser) throw new Error(`unsupported format: ${format2}`);
+    var parse2 = (input, { format = "unix", debug: debug2 = false } = {}) => {
+      const parser = parsers[format];
+      if (!parser) throw new Error(`unsupported format: ${format}`);
       return parser(input, debug2);
     };
     var cp = __toESM2(require("child_process"), 1);
@@ -40244,14 +39093,14 @@ var require_vendor_core = __commonJS({
         cmd: "wmic process get ProcessId,ParentProcessId,CommandLine",
         args: [],
         parse(stdout) {
-          return parse4(removeWmicPrefix(stdout), { format: "win" });
+          return parse2(removeWmicPrefix(stdout), { format: "win" });
         }
       },
       ps: {
         cmd: "ps",
         args: ["-lx"],
         parse(stdout) {
-          return parse4(stdout, { format: "unix" });
+          return parse2(stdout, { format: "unix" });
         }
       },
       pwsh: {
@@ -40880,9 +39729,9 @@ ${details}`;
       var _a;
       if (!entry.verbose) return;
       const stream = log.output || import_node_process3.default.stderr;
-      const format2 = ((_a = log.formatters) == null ? void 0 : _a[entry.kind]) || formatters[entry.kind];
-      if (!format2) return;
-      stream.write(format2(entry));
+      const format = ((_a = log.formatters) == null ? void 0 : _a[entry.kind]) || formatters[entry.kind];
+      if (!format) return;
+      stream.write(format(entry));
     };
     var SPACE_RE = /\s/;
     var SYNTAX = "()[]{}<>;:+|&=";
@@ -42478,7 +41327,7 @@ var require_vendor_extra = __commonJS({
           let padded = zeros(startString) || zeros(endString) || zeros(stepString);
           let maxLen = padded ? Math.max(startString.length, endString.length, stepString.length) : 0;
           let toNumber = padded === false && stringify5(start, end, options) === false;
-          let format2 = options.transform || transform(toNumber);
+          let format = options.transform || transform(toNumber);
           if (options.toRegex && step === 1) {
             return toRange(toMaxLen(start, maxLen), toMaxLen(end, maxLen), true, options);
           }
@@ -42490,7 +41339,7 @@ var require_vendor_extra = __commonJS({
             if (options.toRegex === true && step > 1) {
               push(a);
             } else {
-              range.push(pad(format2(a, index), maxLen, toNumber));
+              range.push(pad(format(a, index), maxLen, toNumber));
             }
             a = descending ? a - step : a + step;
             index++;
@@ -42504,7 +41353,7 @@ var require_vendor_extra = __commonJS({
           if (!isNumber(start) && start.length > 1 || !isNumber(end) && end.length > 1) {
             return invalidRange(start, end, options);
           }
-          let format2 = options.transform || ((val) => String.fromCharCode(val));
+          let format = options.transform || ((val) => String.fromCharCode(val));
           let a = `${start}`.charCodeAt(0);
           let b = `${end}`.charCodeAt(0);
           let descending = a > b;
@@ -42516,7 +41365,7 @@ var require_vendor_extra = __commonJS({
           let range = [];
           let index = 0;
           while (descending ? a >= b : a <= b) {
-            range.push(format2(a, index));
+            range.push(format(a, index));
             a = descending ? a - step : a + step;
             index++;
           }
@@ -42827,7 +41676,7 @@ var require_vendor_extra = __commonJS({
           CHAR_NO_BREAK_SPACE,
           CHAR_ZERO_WIDTH_NOBREAK_SPACE
         } = require_constants9();
-        var parse32 = (input, options = {}) => {
+        var parse3 = (input, options = {}) => {
           if (typeof input !== "string") {
             throw new TypeError("Expected a string");
           }
@@ -43027,7 +41876,7 @@ var require_vendor_extra = __commonJS({
           push({ type: "eos" });
           return ast;
         };
-        module22.exports = parse32;
+        module22.exports = parse3;
       }
     });
     var require_braces2 = __commonJS2({
@@ -43036,7 +41885,7 @@ var require_vendor_extra = __commonJS({
         var stringify5 = require_stringify3();
         var compile = require_compile2();
         var expand2 = require_expand2();
-        var parse32 = require_parse4();
+        var parse3 = require_parse4();
         var braces = (input, options = {}) => {
           let output = [];
           if (Array.isArray(input)) {
@@ -43056,7 +41905,7 @@ var require_vendor_extra = __commonJS({
           }
           return output;
         };
-        braces.parse = (input, options = {}) => parse32(input, options);
+        braces.parse = (input, options = {}) => parse3(input, options);
         braces.stringify = (input, options = {}) => {
           if (typeof input === "string") {
             return stringify5(braces.parse(input, options), options);
@@ -43700,7 +42549,7 @@ var require_vendor_extra = __commonJS({
         var syntaxError = (type, char) => {
           return `Missing ${type}: "${char}" - use "\\\\${char}" to match literal characters`;
         };
-        var parse32 = (input, options) => {
+        var parse3 = (input, options) => {
           if (typeof input !== "string") {
             throw new TypeError("Expected a string");
           }
@@ -43849,7 +42698,7 @@ var require_vendor_extra = __commonJS({
                 output = token.close = `)$))${extglobStar}`;
               }
               if (token.inner.includes("*") && (rest = remaining()) && /^\.[^\\/.]+$/.test(rest)) {
-                const expression = parse32(rest, __spreadProps(__spreadValues({}, options), { fastpaths: false })).output;
+                const expression = parse3(rest, __spreadProps(__spreadValues({}, options), { fastpaths: false })).output;
                 output = token.close = `)${expression})${extglobStar})`;
               }
               if (token.prev.type === "bos") {
@@ -44374,7 +43223,7 @@ var require_vendor_extra = __commonJS({
           }
           return state;
         };
-        parse32.fastpaths = (input, options) => {
+        parse3.fastpaths = (input, options) => {
           const opts = __spreadValues({}, options);
           const max = typeof opts.maxLength === "number" ? Math.min(MAX_LENGTH, opts.maxLength) : MAX_LENGTH;
           const len = input.length;
@@ -44440,7 +43289,7 @@ var require_vendor_extra = __commonJS({
           }
           return source;
         };
-        module22.exports = parse32;
+        module22.exports = parse3;
       }
     });
     var require_picomatch3 = __commonJS2({
@@ -44448,7 +43297,7 @@ var require_vendor_extra = __commonJS({
         "use strict";
         var path32 = require("path");
         var scan = require_scan2();
-        var parse32 = require_parse22();
+        var parse3 = require_parse22();
         var utils = require_utils22();
         var constants = require_constants22();
         var isObject = (val) => val && typeof val === "object" && !Array.isArray(val);
@@ -44513,11 +43362,11 @@ var require_vendor_extra = __commonJS({
             return { isMatch: false, output: "" };
           }
           const opts = options || {};
-          const format2 = opts.format || (posix ? utils.toPosixSlashes : null);
+          const format = opts.format || (posix ? utils.toPosixSlashes : null);
           let match = input === glob22;
-          let output = match && format2 ? format2(input) : input;
+          let output = match && format ? format(input) : input;
           if (match === false) {
-            output = format2 ? format2(input) : input;
+            output = format ? format(input) : input;
             match = output === glob22;
           }
           if (match === false || opts.capture === true) {
@@ -44536,7 +43385,7 @@ var require_vendor_extra = __commonJS({
         picomatch.isMatch = (str, patterns, options) => picomatch(patterns, options)(str);
         picomatch.parse = (pattern, options) => {
           if (Array.isArray(pattern)) return pattern.map((p2) => picomatch.parse(p2, options));
-          return parse32(pattern, __spreadProps(__spreadValues({}, options), { fastpaths: false }));
+          return parse3(pattern, __spreadProps(__spreadValues({}, options), { fastpaths: false }));
         };
         picomatch.scan = (input, options) => scan(input, options);
         picomatch.compileRe = (state, options, returnOutput = false, returnState = false) => {
@@ -44562,10 +43411,10 @@ var require_vendor_extra = __commonJS({
           }
           let parsed = { negated: false, fastpaths: true };
           if (options.fastpaths !== false && (input[0] === "." || input[0] === "*")) {
-            parsed.output = parse32.fastpaths(input, options);
+            parsed.output = parse3.fastpaths(input, options);
           }
           if (!parsed.output) {
-            parsed = parse32(input, options);
+            parsed = parse3(input, options);
           }
           return picomatch.compileRe(parsed, options, returnOutput, returnState);
         };
@@ -44847,8 +43696,8 @@ var require_vendor_extra = __commonJS({
         }
         exports22.endsWithSlashGlobStar = endsWithSlashGlobStar;
         function isAffectDepthOfReadingPattern(pattern) {
-          const basename2 = path32.basename(pattern);
-          return endsWithSlashGlobStar(pattern) || isStaticPattern(basename2);
+          const basename = path32.basename(pattern);
+          return endsWithSlashGlobStar(pattern) || isStaticPattern(basename);
         }
         exports22.isAffectDepthOfReadingPattern = isAffectDepthOfReadingPattern;
         function expandPatternsWithBraceExpansion(patterns) {
@@ -48068,8 +46917,8 @@ var require_vendor_extra = __commonJS({
           fs7.createReadStream = createReadStream;
           fs7.createWriteStream = createWriteStream;
           var fs$readFile = fs7.readFile;
-          fs7.readFile = readFile2;
-          function readFile2(path32, options, cb) {
+          fs7.readFile = readFile;
+          function readFile(path32, options, cb) {
             if (typeof options === "function")
               cb = options, options = null;
             return go$readFile(path32, options, cb);
@@ -49440,7 +48289,7 @@ var require_vendor_extra = __commonJS({
             return obj;
           });
         }
-        var readFile2 = universalify.fromPromise(_readFile);
+        var readFile = universalify.fromPromise(_readFile);
         function readFileSync(file, options = {}) {
           if (typeof options === "string") {
             options = { encoding: options };
@@ -49474,7 +48323,7 @@ var require_vendor_extra = __commonJS({
           return fs6.writeFileSync(file, str, options);
         }
         var jsonfile = {
-          readFile: readFile2,
+          readFile,
           readFileSync,
           writeFile,
           writeFileSync
@@ -53921,7 +52770,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
     var import_node_stream2 = require("stream");
     var import_node_events2 = require("events");
     var import_node_stream4 = require("stream");
-    var import_promises5 = require("stream").promises;
+    var import_promises4 = require("stream").promises;
     function mergeStreams2(streams) {
       if (!Array.isArray(streams)) {
         throw new TypeError(`Expected an array, got \`${typeof streams}\`.`);
@@ -54022,7 +52871,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
     });
     var onMergedStreamEnd2 = (_0, _1) => __async(null, [_0, _1], function* (passThroughStream, { signal }) {
       try {
-        yield (0, import_promises5.finished)(passThroughStream, { signal, cleanup: true });
+        yield (0, import_promises4.finished)(passThroughStream, { signal, cleanup: true });
       } catch (error) {
         errorOrAbortStream(passThroughStream, error);
         throw error;
@@ -54101,7 +52950,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
     });
     var onInputStreamEnd2 = (_0) => __async(null, [_0], function* ({ passThroughStream, stream, streams, ended, aborted, controller: { signal } }) {
       try {
-        yield (0, import_promises5.finished)(stream, {
+        yield (0, import_promises4.finished)(stream, {
           signal,
           cleanup: true,
           readable: true,
@@ -54340,9 +53189,9 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
       if (!match) {
         return false;
       }
-      const dirname2 = match[1];
-      const hasWildcards = /[*?[\]{}]/.test(dirname2);
-      const hasExtension = import_node_path22.default.extname(dirname2) && !dirname2.startsWith(".");
+      const dirname = match[1];
+      const hasWildcards = /[*?[\]{}]/.test(dirname);
+      const hasExtension = import_node_path22.default.extname(dirname) && !dirname.startsWith(".");
       return !hasWildcards && !hasExtension;
     };
     var getDirectoryGlob2 = ({ directoryPath, files, extensions }) => {
@@ -54556,11 +53405,11 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
       isPair: () => isPair,
       isScalar: () => isScalar,
       isSeq: () => isSeq,
-      parse: () => parse4,
+      parse: () => parse2,
       parseAllDocuments: () => parseAllDocuments,
       parseDocument: () => parseDocument,
       stringify: () => stringify3,
-      visit: () => visit2,
+      visit: () => visit,
       visitAsync: () => visitAsync
     });
     var dist_exports = {};
@@ -54588,11 +53437,11 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
       isPair: () => isPair,
       isScalar: () => isScalar,
       isSeq: () => isSeq,
-      parse: () => parse4,
+      parse: () => parse2,
       parseAllDocuments: () => parseAllDocuments,
       parseDocument: () => parseDocument,
       stringify: () => stringify3,
-      visit: () => visit2,
+      visit: () => visit,
       visitAsync: () => visitAsync
     });
     var ALIAS = /* @__PURE__ */ Symbol.for("yaml.alias");
@@ -54632,7 +53481,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
     var BREAK = /* @__PURE__ */ Symbol("break visit");
     var SKIP = /* @__PURE__ */ Symbol("skip children");
     var REMOVE = /* @__PURE__ */ Symbol("remove node");
-    function visit2(node, visitor) {
+    function visit(node, visitor) {
       const visitor_ = initVisitor(visitor);
       if (isDocument(node)) {
         const cd = visit_(null, node.contents, visitor_, Object.freeze([node]));
@@ -54641,9 +53490,9 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
       } else
         visit_(null, node, visitor_, Object.freeze([]));
     }
-    visit2.BREAK = BREAK;
-    visit2.SKIP = SKIP;
-    visit2.REMOVE = REMOVE;
+    visit.BREAK = BREAK;
+    visit.SKIP = SKIP;
+    visit.REMOVE = REMOVE;
     function visit_(key, node, visitor, path32) {
       const ctrl = callVisitor(key, node, visitor, path32);
       if (isNode(ctrl) || isPair(ctrl)) {
@@ -54925,7 +53774,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
         let tagNames;
         if (doc && tagEntries.length > 0 && isNode(doc.contents)) {
           const tags = {};
-          visit2(doc.contents, (_key, node) => {
+          visit(doc.contents, (_key, node) => {
             if (isNode(node) && node.tag)
               tags[node.tag] = true;
           });
@@ -54953,7 +53802,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
     }
     function anchorNames(root) {
       const anchors = /* @__PURE__ */ new Set();
-      visit2(root, {
+      visit(root, {
         Value(_key, node) {
           if (node.anchor)
             anchors.add(node.anchor);
@@ -55113,7 +53962,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
           nodes = ctx.aliasResolveCache;
         } else {
           nodes = [];
-          visit2(doc, {
+          visit(doc, {
             Node: (_key, node) => {
               if (isAlias(node) || hasAnchor(node))
                 nodes.push(node);
@@ -56610,14 +55459,14 @@ ${indent}${end}`;
         return value ? ctx.options.trueStr : ctx.options.falseStr;
       }
     };
-    function stringifyNumber({ format: format2, minFractionDigits, tag, value }) {
+    function stringifyNumber({ format, minFractionDigits, tag, value }) {
       if (typeof value === "bigint")
         return String(value);
       const num = typeof value === "number" ? value : Number(value);
       if (!isFinite(num))
         return isNaN(num) ? ".nan" : num < 0 ? "-.inf" : ".inf";
       let n4 = JSON.stringify(value);
-      if (!format2 && minFractionDigits && (!tag || tag === "tag:yaml.org,2002:float") && /^\d/.test(n4)) {
+      if (!format && minFractionDigits && (!tag || tag === "tag:yaml.org,2002:float") && /^\d/.test(n4)) {
         let i = n4.indexOf(".");
         if (i < 0) {
           i = n4.length;
@@ -59135,7 +57984,7 @@ ${end.comment}` : end.comment;
       setScalarValue: () => setScalarValue,
       stringify: () => stringify2,
       tokenType: () => tokenType,
-      visit: () => visit22
+      visit: () => visit2
     });
     function resolveAsScalar(token, strict = true, onError) {
       if (token) {
@@ -59365,15 +58214,15 @@ ${end.comment}` : end.comment;
     var BREAK2 = /* @__PURE__ */ Symbol("break visit");
     var SKIP2 = /* @__PURE__ */ Symbol("skip children");
     var REMOVE2 = /* @__PURE__ */ Symbol("remove item");
-    function visit22(cst, visitor) {
+    function visit2(cst, visitor) {
       if ("type" in cst && cst.type === "document")
         cst = { start: cst.start, value: cst.value };
       _visit(Object.freeze([]), cst, visitor);
     }
-    visit22.BREAK = BREAK2;
-    visit22.SKIP = SKIP2;
-    visit22.REMOVE = REMOVE2;
-    visit22.itemAtPath = (cst, path32) => {
+    visit2.BREAK = BREAK2;
+    visit2.SKIP = SKIP2;
+    visit2.REMOVE = REMOVE2;
+    visit2.itemAtPath = (cst, path32) => {
       let item = cst;
       for (const [field, index] of path32) {
         const tok = item == null ? void 0 : item[field];
@@ -59384,8 +58233,8 @@ ${end.comment}` : end.comment;
       }
       return item;
     };
-    visit22.parentCollection = (cst, path32) => {
-      const parent = visit22.itemAtPath(cst, path32.slice(0, -1));
+    visit2.parentCollection = (cst, path32) => {
+      const parent = visit2.itemAtPath(cst, path32.slice(0, -1));
       const field = path32[path32.length - 1][0];
       const coll = parent == null ? void 0 : parent[field];
       if (coll && "items" in coll)
@@ -60985,7 +59834,7 @@ ${end.comment}` : end.comment;
       }
       return doc;
     }
-    function parse4(src, reviver, options) {
+    function parse2(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
@@ -61543,7 +60392,47 @@ var require_build_pack = __commonJS({
       verifyDockerImageTags: () => verifyDockerImageTags
     });
     module2.exports = __toCommonJS2(build_pack_exports);
-    var import_project = (init_project(), __toCommonJS(project_exports));
+    async function discoverProjects(workspaceRoot) {
+      const { globby: globby22 } = await Promise.resolve().then(() => (init_globby(), globby_exports));
+      const fs5 = await import("fs/promises");
+      const path4 = await import("path");
+      const packageJsonPaths = await globby22(["**/package.json"], {
+        cwd: workspaceRoot,
+        ignore: ["**/node_modules/**"]
+      });
+      const projects = [];
+      for (const packagePath of packageJsonPaths) {
+        const fullPath = path4.join(workspaceRoot, packagePath);
+        const directory = path4.dirname(fullPath);
+        try {
+          const content = await fs5.readFile(fullPath, "utf-8");
+          const packageJson = JSON.parse(content);
+          if (packageJson.name) {
+            projects.push({
+              name: packageJson.name,
+              directory,
+              packageJson,
+              dependencies: []
+            });
+          }
+        } catch (error) {
+          console.warn(`Failed to parse ${packagePath}:`, error);
+        }
+      }
+      return projects;
+    }
+    function buildDependencyGraph(projects) {
+      const dependencies = /* @__PURE__ */ new Map();
+      projects.forEach((project) => {
+        dependencies.set(project.name, []);
+      });
+      const batches = [projects];
+      return {
+        dependencies,
+        batches,
+        getTopologicalBatches: () => batches
+      };
+    }
     function extractPRMetadata(prBody) {
       const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
       if (!yamlMatch) {
@@ -61587,7 +60476,7 @@ var require_build_pack = __commonJS({
       return metadata;
     }
     var import_node_fs4 = require("fs");
-    var import_promises42 = require("fs/promises");
+    var import_promises4 = require("fs/promises");
     var import_node_path22 = require("path");
     var import_yaml2 = require_dist();
     var import_zx3 = require_build();
@@ -61773,11 +60662,11 @@ ${processedMetadata}
       }
     }
     var import_promises22 = require("fs/promises");
-    var import_path2 = require("path");
+    var import_path = require("path");
     var import_zx = require_build();
     async function rewriteNpmWorkspaceDependencies(options) {
       const { project, allProjects } = options;
-      const pkgPath = (0, import_path2.join)(project.cwd, "package.json");
+      const pkgPath = (0, import_path.join)(project.cwd, "package.json");
       const content = await (0, import_promises22.readFile)(pkgPath, "utf-8");
       const pkg = JSON.parse(content);
       const versionMap = new Map(
@@ -61803,15 +60692,15 @@ ${processedMetadata}
       }
     }
     async function restorePackageJson(projectCwd) {
-      const pkgPath = (0, import_path2.join)(projectCwd, "package.json");
+      const pkgPath = (0, import_path.join)(projectCwd, "package.json");
       await (0, import_zx.$)({ cwd: projectCwd })`git checkout ${pkgPath}`;
     }
     var import_promises32 = require("fs/promises");
     var import_zx2 = require_build();
-    var import_globby2 = (init_globby(), __toCommonJS(globby_exports));
+    var import_globby = (init_globby(), __toCommonJS(globby_exports));
     async function rewriteNugetProjectReferences(options) {
       const { project, allProjects } = options;
-      const csprojFiles = await (0, import_globby2.globby)("**/*.csproj", {
+      const csprojFiles = await (0, import_globby.globby)("**/*.csproj", {
         cwd: project.cwd,
         absolute: true,
         gitignore: true
@@ -61847,7 +60736,7 @@ ${processedMetadata}
       }
     }
     async function restoreCsprojFiles(projectCwd) {
-      const csprojFiles = await (0, import_globby2.globby)("**/*.csproj", {
+      const csprojFiles = await (0, import_globby.globby)("**/*.csproj", {
         cwd: projectCwd,
         absolute: true,
         gitignore: true
@@ -61884,10 +60773,10 @@ ${processedMetadata}
       if (!(0, import_node_fs4.existsSync)(pkgPath)) {
         return;
       }
-      const content = await (0, import_promises42.readFile)(pkgPath, "utf-8");
+      const content = await (0, import_promises4.readFile)(pkgPath, "utf-8");
       const pkg = JSON.parse(content);
       pkg.version = version;
-      await (0, import_promises42.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+      await (0, import_promises4.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
     }
     async function applyVersionToCsproj(cwd, version) {
       try {
@@ -61895,7 +60784,7 @@ ${processedMetadata}
         const csprojFiles = stdout.trim().split("\n").filter(Boolean);
         for (const csprojFile of csprojFiles) {
           const csprojPath = (0, import_node_path22.join)(cwd, csprojFile);
-          let content = await (0, import_promises42.readFile)(csprojPath, "utf-8");
+          let content = await (0, import_promises4.readFile)(csprojPath, "utf-8");
           if (content.includes("<Version>")) {
             content = content.replace(/<Version>.*?<\/Version>/, `<Version>${version}</Version>`);
           } else {
@@ -61905,7 +60794,7 @@ ${processedMetadata}
     <Version>${version}</Version>`
             );
           }
-          await (0, import_promises42.writeFile)(csprojPath, content);
+          await (0, import_promises4.writeFile)(csprojPath, content);
         }
       } catch (error) {
       }
@@ -61916,7 +60805,7 @@ ${processedMetadata}
     }
     async function readPackageJson(cwd) {
       const pkgPath = (0, import_node_path22.join)(cwd, "package.json");
-      const content = await (0, import_promises42.readFile)(pkgPath, "utf-8");
+      const content = await (0, import_promises4.readFile)(pkgPath, "utf-8");
       return JSON.parse(content);
     }
     async function hasBuildScript(project) {
@@ -62041,7 +60930,7 @@ ${processedMetadata}
             success: true
           };
         }
-        const artifactYml = await (0, import_promises42.readFile)(artifactPath, "utf-8");
+        const artifactYml = await (0, import_promises4.readFile)(artifactPath, "utf-8");
         const doc = (0, import_yaml2.parseDocument)(artifactYml);
         const descriptor = doc.toJSON();
         console.log(`  \u{1F4C4} Found ${descriptor.artifacts.length} artifact(s) to upload`);
@@ -62115,9 +61004,7 @@ ${processedMetadata}
       console.log(`   Source branch: ${metadata.sourceBranch}
 `);
       console.log("\u{1F50D} Discovering workspace projects...");
-      const discoveredProjects = await (0, import_project.discoverProjects)({
-        cwd: context.workspaceRoot
-      });
+      const discoveredProjects = await discoverProjects(context.workspaceRoot);
       console.log(`   Found ${discoveredProjects.length} projects
 `);
       const projectsToRelease = buildProjectConfigs(
@@ -62170,8 +61057,8 @@ ${processedMetadata}
         allProjects: allProjectsToProcess
       };
       console.log("\u{1F4CA} Building dependency graph...");
-      const graph = (0, import_project.buildDependencyGraph)(allProjectsToProcess);
-      const batches = graph.getTopologicalBatches();
+      const graph = buildDependencyGraph(allProjectsToProcess);
+      const batches = graph.batches;
       console.log(`   Organized into ${batches.length} dependency batches
 `);
       displayExecutionPlan(batches, allProjectsToProcess, projectsToProcess);
