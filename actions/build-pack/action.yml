@@ -46,6 +46,10 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@cpdevtools'
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
     
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
@@ -55,6 +59,8 @@ runs:
     - name: Install dependencies
       shell: bash
       run: pnpm install
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
     
     - name: Run Build & Pack
       shell: bash
