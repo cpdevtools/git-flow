@@ -5,7 +5,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { resolve } from 'node:path';
-import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
+import { runBuildPack } from '../../packages/git-flow/src/build-pack/index.js';
 
 async function run(): Promise<void> {
   try {

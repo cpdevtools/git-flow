@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { discoverProjects } from '@cpdevtools/ts-dev-utilities/project';
 import { parseJson } from '@cpdevtools/ts-dev-utilities/json';
-import { resolveVersion } from '@cpdevtools/git-flow/version';
+import { resolveVersion } from '../../packages/git-flow/src/version/resolve.js';
 import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
 
