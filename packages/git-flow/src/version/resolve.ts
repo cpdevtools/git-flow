@@ -6,16 +6,31 @@ import {
   extractVersionParts,
   buildVersion,
 } from './utils.js';
+import { $ } from 'zx';
+
+// Suppress zx output
+$.verbose = false;
 
 /**
  * Check if a git tag exists
- * Note: This is a placeholder - actual implementation would use git commands
- * For now, returns false to simulate no tag exists
+ * Uses git ls-remote to check for tag on remote (works in CI)
+ * Falls back to local git tag check
  */
-async function tagExists(_tag: string): Promise<boolean> {
-  // TODO: Implement actual git tag check
-  // For phase 1, we'll simulate this
-  return false;
+async function tagExists(tag: string): Promise<boolean> {
+  try {
+    // First try local git tag
+    const localResult = await $`git tag -l ${tag}`.nothrow();
+    if (localResult.stdout.trim() === tag) {
+      return true;
+    }
+    
+    // Check remote tags (for CI where local might not have all tags)
+    const remoteResult = await $`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
+    return remoteResult.stdout.trim().length > 0;
+  } catch (error) {
+    console.warn(`Warning: Failed to check tag ${tag}: ${error}`);
+    return false;
+  }
 }
 
 /**
