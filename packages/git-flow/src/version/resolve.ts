@@ -30,25 +30,35 @@ function buildTagName(version: string, projectName?: string): string {
  */
 async function tagExists(tag: string): Promise<boolean> {
   try {
+    console.log(`[tagExists] Checking tag: ${tag}`);
+    
     // First try local git tag
     const localResult = await $`git tag -l ${tag}`.nothrow();
+    console.log(`[tagExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
     if (localResult.stdout.trim() === tag) {
+      console.log(`[tagExists] Found local git tag: ${tag}`);
       return true;
     }
     
     // Check remote tags (for CI where local might not have all tags)
     const remoteResult = await $`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
+    console.log(`[tagExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
     if (remoteResult.stdout.trim().length > 0) {
+      console.log(`[tagExists] Found remote git tag: ${tag}`);
       return true;
     }
 
     // Check GitHub releases by tag name (catches draft releases too)
     // gh release view returns exit code 0 if release exists, 1 if not
+    console.log(`[tagExists] Checking GitHub release: gh release view ${tag} --json tagName`);
     const releaseResult = await $`gh release view ${tag} --json tagName`.nothrow();
+    console.log(`[tagExists] GitHub release result: exitCode=${releaseResult.exitCode}, stdout="${releaseResult.stdout.trim().substring(0, 100)}"`);
     if (releaseResult.exitCode === 0) {
+      console.log(`[tagExists] Found GitHub release: ${tag}`);
       return true;
     }
 
+    console.log(`[tagExists] Tag not found: ${tag}`);
     return false;
   } catch (error) {
     console.warn(`Warning: Failed to check tag ${tag}: ${error}`);

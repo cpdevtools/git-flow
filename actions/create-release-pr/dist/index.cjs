@@ -54549,18 +54549,27 @@ var require_version = __commonJS({
     }
     async function tagExists(tag) {
       try {
+        console.log(`[tagExists] Checking tag: ${tag}`);
         const localResult = await import_zx.$`git tag -l ${tag}`.nothrow();
+        console.log(`[tagExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
         if (localResult.stdout.trim() === tag) {
+          console.log(`[tagExists] Found local git tag: ${tag}`);
           return true;
         }
         const remoteResult = await import_zx.$`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
+        console.log(`[tagExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
         if (remoteResult.stdout.trim().length > 0) {
+          console.log(`[tagExists] Found remote git tag: ${tag}`);
           return true;
         }
+        console.log(`[tagExists] Checking GitHub release: gh release view ${tag} --json tagName`);
         const releaseResult = await import_zx.$`gh release view ${tag} --json tagName`.nothrow();
+        console.log(`[tagExists] GitHub release result: exitCode=${releaseResult.exitCode}, stdout="${releaseResult.stdout.trim().substring(0, 100)}"`);
         if (releaseResult.exitCode === 0) {
+          console.log(`[tagExists] Found GitHub release: ${tag}`);
           return true;
         }
+        console.log(`[tagExists] Tag not found: ${tag}`);
         return false;
       } catch (error) {
         console.warn(`Warning: Failed to check tag ${tag}: ${error}`);
