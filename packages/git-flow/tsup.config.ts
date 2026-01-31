@@ -20,6 +20,11 @@ export default defineConfig([
     splitting: false,
     minify: false,
     target: 'node20',
+    platform: 'node',
+    external: [
+      ...builtinModules,
+      ...builtinModules.map(m => `node:${m}`),
+    ],
   },
   // CLI outputs - keep oclif external (uses dynamic requires), bundle ts-dev-utilities
   {
