@@ -62800,7 +62800,7 @@ This may indicate the image was modified after being built in Phase 2.`
             throw new Error(`NPM artifact ${artifact.name} missing path`);
           }
           await publishToNpm({
-            artifactPath: (0, import_path3.join)(workspaceRoot, artifact.path),
+            artifactPath: (0, import_path3.join)(workspaceRoot, ".artifacts", (0, import_path3.basename)(artifact.path)),
             registry,
             token
           });
@@ -62810,7 +62810,7 @@ This may indicate the image was modified after being built in Phase 2.`
             throw new Error(`NuGet artifact ${artifact.name} missing path`);
           }
           await publishToNuget({
-            artifactPath: (0, import_path3.join)(workspaceRoot, artifact.path),
+            artifactPath: (0, import_path3.join)(workspaceRoot, ".artifacts", (0, import_path3.basename)(artifact.path)),
             registry,
             apiKey: token
           });

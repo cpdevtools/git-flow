@@ -4,7 +4,7 @@
 
 import type { ProjectArtifactDescriptor, Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { parseDocument } from 'yaml';
-import { join } from 'path';
+import { join, basename } from 'path';
 import {
   loadRegistryConfig,
   getRegistry,
@@ -212,8 +212,9 @@ async function publishArtifact(
       if (!artifact.path) {
         throw new Error(`NPM artifact ${artifact.name} missing path`);
       }
+      // Use just the filename from the artifact path and look in .artifacts/
       await publishToNpm({
-        artifactPath: join(workspaceRoot, artifact.path),
+        artifactPath: join(workspaceRoot, '.artifacts', basename(artifact.path)),
         registry: registry as NpmRegistry,
         token,
       });
@@ -223,8 +224,9 @@ async function publishArtifact(
       if (!artifact.path) {
         throw new Error(`NuGet artifact ${artifact.name} missing path`);
       }
+      // Use just the filename from the artifact path and look in .artifacts/
       await publishToNuget({
-        artifactPath: join(workspaceRoot, artifact.path),
+        artifactPath: join(workspaceRoot, '.artifacts', basename(artifact.path)),
         registry: registry as NugetRegistry,
         apiKey: token,
       });
