@@ -62518,7 +62518,7 @@ var require_publish_release = __commonJS({
       console.log(`  \u{1F4DD} Writing .npmrc to ${npmrcPath}`);
       await (0, import_promises22.writeFile)(npmrcPath, npmrcContent);
       try {
-        await import_zx.$`pnpm publish ${artifactPath} --registry ${registry.url} --no-git-checks`;
+        await import_zx.$`npm publish ${artifactPath} --registry ${registry.url}`;
       } finally {
         await import_zx.$`rm -f ${npmrcPath}`.catch(() => {
         });
