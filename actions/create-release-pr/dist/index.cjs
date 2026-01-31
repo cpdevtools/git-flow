@@ -63445,6 +63445,7 @@ var import_promises5 = require("fs/promises");
 var import_yaml = __toESM(require_dist(), 1);
 async function run() {
   try {
+    core.info("\u{1F680} create-release-pr action v2 - checking GitHub releases for existing versions");
     const branch = core.getInput("branch", { required: true });
     const token = core.getInput("token", { required: true });
     const versionsFile = core.getInput("versions-file") || ".github/versions.json";

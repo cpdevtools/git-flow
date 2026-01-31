@@ -19,6 +19,8 @@ interface ProjectMetadata {
 
 async function run() {
   try {
+    core.info('🚀 create-release-pr action v2 - checking GitHub releases for existing versions');
+    
     // Get inputs
     const branch = core.getInput('branch', { required: true });
     const token = core.getInput('token', { required: true });
