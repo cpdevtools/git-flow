@@ -66,6 +66,13 @@ jobs:
           sudo ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js /usr/local/bin/cpdt-gitflow
           sudo chmod +x /usr/local/bin/cpdt-gitflow
       
+      - name: Test git-flow CLI
+        run: |
+          echo "Testing CLI..."
+          cpdt-gitflow --help || echo "CLI failed"
+          which cpdt-gitflow
+          ls -la /usr/local/bin/cpdt-gitflow
+      
       - name: Build & Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
         with:
