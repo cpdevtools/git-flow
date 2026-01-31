@@ -40,11 +40,7 @@
     "bin": "cpdt-gitflow",
     "dirname": "cpdt-gitflow",
     "commands": "./dist/cli/commands",
-    "topicSeparator": " ",
-    "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-autocomplete"
-    ]
+    "topicSeparator": " "
   },
   "files": [
     "dist",

@@ -1,9 +1,8 @@
-import { createRequire } from 'module';
 import { pathToFileURL } from 'url';
 import { existsSync } from 'fs';
 import { join } from 'path';
 
-createRequire(import.meta.url);
+// src/cli/config-loader.ts
 async function loadConfig(cwd) {
   const configPaths = [
     join(cwd, "cpdevtools.config.ts"),
