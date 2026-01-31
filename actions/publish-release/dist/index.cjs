@@ -62734,6 +62734,8 @@ This may indicate the image was modified after being built in Phase 2.`
           owner,
           repo,
           release_id: release.id,
+          tag_name: tag,
+          // Update from untagged-XXX to final tag
           draft: false,
           prerelease
         });

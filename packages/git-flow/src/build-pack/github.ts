@@ -391,10 +391,12 @@ export async function finalizeRelease(
     }
 
     // Update to published (using prerelease flag from PR metadata)
+    // IMPORTANT: Also update tag_name to the final tag
     await octokit.rest.repos.updateRelease({
       owner,
       repo,
       release_id: release.id,
+      tag_name: tag,  // Update from untagged-XXX to final tag
       draft: false,
       prerelease,
     });
