@@ -48,8 +48,8 @@ jobs:
       
       - name: Install git-flow library dependencies
         run: |
-          cd /home/runner/work/_actions/cpdevtools/git-flow/main
-          pnpm install --frozen-lockfile
+          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
+          npm install
       
       - name: Symlink bundled git-flow CLI to PATH
         run: |
