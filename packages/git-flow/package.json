@@ -59,7 +59,9 @@
     "test:watch": "vitest",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "github.actions.build": "pnpm build",
+    "github.actions.pack": "node scripts/generate-artifact.js"
   },
   "keywords": [
     "git",
@@ -95,7 +97,7 @@
     "eslint": "^9.18.0",
     "prettier": "^3.4.2",
     "tsup": "^8.3.5",
-    "typescript": "^5.7.3",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   },
   "engines": {

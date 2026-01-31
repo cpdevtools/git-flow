@@ -1,0 +1,4 @@
+github-npm:
+  type: npm
+  registry: https://npm.pkg.github.com
+  scope: "@cpdevtools"

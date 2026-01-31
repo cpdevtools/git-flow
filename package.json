@@ -29,6 +29,10 @@
   },
   "homepage": "https://github.com/cpdevtools/git-flow#readme",
   "devDependencies": {
+    "@cpdevtools/ts-dev-utilities": "^0.1.0",
+    "prettier": "^3.4.2"
+  },
+  "devDependencies": {
     "prettier": "^3.4.2"
   },
   "engines": {
