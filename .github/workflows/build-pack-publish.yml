@@ -18,17 +18,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
       
       - name: Build and Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
         with:
-          pr-number: ${{ github.event.pull_request.number }}
+          pr-number: ${{ github.event.pull_request.number || '0' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
     needs: build-pack
-    if: github.event.pull_request.merged == true
+    if: (github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
