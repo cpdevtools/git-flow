@@ -49,9 +49,12 @@ async function tagExists(tag: string): Promise<boolean> {
     }
 
     // Check GitHub releases by tag name (catches draft releases too)
-    // gh release view returns exit code 0 if release exists, 1 if not
-    console.log(`[tagExists] Checking GitHub release: gh release view ${tag} --json tagName`);
-    const releaseResult = await $`gh release view ${tag} --json tagName`.nothrow();
+    // Need to set GH_TOKEN for authentication in GitHub Actions
+    const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+    console.log(`[tagExists] Checking GitHub release (token available: ${ghToken.length > 0})`);
+    
+    // Use environment variable for the token
+    const releaseResult = await $({ env: { ...process.env, GH_TOKEN: ghToken } })`gh release view ${tag} --json tagName`.nothrow();
     console.log(`[tagExists] GitHub release result: exitCode=${releaseResult.exitCode}, stdout="${releaseResult.stdout.trim().substring(0, 100)}"`);
     if (releaseResult.exitCode === 0) {
       console.log(`[tagExists] Found GitHub release: ${tag}`);

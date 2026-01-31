@@ -27,6 +27,10 @@ async function run() {
     const versionsFile = core.getInput('versions-file') || '.github/versions.json';
     const runNumber = parseInt(core.getInput('run-number') || '0', 10);
 
+    // Set GITHUB_TOKEN for gh CLI commands in version resolution
+    process.env.GITHUB_TOKEN = token;
+    core.info(`Token set for gh CLI (length: ${token.length})`);
+
     core.info(`Creating release PR for branch: ${branch}`);
     core.info(`Run number: ${runNumber}`);
 

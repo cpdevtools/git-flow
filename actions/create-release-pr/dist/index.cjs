@@ -54562,8 +54562,9 @@ var require_version = __commonJS({
           console.log(`[tagExists] Found remote git tag: ${tag}`);
           return true;
         }
-        console.log(`[tagExists] Checking GitHub release: gh release view ${tag} --json tagName`);
-        const releaseResult = await import_zx.$`gh release view ${tag} --json tagName`.nothrow();
+        const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
+        console.log(`[tagExists] Checking GitHub release (token available: ${ghToken.length > 0})`);
+        const releaseResult = await (0, import_zx.$)({ env: { ...process.env, GH_TOKEN: ghToken } })`gh release view ${tag} --json tagName`.nothrow();
         console.log(`[tagExists] GitHub release result: exitCode=${releaseResult.exitCode}, stdout="${releaseResult.stdout.trim().substring(0, 100)}"`);
         if (releaseResult.exitCode === 0) {
           console.log(`[tagExists] Found GitHub release: ${tag}`);
@@ -63450,6 +63451,8 @@ async function run() {
     const token = core.getInput("token", { required: true });
     const versionsFile = core.getInput("versions-file") || ".github/versions.json";
     const runNumber = parseInt(core.getInput("run-number") || "0", 10);
+    process.env.GITHUB_TOKEN = token;
+    core.info(`Token set for gh CLI (length: ${token.length})`);
     core.info(`Creating release PR for branch: ${branch}`);
     core.info(`Run number: ${runNumber}`);
     const versionsContent = await (0, import_promises5.readFile)(versionsFile, "utf-8");
