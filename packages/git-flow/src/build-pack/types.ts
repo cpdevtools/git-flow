@@ -2,7 +2,7 @@
  * Type definitions for Phase 2 Build & Pack workflow
  */
 
-import type { Project } from '../../lib/project';
+import type { Project } from '../lib/project';
 
 /**
  * Project configuration for build & pack workflow
