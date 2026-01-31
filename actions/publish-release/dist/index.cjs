@@ -62552,8 +62552,16 @@ This may indicate the image was modified after being built in Phase 2.`
     var import_zx2 = require_build();
     async function isNpmPublished(packageName, version, registry) {
       try {
-        const result = await import_zx2.$`npm view ${packageName}@${version} version --registry ${registry.url}`;
-        const publishedVersion = result.stdout.trim();
+        const scopeConfig = registry.scope ? `--${registry.scope}:registry=${registry.url}` : "";
+        const result = await import_zx2.$`npm view ${packageName}@${version} version --registry ${registry.url} ${scopeConfig} --json`.nothrow();
+        if (result.exitCode !== 0) {
+          return {
+            published: false,
+            error: "Package not found in registry"
+          };
+        }
+        const output = result.stdout.trim();
+        const publishedVersion = output.replace(/^"|"$/g, "");
         return {
           published: publishedVersion === version,
           version: publishedVersion

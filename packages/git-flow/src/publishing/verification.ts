@@ -10,8 +10,21 @@ export async function isNpmPublished(
   registry: NpmRegistry
 ): Promise<VerificationResult> {
   try {
-    const result = await $`npm view ${packageName}@${version} version --registry ${registry.url}`;
-    const publishedVersion = result.stdout.trim();
+    // Use JSON output and explicit registry with scope config for reliability
+    const scopeConfig = registry.scope ? `--${registry.scope}:registry=${registry.url}` : '';
+    const result = await $`npm view ${packageName}@${version} version --registry ${registry.url} ${scopeConfig} --json`.nothrow();
+    
+    if (result.exitCode !== 0) {
+      // Package doesn't exist yet
+      return {
+        published: false,
+        error: 'Package not found in registry',
+      };
+    }
+    
+    // Parse JSON output (npm view returns quoted string or null)
+    const output = result.stdout.trim();
+    const publishedVersion = output.replace(/^"|"$/g, '');
 
     return {
       published: publishedVersion === version,
