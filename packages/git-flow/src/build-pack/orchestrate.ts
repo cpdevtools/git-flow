@@ -36,9 +36,7 @@ export async function runBuildPack(
 
   // Discover all workspace projects
   console.log('🔍 Discovering workspace projects...');
-  const discoveredProjects = await discoverProjects({
-    cwd: context.workspaceRoot,
-  });
+  const discoveredProjects = await discoverProjects(context.workspaceRoot);
   console.log(`   Found ${discoveredProjects.length} projects\n`);
 
   // Build project configurations from metadata (projects to pack/publish)
@@ -107,7 +105,7 @@ export async function runBuildPack(
   // Build dependency graph and get topological batches (all projects)
   console.log('📊 Building dependency graph...');
   const graph = buildDependencyGraph(allProjectsToProcess);
-  const batches = graph.getTopologicalBatches();
+  const batches = graph.batches;
   console.log(`   Organized into ${batches.length} dependency batches\n`);
 
   // Display execution plan
