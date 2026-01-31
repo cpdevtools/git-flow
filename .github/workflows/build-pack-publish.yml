@@ -82,7 +82,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
-          path: ${{ github.workspace }}/.artifacts/
+          path: |
+            .artifacts/**
           retention-days: 1
           if-no-files-found: error
   
