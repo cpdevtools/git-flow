@@ -5,6 +5,8 @@
 import type { ProjectArtifactDescriptor, Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { parseDocument } from 'yaml';
 import { join, basename } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
+import { getOctokit as getActionsOctokit } from '@actions/github';
 import {
   loadRegistryConfig,
   getRegistry,
@@ -30,6 +32,52 @@ import {
   updateDraftReleaseBody,
   findDraftReleaseByTag
 } from '../build-pack/github.js';
+
+/**
+ * Download release assets to local directory
+ */
+async function downloadReleaseAssets(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  tag: string,
+  outputDir: string
+): Promise<void> {
+  const octokit = getActionsOctokit(githubToken);
+  
+  // Find the release
+  const { data: releases } = await octokit.rest.repos.listReleases({
+    owner,
+    repo,
+    per_page: 100,
+  });
+
+  const release = releases.find(r => r.tag_name === tag || (r.draft && r.name?.includes(tag.split('/v')[1])));
+  if (!release) {
+    throw new Error(`Release not found for tag: ${tag}`);
+  }
+
+  // Create output directory
+  await mkdir(outputDir, { recursive: true });
+
+  // Download each asset
+  for (const asset of release.assets) {
+    console.log(`  ⬇️  Downloading ${asset.name}...`);
+    
+    const response = await octokit.rest.repos.getReleaseAsset({
+      owner,
+      repo,
+      asset_id: asset.id,
+      headers: {
+        accept: 'application/octet-stream',
+      },
+    });
+
+    const assetPath = join(outputDir, asset.name);
+    await writeFile(assetPath, Buffer.from(response.data as unknown as ArrayBuffer));
+    console.log(`  ✓ Downloaded to ${assetPath}`);
+  }
+}
 
 /**
  * Update release body to mark all artifacts as published:true
@@ -112,6 +160,17 @@ export async function runPublishRelease(
 
         const doc = parseDocument(artifactYml);
         const descriptor = doc.toJSON() as ProjectArtifactDescriptor;
+
+        // Download artifacts from GitHub release to local directory
+        console.log(`  ⬇️  Downloading artifacts from release...`);
+        const artifactsDir = join(options.workspaceRoot, '.artifacts');
+        await downloadReleaseAssets(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          tag,
+          artifactsDir
+        );
 
         // Publish each artifact to its registries
         const publishResult = await publishProjectArtifacts(

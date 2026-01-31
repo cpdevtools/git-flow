@@ -62435,12 +62435,14 @@ var require_publish_release = __commonJS({
     var import_yaml3 = require_dist();
     var import_path4 = require("path");
     var import_promises5 = require("fs/promises");
+    var import_github2 = require_github();
+    var import_promises6 = require("fs/promises");
     var import_path2 = require("path");
     var import_yaml = require_dist();
     async function loadRegistryConfig(workspaceRoot) {
       const configPath = (0, import_path2.join)(workspaceRoot, ".github", "registries.yml");
       try {
-        const content = await (0, import_promises5.readFile)(configPath, "utf-8");
+        const content = await (0, import_promises6.readFile)(configPath, "utf-8");
         const config = (0, import_yaml.parse)(content);
         validateRegistryConfig(config);
         return config;
@@ -62787,6 +62789,33 @@ This may indicate the image was modified after being built in Phase 2.`
         return null;
       }
     }
+    async function downloadReleaseAssets(githubToken, owner, repo, tag, outputDir) {
+      const octokit = (0, import_github2.getOctokit)(githubToken);
+      const { data: releases } = await octokit.rest.repos.listReleases({
+        owner,
+        repo,
+        per_page: 100
+      });
+      const release = releases.find((r) => r.tag_name === tag || r.draft && r.name?.includes(tag.split("/v")[1]));
+      if (!release) {
+        throw new Error(`Release not found for tag: ${tag}`);
+      }
+      await (0, import_promises5.mkdir)(outputDir, { recursive: true });
+      for (const asset of release.assets) {
+        console.log(`  \u2B07\uFE0F  Downloading ${asset.name}...`);
+        const response = await octokit.rest.repos.getReleaseAsset({
+          owner,
+          repo,
+          asset_id: asset.id,
+          headers: {
+            accept: "application/octet-stream"
+          }
+        });
+        const assetPath = (0, import_path4.join)(outputDir, asset.name);
+        await (0, import_promises5.writeFile)(assetPath, Buffer.from(response.data));
+        console.log(`  \u2713 Downloaded to ${assetPath}`);
+      }
+    }
     async function updateReleaseBodyPublishedFlags(githubToken, owner, repo, tag, artifactYml) {
       const doc = (0, import_yaml3.parseDocument)(artifactYml);
       const descriptor = doc.toJSON();
@@ -62837,6 +62866,15 @@ ${updatedYaml}
             }
             const doc = (0, import_yaml3.parseDocument)(artifactYml);
             const descriptor = doc.toJSON();
+            console.log(`  \u2B07\uFE0F  Downloading artifacts from release...`);
+            const artifactsDir = (0, import_path4.join)(options.workspaceRoot, ".artifacts");
+            await downloadReleaseAssets(
+              options.githubToken,
+              options.owner,
+              options.repo,
+              tag,
+              artifactsDir
+            );
             const publishResult = await publishProjectArtifacts(
               descriptor,
               registryConfig,
