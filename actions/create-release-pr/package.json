@@ -24,7 +24,6 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/git-flow": "^0.0.1",
     "@cpdevtools/ts-dev-utilities": "^0.1.0"
   },
   "devDependencies": {

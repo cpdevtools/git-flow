@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { extractPRMetadata } from '@cpdevtools/git-flow/build-pack';
-import { runPublishRelease } from '@cpdevtools/git-flow/publish-release';
+import { extractPRMetadata } from '../../packages/git-flow/src/build-pack/index.js';
+import { runPublishRelease } from '../../packages/git-flow/src/publish-release/index.js';
 
 async function run() {
   try {
