@@ -26,8 +26,8 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   await writeFile(npmrcPath, npmrcContent);
 
   try {
-    // Publish the tarball
-    await $`pnpm publish ${artifactPath} --registry ${registry.url} --no-git-checks`;
+    // Publish the tarball using npm (pnpm publish repacks from cwd instead of using the tarball)
+    await $`npm publish ${artifactPath} --registry ${registry.url}`;
   } finally {
     // Clean up .npmrc
     await $`rm -f ${npmrcPath}`.catch(() => {});
