@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { extractPRMetadata } from '@cpdevtools/git-flow/build-pack';
 import { runPublishRelease } from '@cpdevtools/git-flow/publish-release';
 
 async function run() {
@@ -11,15 +12,29 @@ async function run() {
     const { owner, repo } = github.context.repo;
     const sha = github.context.sha;
 
-    // TODO: Extract PR metadata to get project list
-    // For now, using placeholder
-    const projects = [
-      {
-        name: 'example-project',
-        version: '1.0.0',
-        releaseTag: 'example-project/v1.0.0',
-      },
-    ];
+    // Fetch PR body to extract metadata
+    const octokit = github.getOctokit(githubToken);
+    const { data: pr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: prNumber,
+    });
+
+    if (!pr.body) {
+      throw new Error(`PR #${prNumber} has no description`);
+    }
+
+    // Extract PR metadata (project list, versions, etc.)
+    const metadata = extractPRMetadata(pr.body);
+
+    // Convert metadata to project list for publish
+    const projects = metadata.projects.map(proj => ({
+      name: proj.name,
+      version: proj.version,
+      releaseTag: `${proj.name}/v${proj.version}`,
+    }));
+
+    core.info(`Publishing ${projects.length} projects from PR #${prNumber}`);
 
     // Registry tokens come from environment variables
     // Workflow sets: env: { NPM_TOKEN: ${{ secrets.NPM_TOKEN }}, ... }
