@@ -43,13 +43,15 @@ async function packNpm(context) {
   const { cwd, outputDir, artifactFilename, version } = context;
   await $({ cwd })`pnpm pack --pack-destination ${outputDir}`;
   const tarballName = `${artifactFilename}-${version}.tgz`;
+  const { relative } = await import('path');
+  const relativePath = relative(cwd, join(outputDir, tarballName));
   const descriptor = {
     project: context.projectName,
     artifacts: [
       {
         type: "npm",
         name: context.projectName,
-        path: tarballName,
+        path: relativePath,
         registries: ["npm", "github"]
       }
     ]
@@ -63,13 +65,15 @@ async function packNuget(context) {
   const { cwd, outputDir, artifactFilename, version } = context;
   await $({ cwd })`dotnet pack -c Release -o ${outputDir} /p:Version=${version}`;
   const nupkgName = `${artifactFilename}.${version}.nupkg`;
+  const { relative } = await import('path');
+  const relativePath = relative(cwd, join(outputDir, nupkgName));
   const descriptor = {
     project: context.projectName,
     artifacts: [
       {
         type: "nuget",
         name: context.projectName,
-        path: nupkgName,
+        path: relativePath,
         registries: ["nuget", "github"]
       }
     ]

@@ -41,6 +41,10 @@ async function packNpm(context: PackContext): Promise<void> {
   // Find the generated tarball (npm creates filename from package name)
   const tarballName = `${artifactFilename}-${version}.tgz`;
   
+  // Compute path relative to project cwd
+  const { relative } = await import('node:path');
+  const relativePath = relative(cwd, join(outputDir, tarballName));
+  
   // Create artifact descriptor
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
@@ -48,7 +52,7 @@ async function packNpm(context: PackContext): Promise<void> {
       {
         type: 'npm',
         name: context.projectName,
-        path: tarballName,
+        path: relativePath,
         registries: ['npm', 'github'],
       },
     ],
@@ -73,6 +77,10 @@ async function packNuget(context: PackContext): Promise<void> {
   // NuGet package filename
   const nupkgName = `${artifactFilename}.${version}.nupkg`;
   
+  // Compute path relative to project cwd
+  const { relative } = await import('node:path');
+  const relativePath = relative(cwd, join(outputDir, nupkgName));
+  
   // Create artifact descriptor
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
@@ -80,7 +88,7 @@ async function packNuget(context: PackContext): Promise<void> {
       {
         type: 'nuget',
         name: context.projectName,
-        path: nupkgName,
+        path: relativePath,
         registries: ['nuget', 'github'],
       },
     ],
