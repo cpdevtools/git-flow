@@ -1,5 +1,6 @@
 import { writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
+import { homedir } from 'os';
 import { $ } from 'zx';
 import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';
 
@@ -9,23 +10,26 @@ import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } fro
 export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   const { artifactPath, registry, token } = options;
 
-  // Create temporary .npmrc
-  const npmrcPath = join(dirname(artifactPath), '.npmrc');
+  // Create .npmrc in home directory (where npm looks for auth by default)
+  const npmrcPath = join(homedir(), '.npmrc');
   const registryUrl = new URL(registry.url);
   
-  let npmrcContent = `//${registryUrl.host}${registryUrl.pathname}:_authToken=${token}\n`;
+  // Include trailing slash for registry path to match npm's expectations
+  const registryPath = registryUrl.pathname.endsWith('/') ? registryUrl.pathname : registryUrl.pathname + '/';
+  let npmrcContent = `//${registryUrl.host}${registryPath}:_authToken=${token}\n`;
   
   if (registry.scope) {
     npmrcContent += `${registry.scope}:registry=${registry.url}\n`;
   }
   
+  console.log(`  📝 Writing .npmrc to ${npmrcPath}`);
   await writeFile(npmrcPath, npmrcContent);
 
   try {
     // Publish the tarball
     await $`pnpm publish ${artifactPath} --registry ${registry.url} --no-git-checks`;
   } finally {
-    // Clean up temporary .npmrc
+    // Clean up .npmrc
     await $`rm -f ${npmrcPath}`.catch(() => {});
   }
 }

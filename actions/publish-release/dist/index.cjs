@@ -62485,17 +62485,20 @@ var require_publish_release = __commonJS({
     }
     var import_promises22 = require("fs/promises");
     var import_path22 = require("path");
+    var import_os = require("os");
     var import_zx = require_build();
     async function publishToNpm(options) {
       const { artifactPath, registry, token } = options;
-      const npmrcPath = (0, import_path22.join)((0, import_path22.dirname)(artifactPath), ".npmrc");
+      const npmrcPath = (0, import_path22.join)((0, import_os.homedir)(), ".npmrc");
       const registryUrl = new URL(registry.url);
-      let npmrcContent = `//${registryUrl.host}${registryUrl.pathname}:_authToken=${token}
+      const registryPath = registryUrl.pathname.endsWith("/") ? registryUrl.pathname : registryUrl.pathname + "/";
+      let npmrcContent = `//${registryUrl.host}${registryPath}:_authToken=${token}
 `;
       if (registry.scope) {
         npmrcContent += `${registry.scope}:registry=${registry.url}
 `;
       }
+      console.log(`  \u{1F4DD} Writing .npmrc to ${npmrcPath}`);
       await (0, import_promises22.writeFile)(npmrcPath, npmrcContent);
       try {
         await import_zx.$`pnpm publish ${artifactPath} --registry ${registry.url} --no-git-checks`;
