@@ -13,5 +13,5 @@ export default defineConfig({
   bundle: true,
   minify: false,
   splitting: false,
-  external: ['@cpdevtools/git-flow/build-pack'],
+  noExternal: [/@cpdevtools\/git-flow/], // Bundle the git-flow library
 });
