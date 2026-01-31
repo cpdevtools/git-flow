@@ -75,15 +75,16 @@ jobs:
           echo "Current directory: $(pwd)"
           echo "Listing .artifacts/:"
           ls -la .artifacts/ || echo "Directory does not exist"
-          echo "Finding .artifact.yml files:"
-          find . -name "*.artifact.yml" -o -name "*.tgz" 2>/dev/null | head -20
+          echo "Copying to /tmp/upload-artifacts"
+          mkdir -p /tmp/upload-artifacts
+          cp -r .artifacts/* /tmp/upload-artifacts/
+          ls -la /tmp/upload-artifacts/
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
-          path: |
-            .artifacts/**
+          path: /tmp/upload-artifacts/
           retention-days: 1
           if-no-files-found: error
   
