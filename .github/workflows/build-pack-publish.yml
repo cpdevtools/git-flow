@@ -46,17 +46,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
-      - name: Setup git-flow CLI
+      - name: Link git-flow CLI globally
         run: |
-          # Install only the external CLI dependencies (oclif)
-          # ts-dev-utilities is bundled in the CLI dist
-          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
-          npm install --no-save @oclif/core@^4.8.0 @oclif/plugin-help@^6.2.37 @oclif/plugin-autocomplete@^3.2.40 @actions/core@^1.11.1 @actions/github@^6.0.0 globby@^14.0.2 semver@^7.6.3 yaml@^2.8.2 zx@^8.2.4
-          # Symlink to PATH
-          mkdir -p /home/runner/.local/bin
-          ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js /home/runner/.local/bin/cpdt-gitflow
-          chmod +x /home/runner/.local/bin/cpdt-gitflow
-          echo "/home/runner/.local/bin" >> $GITHUB_PATH
+          cd $GITHUB_ACTION_PATH/packages/git-flow
+          pnpm link --global
       
       - name: Build & Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
