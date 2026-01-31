@@ -13,9 +13,9 @@ export interface DependencyGraph {
   /** Map of project names to their dependencies */
   dependencies: Map<string, string[]>;
   /** Ordered batches for parallel execution */
-  batches: string[][];
+  batches: Project[][];
   /** Get topological batches (legacy method) */
-  getTopologicalBatches(): string[][];
+  getTopologicalBatches(): Project[][];
 }
 
 /**
@@ -68,7 +68,7 @@ export function buildDependencyGraph(projects: Project[]): DependencyGraph {
     dependencies.set(project.name, []);
   });
 
-  const batches = [projects.map(p => p.name)];
+  const batches = [projects]; // Return the actual Project objects
 
   return {
     dependencies,
