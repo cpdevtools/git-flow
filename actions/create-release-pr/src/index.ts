@@ -54,7 +54,7 @@ async function run() {
     core.info(`${buildableProjects.length} projects have github.actions.build script`);
 
     // Resolve versions for each project
-    const projectMetadata: ProjectMetadata[] = [];
+    const projectMetadata: Array<ProjectMetadata & { cwd: string }> = [];
     
     for (const project of buildableProjects) {
       const packageVersion = project.packageJson.version;
@@ -76,6 +76,7 @@ async function run() {
           version: packageVersion,
           resolvedVersion: result.version,
           isPreRelease: result.isPreRelease,
+          cwd: project.directory,
         });
 
         core.info(
@@ -245,7 +246,7 @@ function generateYamlMetadata(metadata: any): string {
     yaml.push(`  - name: ${project.name}`);
     yaml.push(`    version: ${project.resolvedVersion}`);
     yaml.push(`    prerelease: ${project.isPreRelease}`);
-    yaml.push(`    cwd: .`);
+    yaml.push(`    cwd: ${project.cwd}`);
   }
 
   return yaml.join('\n');

@@ -41159,7 +41159,8 @@ async function run() {
           name: project.packageJson.name || "unknown",
           version: packageVersion,
           resolvedVersion: result.version,
-          isPreRelease: result.isPreRelease
+          isPreRelease: result.isPreRelease,
+          cwd: project.directory
         });
         core.info(
           `${project.packageJson.name}: ${packageVersion} \u2192 ${result.version} (pre-release: ${result.isPreRelease})`
@@ -41298,7 +41299,7 @@ function generateYamlMetadata(metadata) {
     yaml.push(`  - name: ${project.name}`);
     yaml.push(`    version: ${project.resolvedVersion}`);
     yaml.push(`    prerelease: ${project.isPreRelease}`);
-    yaml.push(`    cwd: .`);
+    yaml.push(`    cwd: ${project.cwd}`);
   }
   return yaml.join("\n");
 }
