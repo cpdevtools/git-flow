@@ -48,8 +48,12 @@ jobs:
       
       - name: Install CLI dependencies in action directory
         run: |
-          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
-          npm install @oclif/core@^4.8.0 @actions/core@^1.11.1 @actions/github@^6.0.0 globby@^14.0.2 semver@^7.6.3 yaml@^2.8.2 zx@^8.2.4
+          # Install in temp dir to avoid package.json with link: protocol
+          TEMP_DIR=$(mktemp -d)
+          cd $TEMP_DIR
+          npm install --no-save @oclif/core@^4.8.0 @actions/core@^1.11.1 @actions/github@^6.0.0 globby@^14.0.2 semver@^7.6.3 yaml@^2.8.2 zx@^8.2.4
+          # Move to action directory
+          mv node_modules /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/
       
       - name: Symlink bundled git-flow CLI to PATH
         run: |
