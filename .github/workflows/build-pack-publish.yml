@@ -57,9 +57,28 @@ jobs:
       
       - name: Symlink bundled git-flow CLI to PATH
         run: |
-          # Symlink to /usr/local/bin which is already in PATH
-          sudo ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js /usr/local/bin/cpdt-gitflow
-          sudo chmod +x /usr/local/bin/cpdt-gitflow
+          echo "=== Debugging action checkout ==="
+          echo "Working directory: $(pwd)"
+          echo "Action directory structure:"
+          find /home/runner/work/_actions/cpdevtools/git-flow/main -type f | head -20
+          
+          echo "=== Checking for git-flow package ==="
+          ls -la /home/runner/work/_actions/cpdevtools/git-flow/main/packages/ || echo "No packages directory"
+          
+          echo "=== Checking for CLI files ==="
+          find /home/runner/work/_actions/cpdevtools/git-flow/main -name "bin.js" || echo "No bin.js found"
+          
+          echo "=== Attempting symlink ==="
+          CLI_PATH="/home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js"
+          if [ -f "$CLI_PATH" ]; then
+            echo "CLI file exists, creating symlink"
+            sudo ln -s "$CLI_PATH" /usr/local/bin/cpdt-gitflow
+            sudo chmod +x /usr/local/bin/cpdt-gitflow
+            echo "Symlink created successfully"
+          else
+            echo "ERROR: CLI file not found at $CLI_PATH"
+            exit 1
+          fi
       
       - name: Build & Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
