@@ -48,7 +48,7 @@ jobs:
       
       - name: Link git-flow CLI globally
         run: |
-          cd $GITHUB_ACTION_PATH/packages/git-flow
+          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
           pnpm link --global
       
       - name: Build & Pack
