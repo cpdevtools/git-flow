@@ -55,6 +55,11 @@ jobs:
           # Move to action directory
           mv node_modules /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/
       
+      - name: Install action dependencies
+        run: |
+          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
+          npm install
+      
       - name: Symlink bundled git-flow CLI to PATH
         run: |
           # Symlink to /usr/local/bin which is already in PATH
