@@ -413,7 +413,18 @@ export async function getDraftReleaseMetadata(
       per_page: 100, // Should be enough for recent releases
     });
 
-    const release = releases.find(r => r.tag_name === tag && r.draft);
+    // Parse tag to get name and version for fallback search
+    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
+    const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+    const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+
+    // First try to find by exact tag match
+    let release = releases.find(r => r.tag_name === tag && r.draft);
+
+    // Fallback: find by release name (handles GitHub's untagged- behavior)
+    if (!release && expectedName) {
+      release = releases.find(r => r.name === expectedName && r.draft);
+    }
 
     if (!release || !release.body) {
       return null;

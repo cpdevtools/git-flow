@@ -61739,7 +61739,12 @@ ${artifactMetadata}
           per_page: 100
           // Should be enough for recent releases
         });
-        const release = releases.find((r) => r.tag_name === tag && r.draft);
+        const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+        const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+        let release = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!release && expectedName) {
+          release = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (!release || !release.body) {
           return null;
         }
@@ -62664,7 +62669,12 @@ This may indicate the image was modified after being built in Phase 2.`
           per_page: 100
           // Should be enough for recent releases
         });
-        const release = releases.find((r) => r.tag_name === tag && r.draft);
+        const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+        const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+        let release = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!release && expectedName) {
+          release = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (!release || !release.body) {
           return null;
         }
