@@ -12,7 +12,7 @@ export default defineConfig({
   platform: 'node',
   target: 'node20',
   outDir: 'dist',
-  external: ['path', 'fs/promises', 'fs', ...builtinModules, ...builtinModules.map(m => `node:${m}`)],
+  external: ['path', 'fs', 'fs/promises', ...builtinModules, ...builtinModules.map(m => `node:${m}`)],
   shims: true,
   banner: {
     js: `import { createRequire as __createRequire } from 'node:module';
