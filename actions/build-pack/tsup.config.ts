@@ -1,11 +1,10 @@
 import { defineConfig } from 'tsup';
-import { builtinModules } from 'node:module';
 
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
   },
-  format: ['esm'],
+  format: ['cjs'],
   dts: false,
   sourcemap: true,
   clean: true,
@@ -14,11 +13,5 @@ export default defineConfig({
   bundle: true,
   minify: false,
   splitting: false,
-  noExternal: [/.*/],
-  external: [...builtinModules, ...builtinModules.map(m => `node:${m}`)],
-  shims: true,
-  banner: {
-    js: `import { createRequire as __createRequire } from 'node:module';
-const require = __createRequire(import.meta.url);`,
-  },
+  external: ['@cpdevtools/git-flow/build-pack'],
 });
