@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'fs/promises';
-import { join } from 'node:path';
+import { join } from 'path';
 import { $ } from 'zx';
 
 export interface ProjectConfig {

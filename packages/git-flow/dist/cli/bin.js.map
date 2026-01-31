@@ -1,1 +1,0 @@
-{"version":3,"sources":["../../src/cli/bin.ts"],"names":[],"mappings":";;;AAIA,MAAM,QAAQ,EAAE,WAAA,EAAa,OAAO,GAAA,EAAK,MAAA,CAAA,IAAA,CAAY,KAAK,CAAA","file":"bin.js","sourcesContent":["#!/usr/bin/env node\n\nimport { execute } from '@oclif/core';\n\nawait execute({ development: false, dir: import.meta.url });\n"]}

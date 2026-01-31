@@ -193,7 +193,7 @@ export async function executePack(
       ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
       ARTIFACT_FILENAME: artifactFilename,
       GITHUB_SHA: context.sha,
-    };
+    } as Record<string, string>;
 
     // Rewrite workspace dependencies before packing
     console.log(`  🔄 Rewriting workspace dependencies...`);

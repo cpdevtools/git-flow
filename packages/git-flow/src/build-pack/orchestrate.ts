@@ -2,7 +2,7 @@
  * Main orchestration for Phase 2 Build & Pack workflow
  */
 
-import { join } from 'node:path';
+import { join } from 'path';
 import { discoverProjects, buildDependencyGraph, DependencyGraph } from '@cpdevtools/ts-dev-utilities/project';
 import type { Project } from '@cpdevtools/ts-dev-utilities/project';
 import { extractPRMetadata } from './options.js';
