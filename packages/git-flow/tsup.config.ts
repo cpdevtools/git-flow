@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup';
+import { builtinModules } from 'module';
 
 export default defineConfig([
   // Main library outputs - external dependencies
@@ -36,16 +37,12 @@ export default defineConfig([
     splitting: false,
     minify: false,
     target: 'node20',
+    platform: 'node',
     noExternal: [/.*/], // Bundle everything
     external: [
-      // Keep Node.js built-ins external
-      'node:*',
-      'fs', 'path', 'url', 'util', 'stream', 'events', 'buffer', 'crypto',
-      'http', 'https', 'net', 'tls', 'zlib', 'os', 'child_process', 'assert',
-      'querystring', 'string_decoder', 'timers', 'tty', 'dns', 'dgram',
-      'readline', 'repl', 'vm', 'domain', 'punycode', 'v8', 'worker_threads',
-      'perf_hooks', 'async_hooks', 'inspector', 'trace_events', 'process',
-      'module', 'cluster', 'constants'
+      // Keep all Node.js built-ins external
+      ...builtinModules,
+      ...builtinModules.map(m => `node:${m}`),
     ],
   },
 ]);
