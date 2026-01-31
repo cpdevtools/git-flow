@@ -3,6 +3,8 @@ export interface ProjectArtifactDescriptor {
   name: string;
   /** Project version */
   version: string;
+  /** Project object */
+  project: any;
   /** File path relative to artifact output directory */
   path: string;
   /** MIME type */
@@ -22,6 +24,12 @@ export interface Artifact {
   type: string;
   /** Artifact file path */
   path: string;
+  /** Temporary tag */
+  tempTag?: string;
+  /** Final tag */
+  finalTag?: string;
+  /** Digest */
+  digest?: string;
   /** Artifact content */
   content?: Buffer | string;
   /** Metadata */
