@@ -1,5 +1,5 @@
-import { writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { $ } from 'zx';
 import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';
 
