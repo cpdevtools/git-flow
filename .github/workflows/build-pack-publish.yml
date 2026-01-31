@@ -1,148 +1,45 @@
-name: Build, Pack & Publish Release
+name: Build, Pack & Publish
 
 on:
-  workflow_call:
-    inputs:
-      pr-number:
-        description: 'Release PR number'
-        required: true
-        type: number
-      
-      node-version:
-        description: 'Node.js version to use'
-        required: false
-        type: string
-        default: '20'
-    
-    outputs:
-      published-count:
-        description: 'Number of projects successfully published'
-        value: ${{ jobs.publish.outputs.published-count }}
-      
-      verified-count:
-        description: 'Number of projects verified'
-        value: ${{ jobs.publish.outputs.verified-count }}
-
-# Required for publishing to GitHub Packages and creating releases/tags
-permissions:
-  contents: write
-  packages: write
+  pull_request:
+    types: [closed]
+    branches:
+      - 'release/**'
 
 jobs:
   build-pack:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+      pull-requests: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@cpdevtools'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-      
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Install git-flow library dependencies
-        run: |
-          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
-          npm install
-      
-      - name: Symlink bundled git-flow CLI to PATH
-        run: |
-          # Symlink to /usr/local/bin which is already in PATH
-          sudo ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js /usr/local/bin/cpdt-gitflow
-          sudo chmod +x /usr/local/bin/cpdt-gitflow
-      
-      - name: Test git-flow CLI
-        run: |
-          echo "Testing CLI..."
-          cpdt-gitflow --help || echo "CLI failed"
-          which cpdt-gitflow
-          ls -la /usr/local/bin/cpdt-gitflow
-      
-      - name: Build & Pack
+      - name: Build and Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
         with:
-          pr-number: ${{ inputs.pr-number }}
+          pr-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Debug - List artifact directory
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Listing .artifacts/:"
-          ls -la .artifacts/ || echo "Directory does not exist"
-          echo "Copying to /tmp/upload-artifacts"
-          mkdir -p /tmp/upload-artifacts
-          cp -r .artifacts/* /tmp/upload-artifacts/
-          ls -la /tmp/upload-artifacts/
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-artifacts
-          path: /tmp/upload-artifacts/
-          retention-days: 1
-          if-no-files-found: error
-  
-  publish:
+
+  publish-release:
     needs: build-pack
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    
-    outputs:
-      published-count: ${{ steps.publish.outputs.published-count }}
-      verified-count: ${{ steps.publish.outputs.verified-count }}
-    
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: release-artifacts
-          path: .artifacts/
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@cpdevtools'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-      
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
       
       - name: Publish Release
-        id: publish
         uses: cpdevtools/git-flow/actions/publish-release@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          pr-number: ${{ inputs.pr-number }}
+          pr-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GITHUB_TOKEN }}
