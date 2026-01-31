@@ -61331,7 +61331,16 @@ async function run() {
       }
       prBody = pr.body;
     } else {
-      prBody = `Manual dispatch from commit ${sha.substring(0, 7)}`;
+      prBody = `Manual dispatch from commit ${sha.substring(0, 7)}
+
+\`\`\`yaml
+runNumber: ${runNumber}
+projects:
+  - name: "@cpdevtools/git-flow"
+    version: "0.1.0-dev"
+    path: "packages/git-flow"
+    releaseType: "dev"
+\`\`\``;
     }
     core.info(`Starting Build & Pack workflow for PR #${prNumber}`);
     core.info(`Workspace: ${workspaceRoot}`);

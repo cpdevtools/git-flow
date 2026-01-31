@@ -53,8 +53,17 @@ async function run(): Promise<void> {
       }
       prBody = pr.body;
     } else {
-      // For manual dispatch, create a default body
-      prBody = `Manual dispatch from commit ${sha.substring(0, 7)}`;
+      // For manual dispatch, create a default body with YAML metadata
+      prBody = `Manual dispatch from commit ${sha.substring(0, 7)}
+
+\`\`\`yaml
+runNumber: ${runNumber}
+projects:
+  - name: "@cpdevtools/git-flow"
+    version: "0.1.0-dev"
+    path: "packages/git-flow"
+    releaseType: "dev"
+\`\`\``;
     }
 
     // Run build & pack workflow
