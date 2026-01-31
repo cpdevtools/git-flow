@@ -4,6 +4,7 @@
 
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { resolve } from 'node:path';
 import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
 
 async function run(): Promise<void> {
@@ -12,7 +13,9 @@ async function run(): Promise<void> {
     const prNumber = parseInt(core.getInput('pr-number', { required: true }), 10);
     const token = core.getInput('token', { required: true });
     const workspaceRoot = core.getInput('workspace-root', { required: false }) || process.cwd();
-    const artifactOutputDir = core.getInput('artifact-output-dir', { required: false }) || '.artifacts';
+    const artifactOutputDirInput = core.getInput('artifact-output-dir', { required: false }) || '.artifacts';
+    // Resolve to absolute path relative to workspace root
+    const artifactOutputDir = resolve(workspaceRoot, artifactOutputDirInput);
 
     // Validate inputs
     if (isNaN(prNumber) || prNumber <= 0) {
