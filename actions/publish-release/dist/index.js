@@ -83213,7 +83213,7 @@ async function getDraftReleaseMetadata(githubToken, owner, repo, tag) {
     if (!release.draft || !release.body) {
       return null;
     }
-    const yamlMatch = release.body.match(/```yaml\n([\s\S]*?)\n```/);
+    const yamlMatch = release.body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
     return yamlMatch ? yamlMatch[1] : null;
   } catch (error) {
     if (error.status === 404) {

@@ -416,7 +416,7 @@ export async function getDraftReleaseMetadata(
     }
 
     // Extract YAML from markdown code block
-    const yamlMatch = release.body.match(/```yaml\n([\s\S]*?)\n```/);
+    const yamlMatch = release.body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
     return yamlMatch ? yamlMatch[1] : null;
   } catch (error: any) {
     if (error.status === 404) {
