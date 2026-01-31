@@ -14,6 +14,9 @@ export interface VersionResolutionInput {
 
   /** CI run number for build suffix */
   runNumber?: number;
+
+  /** Project name for per-project tag checking (e.g., "@cpdevtools/git-flow") */
+  projectName?: string;
 }
 
 export interface ResolvedVersion {

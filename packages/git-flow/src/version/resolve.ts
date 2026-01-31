@@ -12,9 +12,21 @@ import { $ } from 'zx';
 $.verbose = false;
 
 /**
- * Check if a git tag exists
- * Uses git ls-remote to check for tag on remote (works in CI)
- * Falls back to local git tag check
+ * Build the tag name for a project version
+ * Format: {projectName}/v{version} for scoped, or v{version} for unscoped
+ */
+function buildTagName(version: string, projectName?: string): string {
+  if (projectName) {
+    return `${projectName}/v${version}`;
+  }
+  return `v${version}`;
+}
+
+/**
+ * Check if a version is already released (git tag or GitHub release exists)
+ * Checks in order:
+ * 1. Git tags (local and remote)
+ * 2. GitHub releases (including drafts) by tag name
  */
 async function tagExists(tag: string): Promise<boolean> {
   try {
@@ -26,7 +38,18 @@ async function tagExists(tag: string): Promise<boolean> {
     
     // Check remote tags (for CI where local might not have all tags)
     const remoteResult = await $`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
-    return remoteResult.stdout.trim().length > 0;
+    if (remoteResult.stdout.trim().length > 0) {
+      return true;
+    }
+
+    // Check GitHub releases by tag name (catches draft releases too)
+    // gh release view returns exit code 0 if release exists, 1 if not
+    const releaseResult = await $`gh release view ${tag} --json tagName`.nothrow();
+    if (releaseResult.exitCode === 0) {
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.warn(`Warning: Failed to check tag ${tag}: ${error}`);
     return false;
@@ -52,7 +75,7 @@ async function tagExists(tag: string): Promise<boolean> {
  * ```
  */
 export async function resolveVersion(input: VersionResolutionInput): Promise<ResolvedVersion> {
-  const { placeholder, branch, versionsByPlaceholder, runNumber } = input;
+  const { placeholder, branch, versionsByPlaceholder, runNumber, projectName } = input;
 
   // Step 1: Resolve placeholder
   const resolvedVersion = versionsByPlaceholder[placeholder];
@@ -69,6 +92,7 @@ export async function resolveVersion(input: VersionResolutionInput): Promise<Res
       resolvedVersion,
       branch,
       runNumber,
+      projectName,
     });
   } else {
     return await resolveDevelopmentBranch({
@@ -76,6 +100,7 @@ export async function resolveVersion(input: VersionResolutionInput): Promise<Res
       resolvedVersion,
       branch,
       runNumber,
+      projectName,
     });
   }
 }
@@ -88,11 +113,12 @@ async function resolveMainlineBranch(params: {
   resolvedVersion: string;
   branch: string;
   runNumber?: number;
+  projectName?: string;
 }): Promise<ResolvedVersion> {
-  const { placeholder, resolvedVersion, branch, runNumber } = params;
+  const { placeholder, resolvedVersion, branch, runNumber, projectName } = params;
 
-  // Check if tag exists
-  const tag = `v${resolvedVersion}`;
+  // Check if tag exists (per-project format: {projectName}/v{version})
+  const tag = buildTagName(resolvedVersion, projectName);
   const hasTag = await tagExists(tag);
 
   let version: string;
@@ -142,8 +168,9 @@ async function resolveDevelopmentBranch(params: {
   resolvedVersion: string;
   branch: string;
   runNumber?: number;
+  projectName?: string;
 }): Promise<ResolvedVersion> {
-  const { placeholder, resolvedVersion, branch, runNumber } = params;
+  const { placeholder, resolvedVersion, branch, runNumber, projectName } = params;
 
   const sanitizedBranch = sanitizeBranchName(branch);
   const resolvedIsPreRelease = isPreRelease(resolvedVersion);
@@ -159,8 +186,8 @@ async function resolveDevelopmentBranch(params: {
     versionWithBranch = `${resolvedVersion}-${sanitizedBranch}`;
   }
 
-  // Check if tag exists for version with branch
-  const tag = `v${versionWithBranch}`;
+  // Check if tag exists for version with branch (per-project format)
+  const tag = buildTagName(versionWithBranch, projectName);
   const hasTag = await tagExists(tag);
 
   let version: string;

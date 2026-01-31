@@ -54541,6 +54541,12 @@ var require_version = __commonJS({
     }
     var import_zx = require_build();
     import_zx.$.verbose = false;
+    function buildTagName(version, projectName) {
+      if (projectName) {
+        return `${projectName}/v${version}`;
+      }
+      return `v${version}`;
+    }
     async function tagExists(tag) {
       try {
         const localResult = await import_zx.$`git tag -l ${tag}`.nothrow();
@@ -54548,14 +54554,21 @@ var require_version = __commonJS({
           return true;
         }
         const remoteResult = await import_zx.$`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
-        return remoteResult.stdout.trim().length > 0;
+        if (remoteResult.stdout.trim().length > 0) {
+          return true;
+        }
+        const releaseResult = await import_zx.$`gh release view ${tag} --json tagName`.nothrow();
+        if (releaseResult.exitCode === 0) {
+          return true;
+        }
+        return false;
       } catch (error) {
         console.warn(`Warning: Failed to check tag ${tag}: ${error}`);
         return false;
       }
     }
     async function resolveVersion2(input) {
-      const { placeholder, branch, versionsByPlaceholder, runNumber } = input;
+      const { placeholder, branch, versionsByPlaceholder, runNumber, projectName } = input;
       const resolvedVersion = versionsByPlaceholder[placeholder];
       if (!resolvedVersion) {
         throw new Error(`No version found for placeholder: ${placeholder}`);
@@ -54566,20 +54579,22 @@ var require_version = __commonJS({
           placeholder,
           resolvedVersion,
           branch,
-          runNumber
+          runNumber,
+          projectName
         });
       } else {
         return await resolveDevelopmentBranch({
           placeholder,
           resolvedVersion,
           branch,
-          runNumber
+          runNumber,
+          projectName
         });
       }
     }
     async function resolveMainlineBranch(params) {
-      const { placeholder, resolvedVersion, branch, runNumber } = params;
-      const tag = `v${resolvedVersion}`;
+      const { placeholder, resolvedVersion, branch, runNumber, projectName } = params;
+      const tag = buildTagName(resolvedVersion, projectName);
       const hasTag = await tagExists(tag);
       let version;
       let finalIsPreRelease;
@@ -54608,7 +54623,7 @@ var require_version = __commonJS({
       };
     }
     async function resolveDevelopmentBranch(params) {
-      const { placeholder, resolvedVersion, branch, runNumber } = params;
+      const { placeholder, resolvedVersion, branch, runNumber, projectName } = params;
       const sanitizedBranch = sanitizeBranchName(branch);
       const resolvedIsPreRelease = isPreRelease(resolvedVersion);
       let versionWithBranch;
@@ -54618,7 +54633,7 @@ var require_version = __commonJS({
       } else {
         versionWithBranch = `${resolvedVersion}-${sanitizedBranch}`;
       }
-      const tag = `v${versionWithBranch}`;
+      const tag = buildTagName(versionWithBranch, projectName);
       const hasTag = await tagExists(tag);
       let version;
       let buildNumber;
@@ -63456,7 +63471,8 @@ async function run() {
           placeholder: packageVersion,
           branch,
           versionsByPlaceholder,
-          runNumber
+          runNumber,
+          projectName: project.packageJson.name
         });
         projectMetadata.push({
           name: project.packageJson.name || "unknown",

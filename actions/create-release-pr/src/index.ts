@@ -69,6 +69,7 @@ async function run() {
           branch,
           versionsByPlaceholder,
           runNumber,
+          projectName: project.packageJson.name,
         });
 
         projectMetadata.push({
