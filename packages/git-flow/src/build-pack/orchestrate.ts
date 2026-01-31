@@ -3,8 +3,8 @@
  */
 
 import { join } from 'path';
-import { discoverProjects, buildDependencyGraph, DependencyGraph } from '@cpdevtools/ts-dev-utilities/project';
-import type { Project } from '@cpdevtools/ts-dev-utilities/project';
+import { discoverProjects, buildDependencyGraph } from '../../lib/project';
+import type { Project, DependencyGraph } from '../../lib/project';
 import { extractPRMetadata } from './options.js';
 import { executeBuild, executePack, executeUpload } from './execute.js';
 import { getReleaseTag, findDraftReleaseByTag, isArtifactUploaded } from './github.js';

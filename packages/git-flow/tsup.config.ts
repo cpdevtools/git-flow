@@ -18,7 +18,7 @@ export default defineConfig([
     clean: true,
     splitting: false,
     bundle: true, // Bundle to avoid module resolution issues
-    external: ['@actions/core', '@actions/github', 'globby', 'semver', 'yaml', 'zx', '@cpdevtools/ts-dev-utilities'],
+    external: ['@actions/core', '@actions/github', 'globby', 'semver', 'yaml', 'zx'],
     platform: 'node',
   },
   // CLI outputs - CommonJS format (compatible with library)

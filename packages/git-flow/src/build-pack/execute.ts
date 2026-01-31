@@ -2,7 +2,7 @@
  * Build and pack execution functions
  */
 
-import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+import type { ProjectArtifactDescriptor } from '../../lib/artifacts';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
