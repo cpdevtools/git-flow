@@ -405,13 +405,17 @@ export async function getDraftReleaseMetadata(
   const octokit = getOctokit(githubToken);
 
   try {
-    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+    // List all releases and find the draft with matching tag
+    // getReleaseByTag doesn't return draft releases
+    const { data: releases } = await octokit.rest.repos.listReleases({
       owner,
       repo,
-      tag,
+      per_page: 100, // Should be enough for recent releases
     });
 
-    if (!release.draft || !release.body) {
+    const release = releases.find(r => r.tag_name === tag && r.draft);
+
+    if (!release || !release.body) {
       return null;
     }
 
@@ -419,9 +423,6 @@ export async function getDraftReleaseMetadata(
     const yamlMatch = release.body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
     return yamlMatch ? yamlMatch[1] : null;
   } catch (error: any) {
-    if (error.status === 404) {
-      return null;
-    }
     console.error(`Error getting draft release metadata ${tag}:`, error);
     return null;
   }
