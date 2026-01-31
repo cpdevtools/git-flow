@@ -389,12 +389,13 @@ export async function finalizeRelease(
       throw new Error(`Release not found: ${tag}`);
     }
 
-    // Update to published
+    // Update to published (and remove pre-release flag)
     await octokit.rest.repos.updateRelease({
       owner,
       repo,
       release_id: release.id,
       draft: false,
+      prerelease: false,
     });
 
     console.log(`  ✅ Published release: ${tag}`);

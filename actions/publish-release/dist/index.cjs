@@ -62734,7 +62734,8 @@ This may indicate the image was modified after being built in Phase 2.`
           owner,
           repo,
           release_id: release.id,
-          draft: false
+          draft: false,
+          prerelease: false
         });
         console.log(`  \u2705 Published release: ${tag}`);
       } catch (error) {
