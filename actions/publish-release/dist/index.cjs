@@ -61618,7 +61618,12 @@ var require_build_pack = __commonJS({
           repo,
           per_page: 100
         });
-        const draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+        const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+        let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!draftRelease && expectedName) {
+          draftRelease = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (draftRelease) {
           return {
             id: draftRelease.id,
@@ -62681,7 +62686,12 @@ This may indicate the image was modified after being built in Phase 2.`
           repo,
           per_page: 100
         });
-        const draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+        const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+        let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!draftRelease && expectedName) {
+          draftRelease = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (draftRelease) {
           return {
             id: draftRelease.id,
@@ -62712,7 +62722,11 @@ This may indicate the image was modified after being built in Phase 2.`
           repo,
           per_page: 100
         });
-        const release = releases.find((r) => r.tag_name === tag && r.draft);
+        const expectedName = `${projectName} ${version}`;
+        let release = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!release) {
+          release = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (!release) {
           throw new Error(`Release not found: ${tag}`);
         }

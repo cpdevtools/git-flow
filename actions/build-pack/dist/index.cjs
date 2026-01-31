@@ -61618,7 +61618,12 @@ var require_build_pack = __commonJS({
           repo,
           per_page: 100
         });
-        const draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+        const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+        let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!draftRelease && expectedName) {
+          draftRelease = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (draftRelease) {
           return {
             id: draftRelease.id,

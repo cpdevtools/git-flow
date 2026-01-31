@@ -54,7 +54,19 @@ export async function findDraftReleaseByTag(
       per_page: 100,
     });
 
-    const draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+    // Parse tag to get name and version for fallback search
+    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
+    const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+    const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+
+    // First try to find by exact tag match
+    let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+    
+    // Fallback: find by release name (handles GitHub's untagged- behavior)
+    if (!draftRelease && expectedName) {
+      draftRelease = releases.find((r) => r.name === expectedName && r.draft);
+    }
+
     if (draftRelease) {
       return {
         id: draftRelease.id,
@@ -362,7 +374,16 @@ export async function finalizeRelease(
       per_page: 100,
     });
 
-    const release = releases.find((r) => r.tag_name === tag && r.draft);
+    // Parse tag to get name for fallback search
+    const expectedName = `${projectName} ${version}`;
+
+    // First try to find by exact tag match
+    let release = releases.find((r) => r.tag_name === tag && r.draft);
+    
+    // Fallback: find by release name (handles GitHub's untagged- behavior)
+    if (!release) {
+      release = releases.find((r) => r.name === expectedName && r.draft);
+    }
 
     if (!release) {
       throw new Error(`Release not found: ${tag}`);
