@@ -103,6 +103,7 @@ export interface PublishProjectInfo {
   name: string;
   version: string;
   releaseTag: string;
+  prerelease: boolean;
 }
 
 /**

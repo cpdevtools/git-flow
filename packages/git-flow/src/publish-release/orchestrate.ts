@@ -68,7 +68,7 @@ async function updateReleaseBodyPublishedFlags(
   
   // Update release body with new YAML
   const updatedYaml = doc.toString();
-  const body = `# ${projectName} v${version}\n\n## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``;
+  const body = `## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``;
   
   await updateDraftReleaseBody(githubToken, owner, repo, release.id, body);
 }
@@ -142,7 +142,8 @@ export async function runPublishRelease(
           options.owner,
           options.repo,
           project.name,
-          project.version
+          project.version,
+          project.prerelease
         );
 
         // Create git tag

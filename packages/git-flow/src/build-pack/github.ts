@@ -154,7 +154,7 @@ export async function findOrCreateDraftRelease(
   
   // Include artifact metadata in release body if provided
   const body = processedMetadata 
-    ? `# ${project.name} v${project.version}\n\n## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
+    ? `## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
     : `Draft release for ${project.name} v${project.version}`;
 
   // Try to find existing draft release
@@ -361,7 +361,8 @@ export async function finalizeRelease(
   owner: string,
   repo: string,
   projectName: string,
-  version: string
+  version: string,
+  prerelease: boolean
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
@@ -389,13 +390,13 @@ export async function finalizeRelease(
       throw new Error(`Release not found: ${tag}`);
     }
 
-    // Update to published (and remove pre-release flag)
+    // Update to published (using prerelease flag from PR metadata)
     await octokit.rest.repos.updateRelease({
       owner,
       repo,
       release_id: release.id,
       draft: false,
-      prerelease: false,
+      prerelease,
     });
 
     console.log(`  ✅ Published release: ${tag}`);

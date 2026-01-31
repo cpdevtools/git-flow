@@ -61668,9 +61668,7 @@ var require_build_pack = __commonJS({
       const tag = getReleaseTag(project.name, project.version);
       const name = `${project.name} ${project.version}`;
       const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : void 0;
-      const body = processedMetadata ? `# ${project.name} v${project.version}
-
-## Artifact Metadata
+      const body = processedMetadata ? `## Artifact Metadata
 \`\`\`yaml
 ${processedMetadata}
 \`\`\`` : `Draft release for ${project.name} v${project.version}`;

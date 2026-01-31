@@ -61668,9 +61668,7 @@ var require_build_pack = __commonJS({
       const tag = getReleaseTag(project.name, project.version);
       const name = `${project.name} ${project.version}`;
       const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : void 0;
-      const body = processedMetadata ? `# ${project.name} v${project.version}
-
-## Artifact Metadata
+      const body = processedMetadata ? `## Artifact Metadata
 \`\`\`yaml
 ${processedMetadata}
 \`\`\`` : `Draft release for ${project.name} v${project.version}`;
@@ -62713,7 +62711,7 @@ This may indicate the image was modified after being built in Phase 2.`
         body
       });
     }
-    async function finalizeRelease(githubToken, owner, repo, projectName, version) {
+    async function finalizeRelease(githubToken, owner, repo, projectName, version, prerelease) {
       const octokit = (0, import_github.getOctokit)(githubToken);
       const tag = getReleaseTag(projectName, version);
       try {
@@ -62735,7 +62733,7 @@ This may indicate the image was modified after being built in Phase 2.`
           repo,
           release_id: release.id,
           draft: false,
-          prerelease: false
+          prerelease
         });
         console.log(`  \u2705 Published release: ${tag}`);
       } catch (error) {
@@ -62808,9 +62806,7 @@ This may indicate the image was modified after being built in Phase 2.`
       const projectName = tagMatch ? tagMatch[1] : "Unknown";
       const version = tagMatch ? tagMatch[2] : "0.0.0";
       const updatedYaml = doc.toString();
-      const body = `# ${projectName} v${version}
-
-## Artifact Metadata
+      const body = `## Artifact Metadata
 \`\`\`yaml
 ${updatedYaml}
 \`\`\``;
@@ -62864,7 +62860,8 @@ ${updatedYaml}
               options.owner,
               options.repo,
               project.name,
-              project.version
+              project.version,
+              project.prerelease
             );
             console.log(`  \u{1F3F7}\uFE0F  Creating git tag...`);
             await createGitTag(
