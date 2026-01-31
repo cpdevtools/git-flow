@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig([
-  // Library outputs - CommonJS format (transpile only, no bundling)
+  // Library outputs - CommonJS format (bundle for clean consumption)
   {
     entry: {
       'index': 'src/index.ts',
@@ -17,7 +17,8 @@ export default defineConfig([
     sourcemap: true,
     clean: true,
     splitting: false,
-    bundle: false, // Don't bundle - just transpile TypeScript to CommonJS
+    bundle: true, // Bundle to avoid module resolution issues
+    external: ['@actions/core', '@actions/github', 'globby', 'semver', 'yaml', 'zx', '@cpdevtools/ts-dev-utilities'],
     platform: 'node',
   },
   // CLI outputs - CommonJS format (compatible with library)
