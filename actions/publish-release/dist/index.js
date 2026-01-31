@@ -25697,7 +25697,7 @@ var require_util8 = __commonJS({
       toCamelCase: () => toCamelCase
     });
     module.exports = __toCommonJS2(util_exports);
-    var import_node_path5 = __toESM2(__require("path"), 1);
+    var import_node_path6 = __toESM2(__require("path"), 1);
     var import_node_process3 = __toESM2(__require("process"), 1);
     var import_vendor_core = require_vendor_core();
     function noop3() {
@@ -25719,10 +25719,10 @@ var require_util8 = __commonJS({
       const pathKey = import_node_process3.default.platform === "win32" ? Object.keys(env).reverse().find((key) => key.toUpperCase() === "PATH") || "Path" : "PATH";
       const pathValue = dirs.map(
         (c) => c && [
-          import_node_path5.default.resolve(c, "node_modules", ".bin"),
-          import_node_path5.default.resolve(c)
+          import_node_path6.default.resolve(c, "node_modules", ".bin"),
+          import_node_path6.default.resolve(c)
         ]
-      ).flat().concat(env[pathKey]).filter(Boolean).join(import_node_path5.default.delimiter);
+      ).flat().concat(env[pathKey]).filter(Boolean).join(import_node_path6.default.delimiter);
       return __spreadProps(__spreadValues({}, env), {
         [pathKey]: pathValue
       });
@@ -25803,7 +25803,7 @@ var require_core2 = __commonJS({
       kill: () => kill2,
       log: () => log2,
       os: () => os2,
-      path: () => import_node_path5.default,
+      path: () => import_node_path6.default,
       ps: () => import_vendor_core3.ps,
       quote: () => import_util2.quote,
       quotePowerShell: () => import_util2.quotePowerShell,
@@ -26164,7 +26164,7 @@ ${details}`;
     var import_vendor_core2 = require_vendor_core();
     var import_util = require_util8();
     var import_internals = require_internals();
-    var import_node_path5 = __toESM2(__require("path"), 1);
+    var import_node_path6 = __toESM2(__require("path"), 1);
     var os2 = __toESM2(__require("os"), 1);
     var import_vendor_core3 = require_vendor_core();
     var import_util2 = require_util8();
@@ -39402,7 +39402,7 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
     var import_node_process3 = __toESM2(__require("process"), 1);
     var import_node_fs22 = __toESM2(__require("fs"), 1);
     var import_promises32 = __toESM2(__require("fs").promises, 1);
-    var import_node_path5 = __toESM2(__require("path"), 1);
+    var import_node_path6 = __toESM2(__require("path"), 1);
     var import_fast_glob3 = __toESM2(require_out42(), 1);
     var import_ignore3 = __toESM2(require_ignore2(), 1);
     function slash2(path32) {
@@ -39434,23 +39434,23 @@ Content-Type: ${p2.type || "application/octet-stream"}\r
       const hasNonTrailingSlash = slashIndex !== -1 && slashIndex !== cleanPattern.length - 1;
       let result;
       if (!hasNonTrailingSlash) {
-        result = import_node_path5.default.posix.join(base, "**", cleanPattern);
+        result = import_node_path6.default.posix.join(base, "**", cleanPattern);
       } else if (cleanPattern.startsWith("/")) {
-        result = import_node_path5.default.posix.join(base, cleanPattern.slice(1));
+        result = import_node_path6.default.posix.join(base, cleanPattern.slice(1));
       } else {
-        result = import_node_path5.default.posix.join(base, cleanPattern);
+        result = import_node_path6.default.posix.join(base, cleanPattern);
       }
       return isNegative ? "!" + result : result;
     };
     var parseIgnoreFile2 = (file, cwd) => {
-      const base = slash2(import_node_path5.default.relative(cwd, import_node_path5.default.dirname(file.filePath)));
+      const base = slash2(import_node_path6.default.relative(cwd, import_node_path6.default.dirname(file.filePath)));
       return file.content.split(/\r?\n/).filter((line) => line && !line.startsWith("#")).map((pattern) => applyBaseToPattern2(pattern, base));
     };
     var toRelativePath2 = (fileOrDirectory, cwd) => {
       cwd = slash2(cwd);
-      if (import_node_path5.default.isAbsolute(fileOrDirectory)) {
+      if (import_node_path6.default.isAbsolute(fileOrDirectory)) {
         if (slash2(fileOrDirectory).startsWith(cwd)) {
-          return import_node_path5.default.relative(cwd, fileOrDirectory);
+          return import_node_path6.default.relative(cwd, fileOrDirectory);
         }
         throw new Error(`Path ${fileOrDirectory} is not in cwd ${cwd}`);
       }

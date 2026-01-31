@@ -1,5 +1,7 @@
 import { defineConfig } from 'tsup';
 import { builtinModules } from 'module';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 export default defineConfig([
   // Main library outputs - external dependencies
@@ -25,6 +27,24 @@ export default defineConfig([
       ...builtinModules,
       ...builtinModules.map(m => `node:${m}`),
     ],
+    async onSuccess() {
+      // Post-process to add node: prefix to all bare built-in imports
+      const distFiles = ['dist/publishing/index.js', 'dist/publish-release/index.js'];
+      const builtins = ['path', 'fs', 'url', 'crypto', 'stream', 'util', 'events', 'http', 'https', 'zlib', 'buffer', 'querystring', 'os', 'child_process', 'net', 'tls', 'dns', 'dgram', 'readline', 'process'];
+      
+      for (const distFile of distFiles) {
+        try {
+          let content = await readFile(distFile, 'utf-8');
+          for (const builtin of builtins) {
+            content = content.replace(new RegExp(`from ["']${builtin}["']`, 'g'), `from "node:${builtin}"`);
+          }
+          await writeFile(distFile, content, 'utf-8');
+          console.log(`✓ Added node: prefix to ${distFile}`);
+        } catch (err) {
+          // File might not exist, skip
+        }
+      }
+    },
   },
   // CLI outputs - keep oclif external (uses dynamic requires), bundle ts-dev-utilities
   {
