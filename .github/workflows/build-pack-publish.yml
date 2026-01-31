@@ -96,7 +96,7 @@ jobs:
       
       - name: Publish Release
         id: publish
-        uses: cpdevtools/git-flow/actions/publish-release@main
+        uses: cpdevtools/git-flow/actions/publish-release@649eebbc4c833a215a8eb1502df6f83c0907c277
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
