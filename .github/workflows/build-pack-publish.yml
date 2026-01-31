@@ -57,6 +57,12 @@ jobs:
       
       - name: Symlink bundled git-flow CLI to PATH
         run: |
+          # Debug: show what files exist
+          echo "=== Files in action directory ==="
+          ls -la /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/
+          echo "=== Checking for bin files ==="
+          find /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/ -name "bin*"
+          
           # Symlink to /usr/local/bin which is already in PATH
           sudo ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.mjs /usr/local/bin/cpdt-gitflow
           sudo chmod +x /usr/local/bin/cpdt-gitflow
