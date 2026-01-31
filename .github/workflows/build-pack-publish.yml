@@ -46,6 +46,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       
+      - name: Install CLI dependencies in action directory
+        run: |
+          cd /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow
+          npm install @oclif/core@^4.8.0 @actions/core@^1.11.1 @actions/github@^6.0.0 globby@^14.0.2 semver@^7.6.3 yaml@^2.8.2 zx@^8.2.4
+      
       - name: Symlink bundled git-flow CLI to PATH
         run: |
           mkdir -p /home/runner/.local/bin
