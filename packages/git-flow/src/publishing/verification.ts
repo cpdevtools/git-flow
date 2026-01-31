@@ -1,16 +1,36 @@
 import { $ } from 'zx';
+import { writeFile, unlink } from 'fs/promises';
+import { join } from 'path';
+import { homedir } from 'os';
 import type { NpmRegistry, NugetRegistry, DockerRegistry, VerificationResult } from './types.js';
 
 /**
  * Check if a package version is published to NPM registry
+ * Note: GitHub Packages requires authentication even to read packages
  */
 export async function isNpmPublished(
   packageName: string,
   version: string,
-  registry: NpmRegistry
+  registry: NpmRegistry,
+  token?: string
 ): Promise<VerificationResult> {
+  const npmrcPath = join(homedir(), '.npmrc');
+  let npmrcCreated = false;
+  
   try {
     console.log(`  📋 Checking if ${packageName}@${version} exists in ${registry.url}...`);
+    
+    // If token provided, set up .npmrc for auth (GitHub Packages requires auth even for reads)
+    if (token) {
+      const registryUrl = new URL(registry.url);
+      const registryPath = registryUrl.pathname.endsWith('/') ? registryUrl.pathname : registryUrl.pathname + '/';
+      let npmrcContent = `//${registryUrl.host}${registryPath}:_authToken=${token}\n`;
+      if (registry.scope) {
+        npmrcContent += `${registry.scope}:registry=${registry.url}\n`;
+      }
+      await writeFile(npmrcPath, npmrcContent);
+      npmrcCreated = true;
+    }
     
     // Build args array for proper argument handling
     const args = ['view', `${packageName}@${version}`, 'version', '--registry', registry.url, '--json'];
@@ -20,15 +40,17 @@ export async function isNpmPublished(
     console.log(`  📋 npm view exit code: ${result.exitCode}, stdout: ${result.stdout.trim().substring(0, 100)}`);
     
     if (result.exitCode !== 0) {
-      // Check if it's an auth error vs package not found
+      // Check if it's a package not found error
       const stderr = result.stderr || '';
-      if (stderr.includes('404') || stderr.includes('not found') || stderr.includes('E404')) {
+      const stdout = result.stdout || '';
+      if (stderr.includes('404') || stderr.includes('E404') || 
+          stdout.includes('E404') || stderr.includes('not found')) {
         return {
           published: false,
           error: 'Package not found in registry',
         };
       }
-      // For other errors (including auth issues), return the actual error
+      // For other errors, return the actual error
       return {
         published: false,
         error: result.stderr || 'Unknown error checking registry',
@@ -50,6 +72,11 @@ export async function isNpmPublished(
       published: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    // Clean up .npmrc if we created it
+    if (npmrcCreated) {
+      await unlink(npmrcPath).catch(() => {});
+    }
   }
 }
 
@@ -122,11 +149,12 @@ export async function isDockerPublished(
 export async function verifyPublication(
   artifactName: string,
   version: string,
-  registry: NpmRegistry | NugetRegistry | DockerRegistry
+  registry: NpmRegistry | NugetRegistry | DockerRegistry,
+  token?: string
 ): Promise<VerificationResult> {
   switch (registry.type) {
     case 'npm':
-      return isNpmPublished(artifactName, version, registry);
+      return isNpmPublished(artifactName, version, registry, token);
 
     case 'nuget':
       return isNugetPublished(artifactName, version, registry);

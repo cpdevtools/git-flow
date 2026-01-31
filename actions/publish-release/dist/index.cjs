@@ -62416,7 +62416,7 @@ var require_publish_release = __commonJS({
     });
     module2.exports = __toCommonJS2(publish_release_exports);
     var import_yaml2 = require_dist();
-    var import_path3 = require("path");
+    var import_path4 = require("path");
     var import_promises5 = require("fs/promises");
     var import_path2 = require("path");
     var import_yaml = require_dist();
@@ -62550,15 +62550,33 @@ This may indicate the image was modified after being built in Phase 2.`
       }
     }
     var import_zx2 = require_build();
-    async function isNpmPublished(packageName, version, registry) {
+    var import_promises32 = require("fs/promises");
+    var import_path3 = require("path");
+    var import_os2 = require("os");
+    async function isNpmPublished(packageName, version, registry, token) {
+      const npmrcPath = (0, import_path3.join)((0, import_os2.homedir)(), ".npmrc");
+      let npmrcCreated = false;
       try {
         console.log(`  \u{1F4CB} Checking if ${packageName}@${version} exists in ${registry.url}...`);
+        if (token) {
+          const registryUrl = new URL(registry.url);
+          const registryPath = registryUrl.pathname.endsWith("/") ? registryUrl.pathname : registryUrl.pathname + "/";
+          let npmrcContent = `//${registryUrl.host}${registryPath}:_authToken=${token}
+`;
+          if (registry.scope) {
+            npmrcContent += `${registry.scope}:registry=${registry.url}
+`;
+          }
+          await (0, import_promises32.writeFile)(npmrcPath, npmrcContent);
+          npmrcCreated = true;
+        }
         const args = ["view", `${packageName}@${version}`, "version", "--registry", registry.url, "--json"];
         const result = await import_zx2.$`npm ${args}`.nothrow();
         console.log(`  \u{1F4CB} npm view exit code: ${result.exitCode}, stdout: ${result.stdout.trim().substring(0, 100)}`);
         if (result.exitCode !== 0) {
           const stderr = result.stderr || "";
-          if (stderr.includes("404") || stderr.includes("not found") || stderr.includes("E404")) {
+          const stdout = result.stdout || "";
+          if (stderr.includes("404") || stderr.includes("E404") || stdout.includes("E404") || stderr.includes("not found")) {
             return {
               published: false,
               error: "Package not found in registry"
@@ -62581,6 +62599,11 @@ This may indicate the image was modified after being built in Phase 2.`
           published: false,
           error: error instanceof Error ? error.message : String(error)
         };
+      } finally {
+        if (npmrcCreated) {
+          await (0, import_promises32.unlink)(npmrcPath).catch(() => {
+          });
+        }
       }
     }
     async function isNugetPublished(packageId, version, registry) {
@@ -62617,10 +62640,10 @@ This may indicate the image was modified after being built in Phase 2.`
         };
       }
     }
-    async function verifyPublication(artifactName, version, registry) {
+    async function verifyPublication(artifactName, version, registry, token) {
       switch (registry.type) {
         case "npm":
-          return isNpmPublished(artifactName, version, registry);
+          return isNpmPublished(artifactName, version, registry, token);
         case "nuget":
           return isNugetPublished(artifactName, version, registry);
         case "docker":
@@ -62630,7 +62653,7 @@ This may indicate the image was modified after being built in Phase 2.`
       }
     }
     var import_github = require_github();
-    var import_promises32 = require("fs/promises");
+    var import_promises42 = require("fs/promises");
     var import_node_path4 = require("path");
     function getReleaseTag(projectName, version) {
       return `${projectName}/v${version}`;
@@ -62794,9 +62817,10 @@ This may indicate the image was modified after being built in Phase 2.`
           const registries = getArtifactRegistries(artifact);
           for (const registryId of registries) {
             const registry = getRegistry(registryConfig, registryId);
+            const token = getToken(registry);
             const artifactName = getArtifactName(artifact);
             const artifactVersion = getArtifactVersion(artifact, descriptor.project);
-            const verification = await verifyPublication(artifactName, artifactVersion, registry);
+            const verification = await verifyPublication(artifactName, artifactVersion, registry, token);
             if (verification.published) {
               console.log(
                 `  \u23ED\uFE0F  Skipping ${artifact.name} - already published to ${registryId}`
@@ -62805,7 +62829,7 @@ This may indicate the image was modified after being built in Phase 2.`
             }
             console.log(`  \u{1F680} Publishing ${artifact.name} to ${registryId}...`);
             await publishArtifact(artifact, registry, descriptor, workspaceRoot);
-            const postVerification = await verifyPublication(artifactName, artifactVersion, registry);
+            const postVerification = await verifyPublication(artifactName, artifactVersion, registry, token);
             if (!postVerification.published) {
               throw new Error(
                 `Verification failed for ${artifact.name} in ${registryId}: ${postVerification.error}`
@@ -62831,7 +62855,7 @@ This may indicate the image was modified after being built in Phase 2.`
             throw new Error(`NPM artifact ${artifact.name} missing path`);
           }
           await publishToNpm({
-            artifactPath: (0, import_path3.join)(workspaceRoot, ".artifacts", (0, import_path3.basename)(artifact.path)),
+            artifactPath: (0, import_path4.join)(workspaceRoot, ".artifacts", (0, import_path4.basename)(artifact.path)),
             registry,
             token
           });
@@ -62841,7 +62865,7 @@ This may indicate the image was modified after being built in Phase 2.`
             throw new Error(`NuGet artifact ${artifact.name} missing path`);
           }
           await publishToNuget({
-            artifactPath: (0, import_path3.join)(workspaceRoot, ".artifacts", (0, import_path3.basename)(artifact.path)),
+            artifactPath: (0, import_path4.join)(workspaceRoot, ".artifacts", (0, import_path4.basename)(artifact.path)),
             registry,
             apiKey: token
           });

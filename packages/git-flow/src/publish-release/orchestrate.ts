@@ -155,12 +155,13 @@ async function publishProjectArtifacts(
 
       for (const registryId of registries) {
         const registry = getRegistry(registryConfig, registryId);
+        const token = getToken(registry);
 
         // Skip if already published
         const artifactName = getArtifactName(artifact);
         const artifactVersion = getArtifactVersion(artifact, descriptor.project);
 
-        const verification = await verifyPublication(artifactName, artifactVersion, registry);
+        const verification = await verifyPublication(artifactName, artifactVersion, registry, token);
 
         if (verification.published) {
           console.log(
@@ -174,7 +175,7 @@ async function publishProjectArtifacts(
         await publishArtifact(artifact, registry, descriptor, workspaceRoot);
 
         // Verify publication
-        const postVerification = await verifyPublication(artifactName, artifactVersion, registry);
+        const postVerification = await verifyPublication(artifactName, artifactVersion, registry, token);
 
         if (!postVerification.published) {
           throw new Error(
