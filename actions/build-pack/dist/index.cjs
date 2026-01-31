@@ -61305,9 +61305,10 @@ async function run() {
     const workspaceRoot = core.getInput("workspace-root", { required: false }) || process.cwd();
     const artifactOutputDirInput = core.getInput("artifact-output-dir", { required: false }) || ".artifacts";
     const artifactOutputDir = (0, import_node_path4.resolve)(workspaceRoot, artifactOutputDirInput);
-    if (isNaN(prNumber) || prNumber <= 0) {
+    if (isNaN(prNumber) || prNumber < 0) {
       throw new Error(`Invalid PR number: ${core.getInput("pr-number")}`);
     }
+    const isManualDispatch = prNumber === 0;
     const sha = process.env.GITHUB_SHA || "";
     const runNumber = parseInt(process.env.GITHUB_RUN_NUMBER || "0", 10);
     if (!sha) {
@@ -61318,13 +61319,19 @@ async function run() {
     }
     const octokit = github.getOctokit(token);
     const [owner, repo] = (process.env.GITHUB_REPOSITORY || "/").split("/");
-    const { data: pr } = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: prNumber
-    });
-    if (!pr.body) {
-      throw new Error(`PR #${prNumber} has no description`);
+    let prBody = "";
+    if (!isManualDispatch) {
+      const { data: pr } = await octokit.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: prNumber
+      });
+      if (!pr.body) {
+        throw new Error(`PR #${prNumber} has no description`);
+      }
+      prBody = pr.body;
+    } else {
+      prBody = `Manual dispatch from commit ${sha.substring(0, 7)}`;
     }
     core.info(`Starting Build & Pack workflow for PR #${prNumber}`);
     core.info(`Workspace: ${workspaceRoot}`);
@@ -61340,7 +61347,7 @@ async function run() {
         sha,
         runNumber
       },
-      pr.body
+      prBody
     );
     core.setOutput("projects-built", result.built.length);
     core.setOutput("projects-packed", result.packed.length);

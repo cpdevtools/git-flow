@@ -18,9 +18,11 @@ async function run(): Promise<void> {
     const artifactOutputDir = resolve(workspaceRoot, artifactOutputDirInput);
 
     // Validate inputs
-    if (isNaN(prNumber) || prNumber <= 0) {
+    if (isNaN(prNumber) || prNumber < 0) {
       throw new Error(`Invalid PR number: ${core.getInput('pr-number')}`);
     }
+    
+    const isManualDispatch = prNumber === 0;
 
     // Get GitHub context
     const sha = process.env.GITHUB_SHA || '';
@@ -34,17 +36,25 @@ async function run(): Promise<void> {
       throw new Error('GITHUB_RUN_NUMBER environment variable not set');
     }
 
-    // Fetch PR body
+    // Fetch PR body (skip for manual dispatch)
     const octokit = github.getOctokit(token);
     const [owner, repo] = (process.env.GITHUB_REPOSITORY || '/').split('/');
-    const { data: pr } = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number: prNumber,
-    });
+    
+    let prBody = '';
+    if (!isManualDispatch) {
+      const { data: pr } = await octokit.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: prNumber,
+      });
 
-    if (!pr.body) {
-      throw new Error(`PR #${prNumber} has no description`);
+      if (!pr.body) {
+        throw new Error(`PR #${prNumber} has no description`);
+      }
+      prBody = pr.body;
+    } else {
+      // For manual dispatch, create a default body
+      prBody = `Manual dispatch from commit ${sha.substring(0, 7)}`;
     }
 
     // Run build & pack workflow
@@ -63,7 +73,7 @@ async function run(): Promise<void> {
         sha,
         runNumber,
       },
-      pr.body
+      prBody
     );
 
     // Set outputs
