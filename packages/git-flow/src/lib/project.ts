@@ -14,6 +14,8 @@ export interface DependencyGraph {
   dependencies: Map<string, string[]>;
   /** Ordered batches for parallel execution */
   batches: string[][];
+  /** Get topological batches (legacy method) */
+  getTopologicalBatches(): string[][];
 }
 
 /**
@@ -70,6 +72,7 @@ export function buildDependencyGraph(projects: Project[]): DependencyGraph {
 
   return {
     dependencies,
-    batches
+    batches,
+    getTopologicalBatches: () => batches
   };
 }
