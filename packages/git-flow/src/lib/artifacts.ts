@@ -11,6 +11,8 @@ export interface ProjectArtifactDescriptor {
   size: number;
   /** SHA256 hash */
   sha256: string;
+  /** Array of artifacts for this project */
+  artifacts: Artifact[];
 }
 
 export interface Artifact {
