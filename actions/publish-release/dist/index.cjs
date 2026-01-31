@@ -62707,14 +62707,14 @@ This may indicate the image was modified after being built in Phase 2.`
       const octokit = (0, import_github.getOctokit)(githubToken);
       const tag = getReleaseTag(projectName, version);
       try {
-        const { data: release } = await octokit.rest.repos.getReleaseByTag({
+        const { data: releases } = await octokit.rest.repos.listReleases({
           owner,
           repo,
-          tag
+          per_page: 100
         });
-        if (!release.draft) {
-          console.log(`  \u2713 Release ${tag} already published`);
-          return;
+        const release = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!release) {
+          throw new Error(`Release not found: ${tag}`);
         }
         await octokit.rest.repos.updateRelease({
           owner,

@@ -355,16 +355,17 @@ export async function finalizeRelease(
   const tag = getReleaseTag(projectName, version);
 
   try {
-    // Find release by tag
-    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+    // Find draft release by listing all releases
+    const { data: releases } = await octokit.rest.repos.listReleases({
       owner,
       repo,
-      tag,
+      per_page: 100,
     });
 
-    if (!release.draft) {
-      console.log(`  ✓ Release ${tag} already published`);
-      return;
+    const release = releases.find((r) => r.tag_name === tag && r.draft);
+
+    if (!release) {
+      throw new Error(`Release not found: ${tag}`);
     }
 
     // Update to published
