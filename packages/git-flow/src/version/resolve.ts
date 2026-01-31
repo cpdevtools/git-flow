@@ -23,48 +23,81 @@ function buildTagName(version: string, projectName?: string): string {
 }
 
 /**
- * Check if a version is already released (git tag or GitHub release exists)
+ * Check if a version is already published
  * Checks in order:
- * 1. Git tags (local and remote)
- * 2. GitHub releases (including drafts) by tag_name via API
+ * 1. Git tags (indicates a published release)
+ * 2. GitHub release body - checks if ANY artifact has published:true or missing published field
  */
-async function tagExists(tag: string): Promise<boolean> {
+async function versionExists(version: string, projectName?: string): Promise<boolean> {
   try {
-    console.log(`[tagExists] Checking tag: ${tag}`);
+    console.log(`[versionExists] Checking version: ${version} for project: ${projectName || 'unknown'}`);
+    
+    // Build tag name for git check
+    const tag = buildTagName(version, projectName);
     
     // First try local git tag
     const localResult = await $`git tag -l ${tag}`.nothrow();
-    console.log(`[tagExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
+    console.log(`[versionExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
     if (localResult.stdout.trim() === tag) {
-      console.log(`[tagExists] Found local git tag: ${tag}`);
+      console.log(`[versionExists] Found local git tag: ${tag}`);
       return true;
     }
     
     // Check remote tags (for CI where local might not have all tags)
     const remoteResult = await $`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
-    console.log(`[tagExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
+    console.log(`[versionExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
     if (remoteResult.stdout.trim().length > 0) {
-      console.log(`[tagExists] Found remote git tag: ${tag}`);
+      console.log(`[versionExists] Found remote git tag: ${tag}`);
       return true;
     }
 
-    // Check GitHub releases by tag_name (including drafts) via API
-    // Draft releases have tag_name set but no actual git tag exists yet
-    const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
-    console.log(`[tagExists] Checking GitHub releases via API (token available: ${ghToken.length > 0})`);
+    // Check GitHub release body for published artifacts
+    const token = process.env.GITHUB_TOKEN;
+    const owner = process.env.GITHUB_REPOSITORY_OWNER;
+    const repoWithOwner = process.env.GITHUB_REPOSITORY;
+    const repo = repoWithOwner?.split('/')[1];
     
-    // Use GitHub API to list releases and check tag_name field
-    const apiResult = await $({ env: { ...process.env, GH_TOKEN: ghToken } })`gh api repos/{owner}/{repo}/releases --jq ${`.[] | select(.tag_name == "${tag}") | .tag_name`}`.nothrow();
-    console.log(`[tagExists] GitHub API result: exitCode=${apiResult.exitCode}, stdout="${apiResult.stdout.trim()}"`);
-    if (apiResult.exitCode === 0 && apiResult.stdout.trim() === tag) {
-      console.log(`[tagExists] Found GitHub release with tag_name: ${tag}`);
-      return true;
+    if (token && owner && repo) {
+      console.log(`[versionExists] Checking GitHub release body for ${tag}`);
+      $.env = { ...process.env, GITHUB_TOKEN: token };
+      const ghResult = await $`gh api repos/${owner}/${repo}/releases --jq '.[] | select(.tag_name == "${tag}" or .name == "${projectName} ${version}") | select(.draft == true) | .body'`.nothrow();
+      
+      if (ghResult.exitCode === 0 && ghResult.stdout.trim()) {
+        const body = ghResult.stdout.trim();
+        // Extract YAML from markdown code block
+        const yamlMatch = body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
+        
+        if (yamlMatch) {
+          const yaml = yamlMatch[1];
+          console.log(`[versionExists] Found release body YAML, checking published flags`);
+          
+          // Check if any artifact has published:true or is missing published field
+          // Missing field = old release, assume published
+          // All published:false = can resume publishing
+          const hasPublishedTrue = /published:\s*true/i.test(yaml);
+          const hasArtifacts = /artifacts:/i.test(yaml);
+          const allPublishedFalse = hasArtifacts && !hasPublishedTrue && /published:\s*false/i.test(yaml);
+          
+          if (hasPublishedTrue) {
+            console.log(`[versionExists] Found artifact with published:true in release body`);
+            return true;
+          }
+          
+          if (hasArtifacts && !allPublishedFalse) {
+            // Has artifacts but no published field = old release, assume taken
+            console.log(`[versionExists] Found artifacts without published field, assuming version taken`);
+            return true;
+          }
+          
+          console.log(`[versionExists] All artifacts have published:false, version available for resume`);
+        }
+      }
     }
 
-    console.log(`[tagExists] Tag not found: ${tag}`);
+    console.log(`[versionExists] Version not found: ${version}`);
     return false;
   } catch (error) {
-    console.warn(`Warning: Failed to check tag ${tag}: ${error}`);
+    console.warn(`Warning: Failed to check version ${version}: ${error}`);
     return false;
   }
 }
@@ -130,15 +163,14 @@ async function resolveMainlineBranch(params: {
 }): Promise<ResolvedVersion> {
   const { placeholder, resolvedVersion, branch, runNumber, projectName } = params;
 
-  // Check if tag exists (per-project format: {projectName}/v{version})
-  const tag = buildTagName(resolvedVersion, projectName);
-  const hasTag = await tagExists(tag);
+  // Check if version already exists (git tag or npm registry)
+  const hasVersion = await versionExists(resolvedVersion, projectName);
 
   let version: string;
   let finalIsPreRelease: boolean;
   let buildNumber: number | undefined;
 
-  if (!hasTag) {
+  if (!hasVersion) {
     // Tag doesn't exist - use resolved version as-is
     version = resolvedVersion;
     finalIsPreRelease = isPreRelease(resolvedVersion);
@@ -201,7 +233,7 @@ async function resolveDevelopmentBranch(params: {
 
   // Check if tag exists for version with branch (per-project format)
   const tag = buildTagName(versionWithBranch, projectName);
-  const hasTag = await tagExists(tag);
+  const hasTag = await versionExists(versionWithBranch, projectName);
 
   let version: string;
   let buildNumber: number | undefined;

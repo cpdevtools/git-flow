@@ -5,7 +5,29 @@
 import { getOctokit } from '@actions/github';
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
+import { parseDocument } from 'yaml';
 import type { ProjectConfig, BuildPackContext } from './types.js';
+import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+
+/**
+ * Add published:false to all artifacts in YAML metadata
+ */
+function addPublishedFlagsToMetadata(artifactYaml: string): string {
+  const doc = parseDocument(artifactYaml);
+  
+  // Add published:false to each artifact
+  const artifacts = doc.get('artifacts') as any;
+  if (artifacts && Array.isArray(artifacts.items)) {
+    for (const artifactNode of artifacts.items) {
+      if (artifactNode && typeof artifactNode.set === 'function' && !artifactNode.has('published')) {
+        artifactNode.set('published', false);
+      }
+    }
+  }
+  
+  return doc.toString();
+}
+
 
 /**
  * Get release tag name for a project
@@ -115,9 +137,12 @@ export async function findOrCreateDraftRelease(
   const tag = getReleaseTag(project.name, project.version);
   const name = `${project.name} ${project.version}`;
   
+  // Add published:false to artifact metadata if provided
+  const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : undefined;
+  
   // Include artifact metadata in release body if provided
-  const body = artifactMetadata 
-    ? `# ${project.name} v${project.version}\n\n## Artifact Metadata\n\`\`\`yaml\n${artifactMetadata}\n\`\`\``
+  const body = processedMetadata 
+    ? `# ${project.name} v${project.version}\n\n## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
     : `Draft release for ${project.name} v${project.version}`;
 
   // Try to find existing draft release
@@ -132,7 +157,7 @@ export async function findOrCreateDraftRelease(
     console.log(`  ✓ Found existing draft release: ${tag}`);
     
     // Update release body with artifact metadata if provided
-    if (artifactMetadata) {
+    if (processedMetadata) {
       await updateDraftReleaseBody(
         context.githubToken,
         owner,

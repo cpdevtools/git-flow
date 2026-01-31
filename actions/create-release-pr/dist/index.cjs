@@ -54547,33 +54547,55 @@ var require_version = __commonJS({
       }
       return `v${version}`;
     }
-    async function tagExists(tag) {
+    async function versionExists(version, projectName) {
       try {
-        console.log(`[tagExists] Checking tag: ${tag}`);
+        console.log(`[versionExists] Checking version: ${version} for project: ${projectName || "unknown"}`);
+        const tag = buildTagName(version, projectName);
         const localResult = await import_zx.$`git tag -l ${tag}`.nothrow();
-        console.log(`[tagExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
+        console.log(`[versionExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
         if (localResult.stdout.trim() === tag) {
-          console.log(`[tagExists] Found local git tag: ${tag}`);
+          console.log(`[versionExists] Found local git tag: ${tag}`);
           return true;
         }
         const remoteResult = await import_zx.$`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
-        console.log(`[tagExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
+        console.log(`[versionExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
         if (remoteResult.stdout.trim().length > 0) {
-          console.log(`[tagExists] Found remote git tag: ${tag}`);
+          console.log(`[versionExists] Found remote git tag: ${tag}`);
           return true;
         }
-        const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
-        console.log(`[tagExists] Checking GitHub releases via API (token available: ${ghToken.length > 0})`);
-        const apiResult = await (0, import_zx.$)({ env: { ...process.env, GH_TOKEN: ghToken } })`gh api repos/{owner}/{repo}/releases --jq ${`.[] | select(.tag_name == "${tag}") | .tag_name`}`.nothrow();
-        console.log(`[tagExists] GitHub API result: exitCode=${apiResult.exitCode}, stdout="${apiResult.stdout.trim()}"`);
-        if (apiResult.exitCode === 0 && apiResult.stdout.trim() === tag) {
-          console.log(`[tagExists] Found GitHub release with tag_name: ${tag}`);
-          return true;
+        const token = process.env.GITHUB_TOKEN;
+        const owner = process.env.GITHUB_REPOSITORY_OWNER;
+        const repoWithOwner = process.env.GITHUB_REPOSITORY;
+        const repo = repoWithOwner?.split("/")[1];
+        if (token && owner && repo) {
+          console.log(`[versionExists] Checking GitHub release body for ${tag}`);
+          import_zx.$.env = { ...process.env, GITHUB_TOKEN: token };
+          const ghResult = await import_zx.$`gh api repos/${owner}/${repo}/releases --jq '.[] | select(.tag_name == "${tag}" or .name == "${projectName} ${version}") | select(.draft == true) | .body'`.nothrow();
+          if (ghResult.exitCode === 0 && ghResult.stdout.trim()) {
+            const body = ghResult.stdout.trim();
+            const yamlMatch = body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
+            if (yamlMatch) {
+              const yaml = yamlMatch[1];
+              console.log(`[versionExists] Found release body YAML, checking published flags`);
+              const hasPublishedTrue = /published:\s*true/i.test(yaml);
+              const hasArtifacts = /artifacts:/i.test(yaml);
+              const allPublishedFalse = hasArtifacts && !hasPublishedTrue && /published:\s*false/i.test(yaml);
+              if (hasPublishedTrue) {
+                console.log(`[versionExists] Found artifact with published:true in release body`);
+                return true;
+              }
+              if (hasArtifacts && !allPublishedFalse) {
+                console.log(`[versionExists] Found artifacts without published field, assuming version taken`);
+                return true;
+              }
+              console.log(`[versionExists] All artifacts have published:false, version available for resume`);
+            }
+          }
         }
-        console.log(`[tagExists] Tag not found: ${tag}`);
+        console.log(`[versionExists] Version not found: ${version}`);
         return false;
       } catch (error) {
-        console.warn(`Warning: Failed to check tag ${tag}: ${error}`);
+        console.warn(`Warning: Failed to check version ${version}: ${error}`);
         return false;
       }
     }
@@ -54604,12 +54626,11 @@ var require_version = __commonJS({
     }
     async function resolveMainlineBranch(params) {
       const { placeholder, resolvedVersion, branch, runNumber, projectName } = params;
-      const tag = buildTagName(resolvedVersion, projectName);
-      const hasTag = await tagExists(tag);
+      const hasVersion = await versionExists(resolvedVersion, projectName);
       let version;
       let finalIsPreRelease;
       let buildNumber;
-      if (!hasTag) {
+      if (!hasVersion) {
         version = resolvedVersion;
         finalIsPreRelease = isPreRelease(resolvedVersion);
       } else {
@@ -54644,7 +54665,7 @@ var require_version = __commonJS({
         versionWithBranch = `${resolvedVersion}-${sanitizedBranch}`;
       }
       const tag = buildTagName(versionWithBranch, projectName);
-      const hasTag = await tagExists(tag);
+      const hasTag = await versionExists(versionWithBranch, projectName);
       let version;
       let buildNumber;
       if (!hasTag) {

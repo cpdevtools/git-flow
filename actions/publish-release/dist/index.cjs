@@ -61589,11 +61589,24 @@ var require_build_pack = __commonJS({
     var import_node_fs4 = require("fs");
     var import_promises42 = require("fs/promises");
     var import_node_path22 = require("path");
-    var import_yaml = require_dist();
+    var import_yaml2 = require_dist();
     var import_zx3 = require_build();
     var import_github = require_github();
     var import_promises5 = require("fs/promises");
     var import_node_path4 = require("path");
+    var import_yaml = require_dist();
+    function addPublishedFlagsToMetadata(artifactYaml) {
+      const doc = (0, import_yaml.parseDocument)(artifactYaml);
+      const artifacts = doc.get("artifacts");
+      if (artifacts && Array.isArray(artifacts.items)) {
+        for (const artifactNode of artifacts.items) {
+          if (artifactNode && typeof artifactNode.set === "function" && !artifactNode.has("published")) {
+            artifactNode.set("published", false);
+          }
+        }
+      }
+      return doc.toString();
+    }
     function getReleaseTag(projectName, version) {
       return `${projectName}/v${version}`;
     }
@@ -61649,11 +61662,12 @@ var require_build_pack = __commonJS({
       const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
       const tag = getReleaseTag(project.name, project.version);
       const name = `${project.name} ${project.version}`;
-      const body = artifactMetadata ? `# ${project.name} v${project.version}
+      const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : void 0;
+      const body = processedMetadata ? `# ${project.name} v${project.version}
 
 ## Artifact Metadata
 \`\`\`yaml
-${artifactMetadata}
+${processedMetadata}
 \`\`\`` : `Draft release for ${project.name} v${project.version}`;
       const existing = await findDraftReleaseByTag(
         context2.githubToken,
@@ -61663,7 +61677,7 @@ ${artifactMetadata}
       );
       if (existing) {
         console.log(`  \u2713 Found existing draft release: ${tag}`);
-        if (artifactMetadata) {
+        if (processedMetadata) {
           await updateDraftReleaseBody(
             context2.githubToken,
             owner,
@@ -62025,7 +62039,7 @@ ${artifactMetadata}
           };
         }
         const artifactYml = await (0, import_promises42.readFile)(artifactPath, "utf-8");
-        const doc = (0, import_yaml.parseDocument)(artifactYml);
+        const doc = (0, import_yaml2.parseDocument)(artifactYml);
         const descriptor = doc.toJSON();
         console.log(`  \u{1F4C4} Found ${descriptor.artifacts.length} artifact(s) to upload`);
         const release = await findOrCreateDraftRelease(project, context2, artifactYml);
@@ -62415,7 +62429,7 @@ var require_publish_release = __commonJS({
       runPublishRelease: () => runPublishRelease2
     });
     module2.exports = __toCommonJS2(publish_release_exports);
-    var import_yaml2 = require_dist();
+    var import_yaml3 = require_dist();
     var import_path4 = require("path");
     var import_promises5 = require("fs/promises");
     var import_path2 = require("path");
@@ -62655,8 +62669,39 @@ This may indicate the image was modified after being built in Phase 2.`
     var import_github = require_github();
     var import_promises42 = require("fs/promises");
     var import_node_path4 = require("path");
+    var import_yaml2 = require_dist();
     function getReleaseTag(projectName, version) {
       return `${projectName}/v${version}`;
+    }
+    async function findDraftReleaseByTag(githubToken, owner, repo, tag) {
+      const octokit = (0, import_github.getOctokit)(githubToken);
+      try {
+        const { data: releases } = await octokit.rest.repos.listReleases({
+          owner,
+          repo,
+          per_page: 100
+        });
+        const draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
+        if (draftRelease) {
+          return {
+            id: draftRelease.id,
+            upload_url: draftRelease.upload_url
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error(`Error finding draft release ${tag}:`, error);
+        return null;
+      }
+    }
+    async function updateDraftReleaseBody(githubToken, owner, repo, releaseId, body) {
+      const octokit = (0, import_github.getOctokit)(githubToken);
+      await octokit.rest.repos.updateRelease({
+        owner,
+        repo,
+        release_id: releaseId,
+        body
+      });
     }
     async function finalizeRelease(githubToken, owner, repo, projectName, version) {
       const octokit = (0, import_github.getOctokit)(githubToken);
@@ -62729,6 +62774,33 @@ This may indicate the image was modified after being built in Phase 2.`
         return null;
       }
     }
+    async function updateReleaseBodyPublishedFlags(githubToken, owner, repo, tag, artifactYml) {
+      const doc = (0, import_yaml3.parseDocument)(artifactYml);
+      const descriptor = doc.toJSON();
+      if (descriptor.artifacts) {
+        for (let i = 0; i < descriptor.artifacts.length; i++) {
+          const artifactNode = doc.getIn(["artifacts", i]);
+          if (artifactNode) {
+            artifactNode.set("published", true);
+          }
+        }
+      }
+      const release = await findDraftReleaseByTag(githubToken, owner, repo, tag);
+      if (!release) {
+        throw new Error(`Draft release not found for tag: ${tag}`);
+      }
+      const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+      const projectName = tagMatch ? tagMatch[1] : "Unknown";
+      const version = tagMatch ? tagMatch[2] : "0.0.0";
+      const updatedYaml = doc.toString();
+      const body = `# ${projectName} v${version}
+
+## Artifact Metadata
+\`\`\`yaml
+${updatedYaml}
+\`\`\``;
+      await updateDraftReleaseBody(githubToken, owner, repo, release.id, body);
+    }
     async function runPublishRelease2(options) {
       const result = {
         published: [],
@@ -62752,7 +62824,7 @@ This may indicate the image was modified after being built in Phase 2.`
                 `No artifact metadata found in draft release ${tag}. Make sure the build-pack phase completed successfully.`
               );
             }
-            const doc = (0, import_yaml2.parseDocument)(artifactYml);
+            const doc = (0, import_yaml3.parseDocument)(artifactYml);
             const descriptor = doc.toJSON();
             const publishResult = await publishProjectArtifacts(
               descriptor,
@@ -62763,6 +62835,14 @@ This may indicate the image was modified after being built in Phase 2.`
             if (!publishResult.success) {
               throw new Error(publishResult.error || "Unknown error");
             }
+            console.log(`  \u{1F4DD} Updating release body with published flags...`);
+            await updateReleaseBodyPublishedFlags(
+              options.githubToken,
+              options.owner,
+              options.repo,
+              tag,
+              artifactYml
+            );
             console.log(`  \u2705 Finalizing GitHub Release...`);
             await finalizeRelease(
               options.githubToken,

@@ -26,8 +26,52 @@ import {
   finalizeRelease, 
   createGitTag, 
   getReleaseTag,
-  getDraftReleaseMetadata 
+  getDraftReleaseMetadata,
+  updateDraftReleaseBody,
+  findDraftReleaseByTag
 } from '../build-pack/github.js';
+
+/**
+ * Update release body to mark all artifacts as published:true
+ */
+async function updateReleaseBodyPublishedFlags(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  tag: string,
+  artifactYml: string
+): Promise<void> {
+  // Parse YAML and update published flags
+  const doc = parseDocument(artifactYml);
+  const descriptor = doc.toJSON() as ProjectArtifactDescriptor;
+  
+  // Set published:true for all artifacts
+  if (descriptor.artifacts) {
+    for (let i = 0; i < descriptor.artifacts.length; i++) {
+      const artifactNode = doc.getIn(['artifacts', i]) as any;
+      if (artifactNode) {
+        artifactNode.set('published', true);
+      }
+    }
+  }
+  
+  // Get the draft release
+  const release = await findDraftReleaseByTag(githubToken, owner, repo, tag);
+  if (!release) {
+    throw new Error(`Draft release not found for tag: ${tag}`);
+  }
+  
+  // Extract project name and version from tag for body
+  const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+  const projectName = tagMatch ? tagMatch[1] : 'Unknown';
+  const version = tagMatch ? tagMatch[2] : '0.0.0';
+  
+  // Update release body with new YAML
+  const updatedYaml = doc.toString();
+  const body = `# ${projectName} v${version}\n\n## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``;
+  
+  await updateDraftReleaseBody(githubToken, owner, repo, release.id, body);
+}
 
 /**
  * Main orchestration function for publishing and releasing
@@ -80,6 +124,16 @@ export async function runPublishRelease(
         if (!publishResult.success) {
           throw new Error(publishResult.error || 'Unknown error');
         }
+
+        // Update release body with published:true for all artifacts
+        console.log(`  📝 Updating release body with published flags...`);
+        await updateReleaseBodyPublishedFlags(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          tag,
+          artifactYml
+        );
 
         // Finalize GitHub Release (draft → published)
         console.log(`  ✅ Finalizing GitHub Release...`);

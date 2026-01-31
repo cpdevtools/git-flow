@@ -61589,11 +61589,24 @@ var require_build_pack = __commonJS({
     var import_node_fs4 = require("fs");
     var import_promises42 = require("fs/promises");
     var import_node_path22 = require("path");
-    var import_yaml = require_dist();
+    var import_yaml2 = require_dist();
     var import_zx3 = require_build();
     var import_github = require_github();
     var import_promises5 = require("fs/promises");
     var import_node_path5 = require("path");
+    var import_yaml = require_dist();
+    function addPublishedFlagsToMetadata(artifactYaml) {
+      const doc = (0, import_yaml.parseDocument)(artifactYaml);
+      const artifacts = doc.get("artifacts");
+      if (artifacts && Array.isArray(artifacts.items)) {
+        for (const artifactNode of artifacts.items) {
+          if (artifactNode && typeof artifactNode.set === "function" && !artifactNode.has("published")) {
+            artifactNode.set("published", false);
+          }
+        }
+      }
+      return doc.toString();
+    }
     function getReleaseTag(projectName, version) {
       return `${projectName}/v${version}`;
     }
@@ -61649,11 +61662,12 @@ var require_build_pack = __commonJS({
       const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
       const tag = getReleaseTag(project.name, project.version);
       const name = `${project.name} ${project.version}`;
-      const body = artifactMetadata ? `# ${project.name} v${project.version}
+      const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : void 0;
+      const body = processedMetadata ? `# ${project.name} v${project.version}
 
 ## Artifact Metadata
 \`\`\`yaml
-${artifactMetadata}
+${processedMetadata}
 \`\`\`` : `Draft release for ${project.name} v${project.version}`;
       const existing = await findDraftReleaseByTag(
         context.githubToken,
@@ -61663,7 +61677,7 @@ ${artifactMetadata}
       );
       if (existing) {
         console.log(`  \u2713 Found existing draft release: ${tag}`);
-        if (artifactMetadata) {
+        if (processedMetadata) {
           await updateDraftReleaseBody(
             context.githubToken,
             owner,
@@ -61739,7 +61753,12 @@ ${artifactMetadata}
           per_page: 100
           // Should be enough for recent releases
         });
-        const release = releases.find((r) => r.tag_name === tag && r.draft);
+        const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+        const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+        let release = releases.find((r) => r.tag_name === tag && r.draft);
+        if (!release && expectedName) {
+          release = releases.find((r) => r.name === expectedName && r.draft);
+        }
         if (!release || !release.body) {
           return null;
         }
@@ -62020,7 +62039,7 @@ ${artifactMetadata}
           };
         }
         const artifactYml = await (0, import_promises42.readFile)(artifactPath, "utf-8");
-        const doc = (0, import_yaml.parseDocument)(artifactYml);
+        const doc = (0, import_yaml2.parseDocument)(artifactYml);
         const descriptor = doc.toJSON();
         console.log(`  \u{1F4C4} Found ${descriptor.artifacts.length} artifact(s) to upload`);
         const release = await findOrCreateDraftRelease(project, context, artifactYml);
