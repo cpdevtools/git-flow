@@ -21,7 +21,7 @@ export default defineConfig([
     minify: false,
     target: 'node20',
   },
-  // CLI outputs - bundle all dependencies except Node.js built-ins
+  // CLI outputs - keep oclif external (uses dynamic requires), bundle ts-dev-utilities
   {
     entry: {
       'cli/index': 'src/cli/index.ts',
@@ -38,11 +38,19 @@ export default defineConfig([
     minify: false,
     target: 'node20',
     platform: 'node',
-    noExternal: [/.*/], // Bundle everything
     external: [
       // Keep all Node.js built-ins external
       ...builtinModules,
       ...builtinModules.map(m => `node:${m}`),
+      // Keep oclif external - it uses dynamic requires internally
+      '@oclif/core',
+      // Keep these external too - they'll be available from the test workspace or action
+      '@actions/core',
+      '@actions/github',
+      'globby',
+      'semver',
+      'yaml',
+      'zx',
     ],
   },
 ]);
