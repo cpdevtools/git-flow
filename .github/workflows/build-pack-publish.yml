@@ -58,7 +58,7 @@ jobs:
       - name: Symlink bundled git-flow CLI to PATH
         run: |
           # Symlink to /usr/local/bin which is already in PATH
-          sudo ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.js /usr/local/bin/cpdt-gitflow
+          sudo ln -s /home/runner/work/_actions/cpdevtools/git-flow/main/packages/git-flow/dist/cli/bin.mjs /usr/local/bin/cpdt-gitflow
           sudo chmod +x /usr/local/bin/cpdt-gitflow
       
       - name: Build & Pack
