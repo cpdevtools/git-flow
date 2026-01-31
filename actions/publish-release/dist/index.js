@@ -41,8 +41,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // ../../node_modules/.pnpm/tsup@8.5.1_postcss@8.5.6_typescript@5.9.3_yaml@2.8.2/node_modules/tsup/assets/esm_shims.js
-import path2 from "path";
-import { fileURLToPath } from "url";
+import path2 from "node:path";
+import { fileURLToPath } from "node:url";
 var init_esm_shims = __esm({
   "../../node_modules/.pnpm/tsup@8.5.1_postcss@8.5.6_typescript@5.9.3_yaml@2.8.2/node_modules/tsup/assets/esm_shims.js"() {
   }
@@ -60101,7 +60101,7 @@ var github = __toESM(require_github(), 1);
 // ../../packages/git-flow/dist/build-pack/index.js
 init_esm_shims();
 import { readFile, writeFile } from "fs/promises";
-import { join as join2, basename } from "path";
+import { join as join2, basename } from "node:path";
 
 // ../../node_modules/.pnpm/zx@8.8.5/node_modules/zx/build/index.js
 init_esm_shims();
@@ -60109,7 +60109,7 @@ init_esm_shims();
 // ../../node_modules/.pnpm/zx@8.8.5/node_modules/zx/build/deno.js
 init_esm_shims();
 import { createRequire } from "module";
-import * as process2 from "process";
+import * as process2 from "node:process";
 if (globalThis.Deno) {
   globalThis.require = createRequire(import.meta.url);
   globalThis.__filename = new URL(import.meta.url).pathname;
@@ -60179,14 +60179,14 @@ var {
 
 // ../../node_modules/.pnpm/globby@14.1.0/node_modules/globby/index.js
 init_esm_shims();
-import process4 from "process";
-import fs5 from "fs";
-import nodePath from "path";
+import process4 from "node:process";
+import fs5 from "node:fs";
+import nodePath from "node:path";
 
 // ../../node_modules/.pnpm/@sindresorhus+merge-streams@2.3.0/node_modules/@sindresorhus/merge-streams/index.js
 init_esm_shims();
-import { on, once as once2 } from "events";
-import { PassThrough as PassThroughStream } from "stream";
+import { on, once as once2 } from "node:events";
+import { PassThrough as PassThroughStream } from "node:stream";
 import { finished } from "stream/promises";
 function mergeStreams(streams) {
   if (!Array.isArray(streams)) {
@@ -60366,7 +60366,7 @@ var import_fast_glob2 = __toESM(require_out4(), 1);
 
 // ../../node_modules/.pnpm/path-type@6.0.0/node_modules/path-type/index.js
 init_esm_shims();
-import fs3 from "fs";
+import fs3 from "node:fs";
 import fsPromises from "fs/promises";
 async function isType(fsStatType, statsMethodName, filePath) {
   if (typeof filePath !== "string") {
@@ -60404,10 +60404,10 @@ var isSymlinkSync = isTypeSync.bind(void 0, "lstatSync", "isSymbolicLink");
 
 // ../../node_modules/.pnpm/unicorn-magic@0.3.0/node_modules/unicorn-magic/node.js
 init_esm_shims();
-import { promisify } from "util";
-import { execFile as execFileCallback, execFileSync as execFileSyncOriginal } from "child_process";
-import path4 from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import { promisify } from "node:util";
+import { execFile as execFileCallback, execFileSync as execFileSyncOriginal } from "node:child_process";
+import path4 from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 var execFileOriginal = promisify(execFileCallback);
 function toPath(urlOrPath) {
   return urlOrPath instanceof URL ? fileURLToPath2(urlOrPath) : urlOrPath;
@@ -60418,10 +60418,10 @@ var TEN_MEGABYTES_IN_BYTES = 10 * 1024 * 1024;
 init_esm_shims();
 var import_fast_glob = __toESM(require_out4(), 1);
 var import_ignore = __toESM(require_ignore(), 1);
-import process3 from "process";
-import fs4 from "fs";
+import process3 from "node:process";
+import fs4 from "node:fs";
 import fsPromises2 from "fs/promises";
-import path5 from "path";
+import path5 from "node:path";
 
 // ../../node_modules/.pnpm/slash@5.1.0/node_modules/slash/index.js
 init_esm_shims();
@@ -61062,7 +61062,7 @@ init_docker();
 init_esm_shims();
 var import_yaml2 = __toESM(require_dist(), 1);
 import { readFile as readFile2, writeFile as writeFile2 } from "fs/promises";
-import { join as join$1, dirname } from "path";
+import { join as join$1, dirname } from "node:path";
 var import_github2 = __toESM(require_github(), 1);
 async function loadRegistryConfig(workspaceRoot) {
   const configPath = join$1(workspaceRoot, ".github", "registries.yml");
