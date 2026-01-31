@@ -1,23 +1,16 @@
 import { defineConfig } from 'tsup';
-import { builtinModules } from 'node:module';
-import { createRequire } from 'node:module';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['esm'],
-  target: 'node20',
-  platform: 'node',
-  bundle: true,
+  entry: { index: 'src/index.ts' },
+  format: ['cjs'],
+  dts: false,
   sourcemap: true,
   clean: true,
-  dts: false,
+  bundle: true,
   minify: false,
-  noExternal: [/.*/],
-  external: [...builtinModules, ...builtinModules.map(m => `node:${m}`)],
-  outExtension: () => ({ js: '.js' }),
-  shims: true,
-  banner: {
-    js: `import { createRequire as __createRequire } from 'node:module';
-const require = __createRequire(import.meta.url);`,
-  },
+  platform: 'node',
+  target: 'node20',
+  outDir: 'dist',
+  noExternal: [/.*/], // Bundle ALL dependencies
+  splitting: false,
 });
