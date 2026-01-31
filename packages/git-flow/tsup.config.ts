@@ -20,7 +20,7 @@ export default defineConfig([
     minify: false,
     target: 'node20',
   },
-  // CLI outputs - bundle all dependencies
+  // CLI outputs - bundle all dependencies except Node.js built-ins
   {
     entry: {
       'cli/index': 'src/cli/index.ts',
@@ -37,5 +37,15 @@ export default defineConfig([
     minify: false,
     target: 'node20',
     noExternal: [/.*/], // Bundle everything
+    external: [
+      // Keep Node.js built-ins external
+      'node:*',
+      'fs', 'path', 'url', 'util', 'stream', 'events', 'buffer', 'crypto',
+      'http', 'https', 'net', 'tls', 'zlib', 'os', 'child_process', 'assert',
+      'querystring', 'string_decoder', 'timers', 'tty', 'dns', 'dgram',
+      'readline', 'repl', 'vm', 'domain', 'punycode', 'v8', 'worker_threads',
+      'perf_hooks', 'async_hooks', 'inspector', 'trace_events', 'process',
+      'module', 'cluster', 'constants'
+    ],
   },
 ]);
