@@ -13,8 +13,7 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@actions/github": "^6.0.0",
-    "@cpdevtools/git-flow": "link:../../packages/git-flow"
+    "@actions/github": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.11",
