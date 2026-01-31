@@ -61340,7 +61340,7 @@ timestamp: ${(/* @__PURE__ */ new Date()).toISOString()}
 sourceBranch: main
 projects:
   - name: "@cpdevtools/git-flow"
-    version: "0.1.0-dev"
+    version: "0.0.0-DEFAULT"
     path: "packages/git-flow"
     releaseType: "dev"
 \`\`\``;
