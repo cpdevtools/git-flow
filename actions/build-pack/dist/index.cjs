@@ -61335,6 +61335,9 @@ async function run() {
 
 \`\`\`yaml
 runNumber: ${runNumber}
+sha: ${sha}
+timestamp: ${(/* @__PURE__ */ new Date()).toISOString()}
+sourceBranch: main
 projects:
   - name: "@cpdevtools/git-flow"
     version: "0.1.0-dev"

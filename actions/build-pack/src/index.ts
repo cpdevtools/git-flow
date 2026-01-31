@@ -58,6 +58,9 @@ async function run(): Promise<void> {
 
 \`\`\`yaml
 runNumber: ${runNumber}
+sha: ${sha}
+timestamp: ${new Date().toISOString()}
+sourceBranch: main
 projects:
   - name: "@cpdevtools/git-flow"
     version: "0.1.0-dev"
