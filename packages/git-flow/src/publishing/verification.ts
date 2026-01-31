@@ -10,15 +10,28 @@ export async function isNpmPublished(
   registry: NpmRegistry
 ): Promise<VerificationResult> {
   try {
-    // Use JSON output and explicit registry with scope config for reliability
-    const scopeConfig = registry.scope ? `--${registry.scope}:registry=${registry.url}` : '';
-    const result = await $`npm view ${packageName}@${version} version --registry ${registry.url} ${scopeConfig} --json`.nothrow();
+    console.log(`  📋 Checking if ${packageName}@${version} exists in ${registry.url}...`);
+    
+    // Build args array for proper argument handling
+    const args = ['view', `${packageName}@${version}`, 'version', '--registry', registry.url, '--json'];
+    
+    const result = await $`npm ${args}`.nothrow();
+    
+    console.log(`  📋 npm view exit code: ${result.exitCode}, stdout: ${result.stdout.trim().substring(0, 100)}`);
     
     if (result.exitCode !== 0) {
-      // Package doesn't exist yet
+      // Check if it's an auth error vs package not found
+      const stderr = result.stderr || '';
+      if (stderr.includes('404') || stderr.includes('not found') || stderr.includes('E404')) {
+        return {
+          published: false,
+          error: 'Package not found in registry',
+        };
+      }
+      // For other errors (including auth issues), return the actual error
       return {
         published: false,
-        error: 'Package not found in registry',
+        error: result.stderr || 'Unknown error checking registry',
       };
     }
     
@@ -32,6 +45,7 @@ export async function isNpmPublished(
     };
   } catch (error) {
     // npm view returns error if package/version doesn't exist
+    console.log(`  ⚠️ npm view error: ${error}`);
     return {
       published: false,
       error: error instanceof Error ? error.message : String(error),

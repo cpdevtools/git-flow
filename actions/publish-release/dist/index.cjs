@@ -62552,12 +62552,21 @@ This may indicate the image was modified after being built in Phase 2.`
     var import_zx2 = require_build();
     async function isNpmPublished(packageName, version, registry) {
       try {
-        const scopeConfig = registry.scope ? `--${registry.scope}:registry=${registry.url}` : "";
-        const result = await import_zx2.$`npm view ${packageName}@${version} version --registry ${registry.url} ${scopeConfig} --json`.nothrow();
+        console.log(`  \u{1F4CB} Checking if ${packageName}@${version} exists in ${registry.url}...`);
+        const args = ["view", `${packageName}@${version}`, "version", "--registry", registry.url, "--json"];
+        const result = await import_zx2.$`npm ${args}`.nothrow();
+        console.log(`  \u{1F4CB} npm view exit code: ${result.exitCode}, stdout: ${result.stdout.trim().substring(0, 100)}`);
         if (result.exitCode !== 0) {
+          const stderr = result.stderr || "";
+          if (stderr.includes("404") || stderr.includes("not found") || stderr.includes("E404")) {
+            return {
+              published: false,
+              error: "Package not found in registry"
+            };
+          }
           return {
             published: false,
-            error: "Package not found in registry"
+            error: result.stderr || "Unknown error checking registry"
           };
         }
         const output = result.stdout.trim();
@@ -62567,6 +62576,7 @@ This may indicate the image was modified after being built in Phase 2.`
           version: publishedVersion
         };
       } catch (error) {
+        console.log(`  \u26A0\uFE0F npm view error: ${error}`);
         return {
           published: false,
           error: error instanceof Error ? error.message : String(error)
