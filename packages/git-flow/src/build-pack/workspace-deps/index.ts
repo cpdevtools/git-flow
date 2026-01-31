@@ -1,4 +1,7 @@
 import type { ProjectConfig } from './npm.js';
+import { rewriteNpmWorkspaceDependencies, restorePackageJson } from './npm.js';
+import { rewriteNugetProjectReferences, restoreCsprojFiles } from './nuget.js';
+import { verifyDockerImageTags } from './docker.js';
 
 export { type ProjectConfig };
 export * from './npm.js';
@@ -18,17 +21,17 @@ export async function rewriteWorkspaceDependencies(options: {
 
   // If artifact type is not specified, try all
   if (!artifactType || artifactType === 'npm') {
-    const { rewriteNpmWorkspaceDependencies } = await import('./npm.js');
+    // Use direct static import
     await rewriteNpmWorkspaceDependencies({ project, allProjects });
   }
 
   if (!artifactType || artifactType === 'nuget') {
-    const { rewriteNugetProjectReferences } = await import('./nuget.js');
+    // Use direct static import
     await rewriteNugetProjectReferences({ project, allProjects });
   }
 
   if (!artifactType || artifactType === 'docker') {
-    const { verifyDockerImageTags } = await import('./docker.js');
+    // Use direct static import
     await verifyDockerImageTags({ project, allProjects });
   }
 }
@@ -38,10 +41,8 @@ export async function rewriteWorkspaceDependencies(options: {
  */
 export async function restoreProjectFiles(projectCwd: string): Promise<void> {
   // Restore NPM package.json
-  const { restorePackageJson } = await import('./npm.js');
   await restorePackageJson(projectCwd).catch(() => {});
 
   // Restore NuGet .csproj files
-  const { restoreCsprojFiles } = await import('./nuget.js');
   await restoreCsprojFiles(projectCwd).catch(() => {});
 }

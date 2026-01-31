@@ -29,7 +29,7 @@ export default defineConfig([
     ],
     async onSuccess() {
       // Post-process to add node: prefix to all bare built-in imports
-      const distFiles = ['dist/publishing/index.js', 'dist/publish-release/index.js'];
+      const distFiles = ['dist/publishing/index.js', 'dist/publish-release/index.js', 'dist/build-pack/index.js'];
       const builtins = ['path', 'fs', 'url', 'crypto', 'stream', 'util', 'events', 'http', 'https', 'zlib', 'buffer', 'querystring', 'os', 'child_process', 'net', 'tls', 'dns', 'dgram', 'readline', 'process'];
       
       for (const distFile of distFiles) {

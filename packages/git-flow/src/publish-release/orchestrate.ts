@@ -4,6 +4,7 @@
 
 import type { ProjectArtifactDescriptor, Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { parseDocument } from 'yaml';
+import { join } from 'node:path';
 import {
   loadRegistryConfig,
   getRegistry,
