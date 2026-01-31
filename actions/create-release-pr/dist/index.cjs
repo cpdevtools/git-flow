@@ -54563,11 +54563,11 @@ var require_version = __commonJS({
           return true;
         }
         const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
-        console.log(`[tagExists] Checking GitHub release (token available: ${ghToken.length > 0})`);
-        const releaseResult = await (0, import_zx.$)({ env: { ...process.env, GH_TOKEN: ghToken } })`gh release view ${tag} --json tagName`.nothrow();
-        console.log(`[tagExists] GitHub release result: exitCode=${releaseResult.exitCode}, stdout="${releaseResult.stdout.trim().substring(0, 100)}"`);
-        if (releaseResult.exitCode === 0) {
-          console.log(`[tagExists] Found GitHub release: ${tag}`);
+        console.log(`[tagExists] Checking GitHub releases via API (token available: ${ghToken.length > 0})`);
+        const apiResult = await (0, import_zx.$)({ env: { ...process.env, GH_TOKEN: ghToken } })`gh api repos/{owner}/{repo}/releases --jq ${`.[] | select(.tag_name == "${tag}") | .tag_name`}`.nothrow();
+        console.log(`[tagExists] GitHub API result: exitCode=${apiResult.exitCode}, stdout="${apiResult.stdout.trim()}"`);
+        if (apiResult.exitCode === 0 && apiResult.stdout.trim() === tag) {
+          console.log(`[tagExists] Found GitHub release with tag_name: ${tag}`);
           return true;
         }
         console.log(`[tagExists] Tag not found: ${tag}`);

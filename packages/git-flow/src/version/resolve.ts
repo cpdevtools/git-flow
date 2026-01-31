@@ -26,7 +26,7 @@ function buildTagName(version: string, projectName?: string): string {
  * Check if a version is already released (git tag or GitHub release exists)
  * Checks in order:
  * 1. Git tags (local and remote)
- * 2. GitHub releases (including drafts) by tag name
+ * 2. GitHub releases (including drafts) by tag_name via API
  */
 async function tagExists(tag: string): Promise<boolean> {
   try {
@@ -48,16 +48,16 @@ async function tagExists(tag: string): Promise<boolean> {
       return true;
     }
 
-    // Check GitHub releases by tag name (catches draft releases too)
-    // Need to set GH_TOKEN for authentication in GitHub Actions
+    // Check GitHub releases by tag_name (including drafts) via API
+    // Draft releases have tag_name set but no actual git tag exists yet
     const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
-    console.log(`[tagExists] Checking GitHub release (token available: ${ghToken.length > 0})`);
+    console.log(`[tagExists] Checking GitHub releases via API (token available: ${ghToken.length > 0})`);
     
-    // Use environment variable for the token
-    const releaseResult = await $({ env: { ...process.env, GH_TOKEN: ghToken } })`gh release view ${tag} --json tagName`.nothrow();
-    console.log(`[tagExists] GitHub release result: exitCode=${releaseResult.exitCode}, stdout="${releaseResult.stdout.trim().substring(0, 100)}"`);
-    if (releaseResult.exitCode === 0) {
-      console.log(`[tagExists] Found GitHub release: ${tag}`);
+    // Use GitHub API to list releases and check tag_name field
+    const apiResult = await $({ env: { ...process.env, GH_TOKEN: ghToken } })`gh api repos/{owner}/{repo}/releases --jq ${`.[] | select(.tag_name == "${tag}") | .tag_name`}`.nothrow();
+    console.log(`[tagExists] GitHub API result: exitCode=${apiResult.exitCode}, stdout="${apiResult.stdout.trim()}"`);
+    if (apiResult.exitCode === 0 && apiResult.stdout.trim() === tag) {
+      console.log(`[tagExists] Found GitHub release with tag_name: ${tag}`);
       return true;
     }
 
