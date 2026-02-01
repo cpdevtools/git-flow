@@ -2,6 +2,6 @@ project: "@cpdevtools/git-flow"
 artifacts:
   - type: npm
     name: "@cpdevtools/git-flow"
-    path: packages/git-flow/cpdevtools-git-flow-0.0.0-DEFAULT.tgz
+    path: .artifacts/cpdevtools-git-flow-0.0.0-DEFAULT.tgz
     registries:
       - github-packages
