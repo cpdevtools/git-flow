@@ -62,10 +62,10 @@ sha: ${sha}
 timestamp: ${new Date().toISOString()}
 sourceBranch: main
 projects:
-  - name: "@cpdevtools/git-flow"
-    version: "0.0.0-DEFAULT"
-    path: "packages/git-flow"
-    releaseType: "dev"
+  - name: @cpdevtools/git-flow
+    version: 0.0.0-DEFAULT
+    path: packages/git-flow
+    releaseType: dev
 \`\`\``;
     }
 

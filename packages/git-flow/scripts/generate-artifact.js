@@ -21,15 +21,13 @@ async function generateArtifact() {
   const rootPath = join(process.cwd(), '../..');
   
   await writeArtifact({
-    project: packageJson.name,
+    name: packageJson.name,
     version: packageJson.version,
-    artifacts: [{
-      type: 'npm',
-      name: packageJson.name,
-      version: packageJson.version,
-      path: join(artifactOutputDir, tarballName),
-      registries: ['github-npm']
-    }]
+    type: 'npm',
+    path: `packages/git-flow`,
+    tempTag: `${packageJson.name}:${packageJson.version}`,
+    finalTag: `${packageJson.name}:${packageJson.version}`,
+    digest: 'sha256:...' // This would be populated by the actual build process
   }, rootPath);
   
   console.log('✅ Artifact descriptor generated');
