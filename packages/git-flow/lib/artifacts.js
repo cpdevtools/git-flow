@@ -1,40 +1,43 @@
 const { writeFileSync } = require('fs');
 const path = require('path');
+const yaml = require('yaml');
 
 function writeArtifact(descriptor) {
-  // Get the workspace root directory (two levels up from packages/git-flow)
-  const workspaceRoot = path.resolve(__dirname, '../../../');
-  
-  // Default output directory
-  const artifactOutputDir = process.env.ARTIFACT_OUTPUT_DIR || '.artifacts';
-  const outputPath = path.join(workspaceRoot, artifactOutputDir);
-  
+  const artifactOutputDir = process.env.ARTIFACT_OUTPUT_DIR;
+  const projectName = process.env.PROJECT_NAME;
+
+  if (!artifactOutputDir) {
+    throw new Error(
+      'ARTIFACT_OUTPUT_DIR environment variable is required. ' +
+      'This should be set by the workflow.'
+    );
+  }
+
+  if (!projectName) {
+    throw new Error(
+      'PROJECT_NAME environment variable is required. ' +
+      'This should be set by the workflow.'
+    );
+  }
+
   // Ensure the directory exists
   const fs = require('fs');
-  if (!fs.existsSync(outputPath)) {
-    fs.mkdirSync(outputPath, { recursive: true });
+  if (!fs.existsSync(artifactOutputDir)) {
+    fs.mkdirSync(artifactOutputDir, { recursive: true });
   }
-  
-  // Use project name as filename with .artifact.yml extension
-  const projectName = process.env.PROJECT_NAME || 'unknown';
-  const filename = `${projectName.replace('@', '').replace('/', '-')}.artifact.yml`;
-  const filePath = path.join(outputPath, filename);
-  
-  // Convert descriptor to YAML format (simple implementation)
-  const yamlContent = `---
-name: "${descriptor.name || projectName}"
-version: "${descriptor.version || '0.0.0'}"
-type: "${descriptor.type || 'package'}"
-path: "${descriptor.path || '.'}"
-tempTag: "${descriptor.tempTag || ''}"
-finalTag: "${descriptor.finalTag || ''}"
-digest: "${descriptor.digest || ''}"
-`;
-  
-  // Write the descriptor as YAML
-  writeFileSync(filePath, yamlContent);
-  
-  console.log(`✓ Artifact descriptor written to ${filePath}`);
+
+  const filename = `${projectName}.artifact.yml`;
+  const filePath = path.join(artifactOutputDir, filename);
+
+  // Write YAML file using yaml library for proper formatting
+  const yamlContent = yaml.stringify(descriptor, {
+    indent: 2,
+    lineWidth: 0, // Don't wrap lines
+  });
+
+  writeFileSync(filePath, yamlContent, 'utf-8');
+
+  console.log(`✓ Generated artifact descriptor: ${filePath}`);
   
   return {
     path: filePath,
