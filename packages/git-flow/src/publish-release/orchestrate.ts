@@ -52,7 +52,15 @@ async function downloadReleaseAssets(
     per_page: 100,
   });
 
-  const release = releases.find(r => r.tag_name === tag || (r.draft && r.name?.includes(tag.split('/v')[1])));
+  // Parse tag to get expected release name
+  // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
+  const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+  const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+
+  // First try exact tag match, then fall back to name match for untagged releases
+  const release = releases.find(r => r.tag_name === tag) || 
+                  (expectedName ? releases.find(r => r.draft && r.name === expectedName) : null);
+  
   if (!release) {
     throw new Error(`Release not found for tag: ${tag}`);
   }
