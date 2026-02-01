@@ -62,6 +62,7 @@ runs:
       run: pnpm install
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
     
     - name: Run Build & Pack
       shell: bash
