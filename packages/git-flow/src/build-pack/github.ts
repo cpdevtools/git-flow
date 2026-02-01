@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parseDocument } from 'yaml';
 import type { ProjectConfig, BuildPackContext } from './types.js';
-import type { ProjectArtifactDescriptor } from '../lib/artifacts';
+import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 
 /**
  * Add published:false to all artifacts in YAML metadata
