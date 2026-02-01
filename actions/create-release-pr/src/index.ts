@@ -2,10 +2,9 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
-import { resolve, join } from 'node:path';
-import { readdir } from 'node:fs/promises';
-import { stat } from 'node:fs/promises';
 import { resolveVersion } from '@cpdevtools/git-flow/version';
+import { parseJson } from '@cpdevtools/ts-dev-utilities/json';
+import { discoverProjects } from '@cpdevtools/git-flow/build-pack';
 
 interface VersionsConfig {
   [placeholder: string]: string;
@@ -16,52 +15,6 @@ interface ProjectMetadata {
   version: string;
   resolvedVersion: string;
   isPreRelease: boolean;
-}
-
-// Local implementation of parseJson
-function parseJson(content: string): any {
-  return JSON.parse(content);
-}
-
-// Local implementation of discoverProjects
-async function discoverProjects(options: { cwd: string; patterns: string[] }): Promise<Array<{ packageJson: any; path: string }>> {
-  const projects: Array<{ packageJson: any; path: string }> = [];
-  
-  async function findPackageJsonFiles(dir: string): Promise<string[]> {
-    const files: string[] = [];
-    try {
-      const entries = await readdir(dir);
-      for (const entry of entries) {
-        if (entry.startsWith('.') || entry === 'node_modules') continue;
-        const fullPath = join(dir, entry);
-        const stats = await stat(fullPath);
-        if (stats.isDirectory()) {
-          files.push(...await findPackageJsonFiles(fullPath));
-        } else if (entry === 'package.json') {
-          files.push(fullPath);
-        }
-      }
-    } catch {
-      // Ignore errors
-    }
-    return files;
-  }
-  
-  const packageJsonFiles = await findPackageJsonFiles(options.cwd);
-  for (const file of packageJsonFiles) {
-    try {
-      const content = await readFile(file, 'utf-8');
-      const packageJson = parseJson(content);
-      projects.push({
-        packageJson,
-        path: file
-      });
-    } catch {
-      // Ignore invalid package.json files
-    }
-  }
-  
-  return projects;
 }
 
 async function run() {
@@ -90,10 +43,7 @@ async function run() {
     core.info(`Loaded versions from ${versionsFile}: ${JSON.stringify(versionsByPlaceholder)}`);
 
     // Discover projects in workspace
-    const projects = await discoverProjects({
-      cwd: process.cwd(),
-      patterns: ['**/package.json', 'packages/*/package.json'],
-    });
+    const projects = await discoverProjects(process.cwd());
     core.info(`Found ${projects.length} projects`);
 
     // Filter to only projects with github.actions.build script
