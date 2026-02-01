@@ -52,23 +52,22 @@ async function packNpm(context) {
   const { cwd, outputDir, artifactFilename, version } = context;
   await (0, import_zx.$)({ cwd })`pnpm pack --pack-destination ${outputDir}`;
   const tarballName = `${artifactFilename}-${version}.tgz`;
-  const { relative } = await import("node:path");
-  const relativePath = relative(cwd, (0, import_node_path.join)(outputDir, tarballName));
+  const tarballPath = (0, import_node_path.join)(outputDir, tarballName);
   const descriptor = {
     project: context.projectName,
     artifacts: [
       {
         type: "npm",
         name: context.projectName,
-        path: relativePath,
+        path: tarballPath,
         registries: ["github-npm"]
       }
     ]
   };
-  const artifactPath = (0, import_node_path.join)(outputDir, `${artifactFilename}.artifact.yml`);
-  await (0, import_promises.writeFile)(artifactPath, (0, import_yaml.stringify)(descriptor));
+  const descriptorPath = (0, import_node_path.join)(outputDir, `${artifactFilename}.artifact.yml`);
+  await (0, import_promises.writeFile)(descriptorPath, (0, import_yaml.stringify)(descriptor));
   console.log(`\u2713 Created NPM package: ${tarballName}`);
-  console.log(`\u2713 Created artifact descriptor: ${artifactPath}`);
+  console.log(`\u2713 Created artifact descriptor: ${descriptorPath}`);
 }
 async function packNuget(context) {
   const { cwd, outputDir, artifactFilename, version } = context;
