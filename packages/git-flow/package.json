@@ -61,7 +61,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "github.actions.build": "pnpm build",
-    "github.actions.pack": "node scripts/generate-artifact.js"
+    "github.actions.pack": "pnpm pack --pack-destination ${ARTIFACT_OUTPUT_DIR} && node scripts/generate-artifact.js"
   },
   "keywords": [
     "git",
