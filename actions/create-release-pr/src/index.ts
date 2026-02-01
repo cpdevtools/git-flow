@@ -5,6 +5,7 @@ import { parse as parseYaml } from 'yaml';
 import { resolve, join } from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { stat } from 'node:fs/promises';
+import { resolveVersion } from '@cpdevtools/git-flow/version';
 
 interface VersionsConfig {
   [placeholder: string]: string;
@@ -61,26 +62,6 @@ async function discoverProjects(options: { cwd: string; patterns: string[] }): P
   }
   
   return projects;
-}
-
-// Local implementation of resolveVersion
-async function resolveVersion(input: {
-  placeholder: string;
-  branch: string;
-  versionsByPlaceholder: Record<string, string>;
-  runNumber: number;
-  projectName?: string;
-}): Promise<{ version: string; isPreRelease: boolean }> {
-  const { placeholder, versionsByPlaceholder, runNumber } = input;
-  const resolvedVersion = versionsByPlaceholder[placeholder];
-  if (!resolvedVersion) {
-    throw new Error(`No version found for placeholder: ${placeholder}`);
-  }
-  
-  return {
-    version: resolvedVersion,
-    isPreRelease: resolvedVersion.includes('-')
-  };
 }
 
 async function run() {
