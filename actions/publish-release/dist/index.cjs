@@ -60940,7 +60940,7 @@ ${processedMetadata}
         for (const artifact of descriptor.artifacts) {
           switch (artifact.type) {
             case "npm":
-              const npmPath = (0, import_node_path22.join)(project.cwd, artifact.path);
+              const npmPath = (0, import_node_path22.join)(context2.workspaceRoot, artifact.path);
               await uploadArtifact(
                 context2.githubToken,
                 owner,
@@ -60951,7 +60951,7 @@ ${processedMetadata}
               );
               break;
             case "nuget":
-              const nugetPath = (0, import_node_path22.join)(project.cwd, artifact.path);
+              const nugetPath = (0, import_node_path22.join)(context2.workspaceRoot, artifact.path);
               await uploadArtifact(
                 context2.githubToken,
                 owner,
@@ -60962,7 +60962,7 @@ ${processedMetadata}
               );
               break;
             case "release-attachment":
-              const attachmentPath = (0, import_node_path22.join)(project.cwd, artifact.path);
+              const attachmentPath = (0, import_node_path22.join)(context2.workspaceRoot, artifact.path);
               await uploadArtifact(
                 context2.githubToken,
                 owner,
@@ -61005,8 +61005,9 @@ ${processedMetadata}
 `);
       console.log("\u{1F50D} Discovering workspace projects...");
       const discoveredProjects = await discoverProjects(context2.workspaceRoot);
-      console.log(`   Found ${discoveredProjects.length} projects
-`);
+      console.log(`   Found ${discoveredProjects.length} projects:`);
+      discoveredProjects.forEach((p) => console.log(`     - ${p.name}`));
+      console.log("");
       const projectsToRelease = buildProjectConfigs(
         metadata,
         discoveredProjects,
@@ -61123,8 +61124,11 @@ ${"=".repeat(80)}`);
     function buildProjectConfigs(metadata, discoveredProjects, context2) {
       const configs = [];
       for (const prProject of metadata.projects) {
+        console.log(`   Looking for project: "${prProject.name}"`);
         const discovered = discoveredProjects.find((p) => p.name === prProject.name);
+        console.log(`   Found match: ${discovered ? "YES" : "NO"}`);
         if (!discovered) {
+          console.log(`   Available projects: ${discoveredProjects.map((p) => `"${p.name}"`).join(", ")}`);
           throw new Error(
             `Project ${prProject.name} from PR metadata not found in workspace`
           );

@@ -60940,7 +60940,7 @@ ${processedMetadata}
         for (const artifact of descriptor.artifacts) {
           switch (artifact.type) {
             case "npm":
-              const npmPath = (0, import_node_path22.join)(project.cwd, artifact.path);
+              const npmPath = (0, import_node_path22.join)(context.workspaceRoot, artifact.path);
               await uploadArtifact(
                 context.githubToken,
                 owner,
@@ -60951,7 +60951,7 @@ ${processedMetadata}
               );
               break;
             case "nuget":
-              const nugetPath = (0, import_node_path22.join)(project.cwd, artifact.path);
+              const nugetPath = (0, import_node_path22.join)(context.workspaceRoot, artifact.path);
               await uploadArtifact(
                 context.githubToken,
                 owner,
@@ -60962,7 +60962,7 @@ ${processedMetadata}
               );
               break;
             case "release-attachment":
-              const attachmentPath = (0, import_node_path22.join)(project.cwd, artifact.path);
+              const attachmentPath = (0, import_node_path22.join)(context.workspaceRoot, artifact.path);
               await uploadArtifact(
                 context.githubToken,
                 owner,

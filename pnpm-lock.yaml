@@ -26,6 +26,9 @@ importers:
       '@actions/github':
         specifier: ^6.0.0
         version: 6.0.1
+      '@cpdevtools/git-flow':
+        specifier: file:/devcontainer/repos/git-flow/packages/git-flow
+        version: link:../../packages/git-flow
     devDependencies:
       '@types/node':
         specifier: ^20.17.11
@@ -45,6 +48,9 @@ importers:
       '@actions/github':
         specifier: ^6.0.0
         version: 6.0.1
+      '@cpdevtools/git-flow':
+        specifier: file:/devcontainer/repos/git-flow/packages/git-flow
+        version: link:../../packages/git-flow
       yaml:
         specifier: ^2.8.2
         version: 2.8.2
@@ -82,6 +88,9 @@ importers:
       '@actions/github':
         specifier: ^6.0.0
         version: 6.0.1
+      '@cpdevtools/git-flow':
+        specifier: file:/devcontainer/repos/git-flow/packages/git-flow
+        version: link:../../packages/git-flow
     devDependencies:
       '@types/node':
         specifier: ^20.10.5
