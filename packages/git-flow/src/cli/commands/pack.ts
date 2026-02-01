@@ -40,29 +40,26 @@ async function packNpm(context: PackContext): Promise<void> {
   
   // Find the generated tarball (npm creates filename from package name)
   const tarballName = `${artifactFilename}-${version}.tgz`;
+  const tarballPath = join(outputDir, tarballName);
   
-  // Compute path relative to project cwd
-  const { relative } = await import('node:path');
-  const relativePath = relative(cwd, join(outputDir, tarballName));
-  
-  // Create artifact descriptor
+  // Create artifact descriptor with absolute path to avoid resolution issues
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
     artifacts: [
       {
         type: 'npm',
         name: context.projectName,
-        path: relativePath,
+        path: tarballPath,
         registries: ['github-npm'],
       },
     ],
   };
   
-  const artifactPath = join(outputDir, `${artifactFilename}.artifact.yml`);
-  await writeFile(artifactPath, stringify(descriptor));
+  const descriptorPath = join(outputDir, `${artifactFilename}.artifact.yml`);
+  await writeFile(descriptorPath, stringify(descriptor));
   
   console.log(`✓ Created NPM package: ${tarballName}`);
-  console.log(`✓ Created artifact descriptor: ${artifactPath}`);
+  console.log(`✓ Created artifact descriptor: ${descriptorPath}`);
 }
 
 /**
