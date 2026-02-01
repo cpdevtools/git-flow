@@ -37,7 +37,9 @@ export async function runBuildPack(
   // Discover all workspace projects
   console.log('🔍 Discovering workspace projects...');
   const discoveredProjects = await discoverProjects(context.workspaceRoot);
-  console.log(`   Found ${discoveredProjects.length} projects\n`);
+  console.log(`   Found ${discoveredProjects.length} projects:`);
+  discoveredProjects.forEach(p => console.log(`     - ${p.name}`));
+  console.log('');
 
   // Build project configurations from metadata (projects to pack/publish)
   const projectsToRelease = buildProjectConfigs(
@@ -190,10 +192,13 @@ function buildProjectConfigs(
   const configs: ProjectConfig[] = [];
 
   for (const prProject of metadata.projects) {
+    console.log(`   Looking for project: "${prProject.name}"`);
     // Find matching discovered project
     const discovered = discoveredProjects.find((p) => p.name === prProject.name);
+    console.log(`   Found match: ${discovered ? 'YES' : 'NO'}`);
 
     if (!discovered) {
+      console.log(`   Available projects: ${discoveredProjects.map(p => `"${p.name}"`).join(', ')}`);
       throw new Error(
         `Project ${prProject.name} from PR metadata not found in workspace`
       );
