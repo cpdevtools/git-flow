@@ -61300,10 +61300,10 @@ Batch ${i + 1}:`);
 });
 
 // src/index.ts
-var core = __toESM(require_core(), 1);
-var github = __toESM(require_github(), 1);
+var core = __toESM(require_core());
+var github = __toESM(require_github());
 var import_node_path4 = require("path");
-var import_build_pack = __toESM(require_build_pack(), 1);
+var import_build_pack = __toESM(require_build_pack());
 async function run() {
   try {
     const prNumber = parseInt(core.getInput("pr-number", { required: true }), 10);
@@ -61454,4 +61454,4 @@ queue-microtask/index.js:
 run-parallel/index.js:
   (*! run-parallel. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 */
-//# sourceMappingURL=index.cjs.map
+//# sourceMappingURL=index.js.map
