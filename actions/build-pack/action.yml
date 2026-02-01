@@ -9,7 +9,8 @@ branding:
 inputs:
   pr-number:
     description: 'Pull request number containing release metadata'
-    required: true
+    required: false
+    default: '0'
   
   token:
     description: 'GitHub token with release permissions'
