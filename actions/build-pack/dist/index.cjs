@@ -60370,7 +60370,9 @@ var require_build_pack = __commonJS({
     var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
     var build_pack_exports = {};
     __export2(build_pack_exports, {
+      buildDependencyGraph: () => buildDependencyGraph,
       createDraftRelease: () => createDraftRelease,
+      discoverProjects: () => discoverProjects,
       executeBuild: () => executeBuild,
       executePack: () => executePack,
       executeUpload: () => executeUpload,
