@@ -11,3 +11,4 @@ packages/*/dist/*
 packages/git-flow/dist/*
 !packages/git-flow/dist/cli/
 !actions/*/dist/
+packages/git-flow/dist/
