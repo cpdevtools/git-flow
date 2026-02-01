@@ -52,14 +52,15 @@ async function packNpm(context) {
   const { cwd, outputDir, artifactFilename, version } = context;
   await (0, import_zx.$)({ cwd })`pnpm pack --pack-destination ${outputDir}`;
   const tarballName = `${artifactFilename}-${version}.tgz`;
-  const tarballPath = (0, import_node_path.join)(outputDir, tarballName);
+  const { basename } = await import("node:path");
+  const artifactRelativePath = `${basename(outputDir)}/${tarballName}`;
   const descriptor = {
     project: context.projectName,
     artifacts: [
       {
         type: "npm",
         name: context.projectName,
-        path: tarballPath,
+        path: artifactRelativePath,
         registries: ["github-npm"]
       }
     ]

@@ -40,16 +40,20 @@ async function packNpm(context: PackContext): Promise<void> {
   
   // Find the generated tarball (npm creates filename from package name)
   const tarballName = `${artifactFilename}-${version}.tgz`;
-  const tarballPath = join(outputDir, tarballName);
   
-  // Create artifact descriptor with absolute path to avoid resolution issues
+  // Use just the output directory basename and tarball name
+  // The upload step will resolve this relative to workspace root
+  const { basename } = await import('node:path');
+  const artifactRelativePath = `${basename(outputDir)}/${tarballName}`;
+  
+  // Create artifact descriptor
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
     artifacts: [
       {
         type: 'npm',
         name: context.projectName,
-        path: tarballPath,
+        path: artifactRelativePath,
         registries: ['github-npm'],
       },
     ],
