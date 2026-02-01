@@ -11,6 +11,6 @@ export default defineConfig({
   platform: 'node',
   target: 'node20',
   outDir: 'dist',
-  noExternal: [/.*/], // Bundle ALL dependencies
+  external: ['@cpdevtools/git-flow'], // Don't bundle workspace package
   splitting: false,
 });
