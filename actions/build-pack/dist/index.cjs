@@ -61343,10 +61343,10 @@ sha: ${sha}
 timestamp: ${(/* @__PURE__ */ new Date()).toISOString()}
 sourceBranch: main
 projects:
-  - name: "@cpdevtools/git-flow"
-    version: "0.0.0-DEFAULT"
-    path: "packages/git-flow"
-    releaseType: "dev"
+  - name: @cpdevtools/git-flow
+    version: 0.0.0-DEFAULT
+    path: packages/git-flow
+    releaseType: dev
 \`\`\``;
     }
     core.info(`Starting Build & Pack workflow for PR #${prNumber}`);
