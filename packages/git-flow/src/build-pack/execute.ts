@@ -298,7 +298,7 @@ export async function executeUpload(
       switch (artifact.type) {
         case 'npm':
           // Upload npm package file
-          const npmPath = join(project.cwd, artifact.path);
+          const npmPath = join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
             owner,
@@ -311,7 +311,7 @@ export async function executeUpload(
 
         case 'nuget':
           // Upload nuget package file
-          const nugetPath = join(project.cwd, artifact.path);
+          const nugetPath = join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
             owner,
@@ -324,7 +324,7 @@ export async function executeUpload(
 
         case 'release-attachment':
           // Upload release attachment file
-          const attachmentPath = join(project.cwd, artifact.path);
+          const attachmentPath = join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
             owner,
