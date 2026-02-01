@@ -65235,13 +65235,13 @@ Batch ${i + 1}:`);
 });
 
 // src/index.ts
-var core = __toESM(require_core(), 1);
-var github = __toESM(require_github(), 1);
+var core = __toESM(require_core());
+var github = __toESM(require_github());
 var import_promises4 = require("fs/promises");
-var import_yaml = __toESM(require_dist(), 1);
-var import_version4 = __toESM(require_version(), 1);
-var import_json = __toESM(require_json(), 1);
-var import_build_pack = __toESM(require_build_pack(), 1);
+var import_yaml = __toESM(require_dist());
+var import_version4 = __toESM(require_version());
+var import_json = __toESM(require_json());
+var import_build_pack = __toESM(require_build_pack());
 async function run() {
   try {
     core.info("\u{1F680} create-release-pr action v2 - checking GitHub releases for existing versions");
@@ -65485,4 +65485,4 @@ queue-microtask/index.js:
 run-parallel/index.js:
   (*! run-parallel. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 */
-//# sourceMappingURL=index.cjs.map
+//# sourceMappingURL=index.js.map

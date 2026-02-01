@@ -3,7 +3,6 @@
   "version": "0.0.0-DEFAULT",
   "private": true,
   "description": "GitHub composite action to create release PRs",
-  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsup",

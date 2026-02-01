@@ -7,37 +7,31 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./version": {
       "types": "./dist/version/index.d.ts",
-      "import": "./dist/version/index.js",
-      "require": "./dist/version/index.js"
+      "default": "./dist/version/index.js"
     },
     "./branch": {
       "types": "./dist/branch/index.d.ts",
-      "import": "./dist/branch/index.js",
-      "require": "./dist/branch/index.js"
+      "default": "./dist/branch/index.js"
     },
     "./build-pack": {
       "types": "./dist/build-pack/index.d.ts",
-      "import": "./dist/build-pack/index.js",
-      "require": "./dist/build-pack/index.js"
+      "default": "./dist/build-pack/index.js"
     },
     "./publishing": {
       "types": "./dist/publishing/index.d.ts",
-      "import": "./dist/publishing/index.js",
-      "require": "./dist/publishing/index.js"
+      "default": "./dist/publishing/index.js"
     },
     "./publish-release": {
       "types": "./dist/publish-release/index.d.ts",
-      "import": "./dist/publish-release/index.js",
-      "require": "./dist/publish-release/index.js"
+      "default": "./dist/publish-release/index.js"
     },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
-      "require": "./dist/cli/index.js"
+      "default": "./dist/cli/index.js"
     }
   },
   "bin": {

@@ -60370,7 +60370,9 @@ var require_build_pack = __commonJS({
     var __toCommonJS2 = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
     var build_pack_exports = {};
     __export2(build_pack_exports, {
+      buildDependencyGraph: () => buildDependencyGraph,
       createDraftRelease: () => createDraftRelease,
+      discoverProjects: () => discoverProjects,
       executeBuild: () => executeBuild,
       executePack: () => executePack,
       executeUpload: () => executeUpload,
@@ -61941,10 +61943,10 @@ ${updatedYaml}
 });
 
 // src/index.ts
-var core = __toESM(require_core(), 1);
-var github = __toESM(require_github(), 1);
-var import_build_pack = __toESM(require_build_pack(), 1);
-var import_publish_release = __toESM(require_publish_release(), 1);
+var core = __toESM(require_core());
+var github = __toESM(require_github());
+var import_build_pack = __toESM(require_build_pack());
+var import_publish_release = __toESM(require_publish_release());
 async function run() {
   try {
     const prNumber = parseInt(core.getInput("pr-number", { required: true }));
@@ -62041,4 +62043,4 @@ queue-microtask/index.js:
 run-parallel/index.js:
   (*! run-parallel. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> *)
 */
-//# sourceMappingURL=index.cjs.map
+//# sourceMappingURL=index.js.map
