@@ -1,4 +1,4 @@
-const { writeArtifact } = require('../lib/artifacts');
+const { writeArtifact } = require('@cpdevtools/ts-dev-utilities/artifacts');
 const { readFileSync } = require('fs');
 const { join } = require('path');
 
