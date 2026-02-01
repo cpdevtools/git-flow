@@ -13,5 +13,5 @@ export default defineConfig({
   bundle: true,
   minify: false,
   splitting: false,
-  external: ['@cpdevtools/git-flow'], // Don't bundle workspace package
+  noExternal: [/^(?!@cpdevtools\/git-flow$).*/], // Bundle all deps except git-flow
 });
