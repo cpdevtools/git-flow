@@ -1,0 +1,8 @@
+---
+name: "@cpdevtools/git-flow"
+version: "0.0.0-DEFAULT"
+type: "npm"
+path: "packages/git-flow"
+tempTag: "@cpdevtools/git-flow:0.0.0-DEFAULT"
+finalTag: "@cpdevtools/git-flow:0.0.0-DEFAULT"
+digest: "sha256:..."
