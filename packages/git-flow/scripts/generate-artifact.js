@@ -1,44 +1,6 @@
-const { readFileSync, writeFileSync, mkdirSync } = require('fs');
-const { join, dirname } = require('path');
-const { stringify } = require('yaml');
-
-/**
- * Inline version of writeArtifact from @cpdevtools/ts-dev-utilities
- * TODO: Replace with actual package import once published
- */
-function writeArtifact(descriptor) {
-  const artifactOutputDir = process.env.ARTIFACT_OUTPUT_DIR;
-  const projectName = process.env.PROJECT_NAME;
-
-  if (!artifactOutputDir) {
-    throw new Error(
-      'ARTIFACT_OUTPUT_DIR environment variable is required. ' +
-      'This should be set by the workflow.'
-    );
-  }
-
-  if (!projectName) {
-    throw new Error(
-      'PROJECT_NAME environment variable is required. ' +
-      'This should be set by the workflow.'
-    );
-  }
-
-  const artifactPath = join(artifactOutputDir, `${projectName}.artifact.yml`);
-
-  // Ensure output directory exists
-  mkdirSync(dirname(artifactPath), { recursive: true });
-
-  // Write YAML file
-  const yamlContent = stringify(descriptor, {
-    indent: 2,
-    lineWidth: 0, // Don't wrap lines
-  });
-
-  writeFileSync(artifactPath, yamlContent, 'utf-8');
-
-  console.log(`✓ Generated artifact descriptor: ${artifactPath}`);
-}
+const { writeArtifact } = require('@cpdevtools/ts-dev-utilities/artifacts');
+const { readFileSync } = require('fs');
+const { join } = require('path');
 
 async function generateArtifact() {
   const packageJsonPath = join(process.cwd(), 'package.json');
