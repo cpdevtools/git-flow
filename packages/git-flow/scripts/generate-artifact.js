@@ -14,21 +14,27 @@ async function generateArtifact() {
   console.log(`Artifact output directory: ${artifactOutputDir}`);
   console.log(`Tarball name: ${tarballName}`);
   
-  // Set PROJECT_NAME environment variable that writeArtifact expects
-  process.env.PROJECT_NAME = packageJson.name;
+  // Set environment variables that writeArtifact expects
+  // PROJECT_NAME is used as the filename (converted: @cpdevtools/git-flow -> cpdevtools-git-flow)
+  const artifactFilename = packageJson.name.replace(/@/g, '').replace(/\//g, '-');
+  process.env.PROJECT_NAME = artifactFilename;
   
-  // Create the artifact descriptor in the workspace root
-  const rootPath = join(process.cwd(), '../..');
+  // ARTIFACT_OUTPUT_DIR should already be set by the workflow, but default to workspace root
+  if (!process.env.ARTIFACT_OUTPUT_DIR) {
+    process.env.ARTIFACT_OUTPUT_DIR = join(process.cwd(), '../..', artifactOutputDir);
+  }
   
   await writeArtifact({
-    name: packageJson.name,
-    version: packageJson.version,
-    type: 'npm',
-    path: `packages/git-flow`,
-    tempTag: `${packageJson.name}:${packageJson.version}`,
-    finalTag: `${packageJson.name}:${packageJson.version}`,
-    digest: 'sha256:...' // This would be populated by the actual build process
-  }, rootPath);
+    project: packageJson.name,
+    artifacts: [
+      {
+        type: 'npm',
+        name: packageJson.name,
+        path: `packages/git-flow/${tarballName}`,
+        registries: ['github-packages']
+      }
+    ]
+  });
   
   console.log('✅ Artifact descriptor generated');
 }
