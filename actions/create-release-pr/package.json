@@ -25,7 +25,8 @@
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "yaml": "^2.8.2",
-    "@cpdevtools/git-flow": "workspace:*"
+    "@cpdevtools/git-flow": "workspace:*",
+    "@cpdevtools/ts-dev-utilities": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.17.10",
