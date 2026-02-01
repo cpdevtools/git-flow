@@ -61,7 +61,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "github.actions.build": "pnpm build",
-    "github.actions.pack": "pnpm pack --pack-destination ${ARTIFACT_OUTPUT_DIR} && node scripts/generate-artifact.js"
+    "github.actions.pack": "node scripts/generate-artifact.js"
   },
   "keywords": [
     "git",
@@ -80,7 +80,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/ts-dev-utilities": "^0.1.0",
+    "@cpdevtools/ts-dev-utilities": "^0.0.0-dev.1",
     "@oclif/core": "^4.8.0",
     "@oclif/plugin-autocomplete": "^3.2.40",
     "@oclif/plugin-help": "^6.2.37",

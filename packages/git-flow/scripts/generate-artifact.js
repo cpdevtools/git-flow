@@ -29,7 +29,7 @@ async function generateArtifact() {
       {
         type: 'npm',
         name: packageJson.name,
-        path: `.artifacts/${tarballName}`,
+        path: `packages/git-flow/${tarballName}`,
         registries: ['github-packages']
       }
     ]

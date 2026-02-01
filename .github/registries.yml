@@ -1,6 +1,4 @@
-registries:
-  github-packages:
-    type: npm
-    url: https://npm.pkg.github.com
-    auth: GITHUB_TOKEN
-    scope: "@cpdevtools"
+github-npm:
+  type: npm
+  registry: https://npm.pkg.github.com
+  scope: "@cpdevtools"

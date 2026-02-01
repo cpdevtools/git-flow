@@ -2,7 +2,7 @@
  * Phase 3: Publish & Release orchestration
  */
 
-import type { ProjectArtifactDescriptor, Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
+import type { ProjectArtifactDescriptor, Artifact } from '../lib/artifacts';
 import { parseDocument } from 'yaml';
 import { join, basename } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
