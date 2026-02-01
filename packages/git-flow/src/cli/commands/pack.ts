@@ -46,7 +46,7 @@ async function packNpm(context: PackContext): Promise<void> {
   const { basename } = await import('node:path');
   const artifactRelativePath = `${basename(outputDir)}/${tarballName}`;
   
-  // Create artifact descriptor
+  // Create artifact descriptor with absolute path to avoid resolution issues
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
     artifacts: [
