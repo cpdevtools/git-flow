@@ -7,7 +7,7 @@ import { discoverProjects, buildDependencyGraph } from '../lib/project';
 import type { Project, DependencyGraph } from '../lib/project';
 import { extractPRMetadata } from './options.js';
 import { executeBuild, executePack, executeUpload } from './execute.js';
-import { getReleaseTag, findDraftReleaseByTag, isArtifactUploaded } from './github.js';
+import { getReleaseTag, findDraftReleaseByTag, isArtifactUploaded, deleteDraftRelease } from './github.js';
 import type {
   BuildPackContext,
   ProjectConfig,
@@ -32,7 +32,26 @@ export async function runBuildPack(
   const metadata = extractPRMetadata(prBody);
   console.log(`📋 Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
   console.log(`   SHA: ${metadata.sha}`);
-  console.log(`   Source branch: ${metadata.sourceBranch}\n`);
+  console.log(`   Source branch: ${metadata.sourceBranch}`);
+  
+  // Handle Force Rebuild if enabled
+  if (metadata.forceRebuild) {
+    console.log('\n🔄 Force Rebuild enabled - deleting existing draft releases...');
+    const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
+    const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
+    
+    for (const project of metadata.projects) {
+      await deleteDraftRelease(
+        context.githubToken,
+        owner,
+        repo,
+        project.name,
+        project.version
+      );
+    }
+    console.log('   ✓ Draft releases deleted');
+  }
+  console.log();
 
   // Discover all workspace projects
   console.log('🔍 Discovering workspace projects...');

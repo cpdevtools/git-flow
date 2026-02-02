@@ -36,6 +36,8 @@ export {
   isArtifactUploaded,
   uploadArtifact,
   getDraftReleaseMetadata,
+  deleteDraftRelease,
+  detectDraftReleases,
 } from './github.js';
 
 // Options parsing
