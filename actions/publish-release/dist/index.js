@@ -61691,7 +61691,9 @@ This may indicate the image was modified after being built in Phase 2.`
         repo,
         per_page: 100
       });
-      const release = releases.find((r) => r.tag_name === tag || r.draft && r.name?.includes(tag.split("/v")[1]));
+      const tagMatch = tag.match(/^(.+)\/v(.+)$/);
+      const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+      const release = releases.find((r) => r.tag_name === tag) || (expectedName ? releases.find((r) => r.draft && r.name === expectedName) : null);
       if (!release) {
         throw new Error(`Release not found for tag: ${tag}`);
       }

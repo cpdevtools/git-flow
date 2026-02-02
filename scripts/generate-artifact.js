@@ -1,10 +1,10 @@
-import { writeArtifact } from '@cpdevtools/ts-dev-utilities/artifacts';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+const { writeArtifact } = require('@cpdevtools/ts-dev-utilities/artifacts');
+const { readFileSync } = require('fs');
+const { join } = require('path');
 
 async function generateArtifact() {
   console.log('Current working directory:', process.cwd());
-  console.log('Script location:', import.meta.url);
+  console.log('Script location:', __filename);
   
   const packageJsonPath = join(process.cwd(), 'package.json');
   const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
