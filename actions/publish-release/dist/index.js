@@ -60372,6 +60372,8 @@ var require_build_pack = __commonJS({
     __export2(build_pack_exports, {
       buildDependencyGraph: () => buildDependencyGraph,
       createDraftRelease: () => createDraftRelease,
+      deleteDraftRelease: () => deleteDraftRelease,
+      detectDraftReleases: () => detectDraftReleases,
       discoverProjects: () => discoverProjects,
       executeBuild: () => executeBuild,
       executePack: () => executePack,
@@ -60434,48 +60436,6 @@ var require_build_pack = __commonJS({
         batches,
         getTopologicalBatches: () => batches
       };
-    }
-    function extractPRMetadata2(prBody) {
-      const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
-      if (!yamlMatch) {
-        throw new Error("PR body does not contain required YAML metadata block");
-      }
-      const yamlContent = yamlMatch[1];
-      const lines = yamlContent.split("\n");
-      const metadata = { projects: [] };
-      let currentProject = null;
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("runNumber:")) {
-          metadata.runNumber = parseInt(trimmed.split(":")[1].trim());
-        } else if (trimmed.startsWith("sha:")) {
-          metadata.sha = trimmed.split(":")[1].trim();
-        } else if (trimmed.startsWith("timestamp:")) {
-          metadata.timestamp = trimmed.split(":")[1].trim().replace(/'/g, "");
-        } else if (trimmed.startsWith("sourceBranch:")) {
-          metadata.sourceBranch = trimmed.split(":")[1].trim();
-        } else if (trimmed.startsWith("- name:")) {
-          if (currentProject) {
-            metadata.projects.push(currentProject);
-          }
-          currentProject = { name: trimmed.split(":")[1].trim() };
-        } else if (currentProject) {
-          if (trimmed.startsWith("version:")) {
-            currentProject.version = trimmed.split(":")[1].trim();
-          } else if (trimmed.startsWith("prerelease:")) {
-            currentProject.prerelease = trimmed.split(":")[1].trim() === "true";
-          } else if (trimmed.startsWith("cwd:")) {
-            currentProject.cwd = trimmed.split(":")[1].trim();
-          }
-        }
-      }
-      if (currentProject) {
-        metadata.projects.push(currentProject);
-      }
-      if (!metadata.runNumber || !metadata.sha || !metadata.timestamp || !metadata.sourceBranch || !metadata.projects || metadata.projects.length === 0) {
-        throw new Error("Incomplete PR metadata: missing required fields");
-      }
-      return metadata;
     }
     var import_node_fs4 = require("fs");
     var import_promises4 = require("fs/promises");
@@ -60637,6 +60597,51 @@ ${processedMetadata}
         }
       });
       console.log(`  \u2713 Uploaded ${fileName}`);
+    }
+    async function deleteDraftRelease(githubToken, owner, repo, projectName, version) {
+      const octokit = (0, import_github.getOctokit)(githubToken);
+      const tag = getReleaseTag(projectName, version);
+      try {
+        const { data: release } = await octokit.rest.repos.getReleaseByTag({
+          owner,
+          repo,
+          tag
+        });
+        if (release && release.draft) {
+          await octokit.rest.repos.deleteRelease({
+            owner,
+            repo,
+            release_id: release.id
+          });
+          console.log(`  \u{1F5D1}\uFE0F  Deleted draft release: ${tag}`);
+        }
+      } catch (error) {
+        if (error.status === 404) {
+          return;
+        }
+        throw error;
+      }
+    }
+    async function detectDraftReleases(githubToken, owner, repo, projects) {
+      const octokit = (0, import_github.getOctokit)(githubToken);
+      for (const project of projects) {
+        const tag = getReleaseTag(project.name, project.version);
+        try {
+          const { data: release } = await octokit.rest.repos.getReleaseByTag({
+            owner,
+            repo,
+            tag
+          });
+          if (release && release.draft) {
+            return true;
+          }
+        } catch (error) {
+          if (error.status !== 404) {
+            throw error;
+          }
+        }
+      }
+      return false;
     }
     async function getDraftReleaseMetadata(githubToken, owner, repo, tag) {
       const octokit = (0, import_github.getOctokit)(githubToken);
@@ -60998,13 +61003,77 @@ ${processedMetadata}
         };
       }
     }
+    function extractPRMetadata2(prBody) {
+      const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
+      const forceRebuild = !!forceRebuildMatch;
+      const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
+      if (!yamlMatch) {
+        throw new Error("PR body does not contain required YAML metadata block");
+      }
+      const yamlContent = yamlMatch[1];
+      const lines = yamlContent.split("\n");
+      const projectsByPlaceholder = {};
+      let currentPlaceholder = null;
+      let currentProject = null;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.match(/^[A-Z0-9_]+:$/)) {
+          currentPlaceholder = trimmed.slice(0, -1);
+          projectsByPlaceholder[currentPlaceholder] = [];
+        } else if (trimmed.startsWith("- name:")) {
+          if (currentProject && currentPlaceholder) {
+            currentProject.placeholder = currentPlaceholder;
+            projectsByPlaceholder[currentPlaceholder].push(currentProject);
+          }
+          currentProject = { name: trimmed.split(":")[1].trim() };
+        } else if (currentProject) {
+          if (trimmed.startsWith("version:")) {
+            currentProject.version = trimmed.split(":")[1].trim();
+          } else if (trimmed.startsWith("prerelease:")) {
+            currentProject.prerelease = trimmed.split(":")[1].trim() === "true";
+          } else if (trimmed.startsWith("cwd:")) {
+            currentProject.cwd = trimmed.split(":")[1].trim();
+          }
+        }
+      }
+      if (currentProject && currentPlaceholder) {
+        currentProject.placeholder = currentPlaceholder;
+        projectsByPlaceholder[currentPlaceholder].push(currentProject);
+      }
+      if (Object.keys(projectsByPlaceholder).length === 0) {
+        throw new Error("Incomplete PR metadata: no projects found");
+      }
+      return {
+        projectsByPlaceholder,
+        forceRebuild
+      };
+    }
     async function runBuildPack(context2, prBody) {
       console.log("\u{1F680} Starting Phase 2: Build & Pack\n");
       const metadata = extractPRMetadata2(prBody);
-      console.log(`\u{1F4CB} Processing ${metadata.projects.length} projects from PR #${context2.prNumber}`);
-      console.log(`   SHA: ${metadata.sha}`);
-      console.log(`   Source branch: ${metadata.sourceBranch}
-`);
+      const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+      console.log(`\u{1F4CB} Processing ${allProjects.length} projects from PR #${context2.prNumber}`);
+      console.log(`   Run: ${context2.runNumber}`);
+      console.log(`   SHA: ${context2.sha.substring(0, 7)}`);
+      for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
+        console.log(`   ${placeholder}: ${projects.map((p) => p.name).join(", ")}`);
+      }
+      if (metadata.forceRebuild) {
+        console.log("\n\u{1F504} Force Rebuild enabled - deleting existing draft releases...");
+        const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";
+        const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
+        for (const project of allProjects) {
+          await deleteDraftRelease(
+            context2.githubToken,
+            owner,
+            repo,
+            project.name,
+            project.version
+          );
+        }
+        console.log("   \u2713 Draft releases deleted");
+      }
+      console.log();
       console.log("\u{1F50D} Discovering workspace projects...");
       const discoveredProjects = await discoverProjects(context2.workspaceRoot);
       console.log(`   Found ${discoveredProjects.length} projects:`);
@@ -61125,7 +61194,8 @@ ${"=".repeat(80)}`);
     }
     function buildProjectConfigs(metadata, discoveredProjects, context2) {
       const configs = [];
-      for (const prProject of metadata.projects) {
+      const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+      for (const prProject of allProjects) {
         console.log(`   Looking for project: "${prProject.name}"`);
         const discovered = discoveredProjects.find((p) => p.name === prProject.name);
         console.log(`   Found match: ${discovered ? "YES" : "NO"}`);

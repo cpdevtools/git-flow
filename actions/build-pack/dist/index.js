@@ -60437,51 +60437,6 @@ var require_build_pack = __commonJS({
         getTopologicalBatches: () => batches
       };
     }
-    function extractPRMetadata(prBody) {
-      const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
-      const forceRebuild = !!forceRebuildMatch;
-      const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
-      if (!yamlMatch) {
-        throw new Error("PR body does not contain required YAML metadata block");
-      }
-      const yamlContent = yamlMatch[1];
-      const lines = yamlContent.split("\n");
-      const projectsByPlaceholder = {};
-      let currentPlaceholder = null;
-      let currentProject = null;
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.match(/^[A-Z0-9_]+:$/)) {
-          currentPlaceholder = trimmed.slice(0, -1);
-          projectsByPlaceholder[currentPlaceholder] = [];
-        } else if (trimmed.startsWith("- name:")) {
-          if (currentProject && currentPlaceholder) {
-            currentProject.placeholder = currentPlaceholder;
-            projectsByPlaceholder[currentPlaceholder].push(currentProject);
-          }
-          currentProject = { name: trimmed.split(":")[1].trim() };
-        } else if (currentProject) {
-          if (trimmed.startsWith("version:")) {
-            currentProject.version = trimmed.split(":")[1].trim();
-          } else if (trimmed.startsWith("prerelease:")) {
-            currentProject.prerelease = trimmed.split(":")[1].trim() === "true";
-          } else if (trimmed.startsWith("cwd:")) {
-            currentProject.cwd = trimmed.split(":")[1].trim();
-          }
-        }
-      }
-      if (currentProject && currentPlaceholder) {
-        currentProject.placeholder = currentPlaceholder;
-        projectsByPlaceholder[currentPlaceholder].push(currentProject);
-      }
-      if (Object.keys(projectsByPlaceholder).length === 0) {
-        throw new Error("Incomplete PR metadata: no projects found");
-      }
-      return {
-        projectsByPlaceholder,
-        forceRebuild
-      };
-    }
     var import_node_fs4 = require("fs");
     var import_promises4 = require("fs/promises");
     var import_node_path22 = require("path");
@@ -61047,6 +61002,51 @@ ${processedMetadata}
           exitCode: 1
         };
       }
+    }
+    function extractPRMetadata(prBody) {
+      const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
+      const forceRebuild = !!forceRebuildMatch;
+      const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
+      if (!yamlMatch) {
+        throw new Error("PR body does not contain required YAML metadata block");
+      }
+      const yamlContent = yamlMatch[1];
+      const lines = yamlContent.split("\n");
+      const projectsByPlaceholder = {};
+      let currentPlaceholder = null;
+      let currentProject = null;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.match(/^[A-Z0-9_]+:$/)) {
+          currentPlaceholder = trimmed.slice(0, -1);
+          projectsByPlaceholder[currentPlaceholder] = [];
+        } else if (trimmed.startsWith("- name:")) {
+          if (currentProject && currentPlaceholder) {
+            currentProject.placeholder = currentPlaceholder;
+            projectsByPlaceholder[currentPlaceholder].push(currentProject);
+          }
+          currentProject = { name: trimmed.split(":")[1].trim() };
+        } else if (currentProject) {
+          if (trimmed.startsWith("version:")) {
+            currentProject.version = trimmed.split(":")[1].trim();
+          } else if (trimmed.startsWith("prerelease:")) {
+            currentProject.prerelease = trimmed.split(":")[1].trim() === "true";
+          } else if (trimmed.startsWith("cwd:")) {
+            currentProject.cwd = trimmed.split(":")[1].trim();
+          }
+        }
+      }
+      if (currentProject && currentPlaceholder) {
+        currentProject.placeholder = currentPlaceholder;
+        projectsByPlaceholder[currentPlaceholder].push(currentProject);
+      }
+      if (Object.keys(projectsByPlaceholder).length === 0) {
+        throw new Error("Incomplete PR metadata: no projects found");
+      }
+      return {
+        projectsByPlaceholder,
+        forceRebuild
+      };
     }
     async function runBuildPack2(context, prBody) {
       console.log("\u{1F680} Starting Phase 2: Build & Pack\n");
