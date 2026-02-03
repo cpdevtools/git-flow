@@ -58,14 +58,6 @@ export interface BuildPackContext {
  * PR metadata from PR body YAML block
  */
 export interface PRMetadata {
-  /** Workflow run number */
-  runNumber: number;
-  /** Git commit SHA */
-  sha: string;
-  /** ISO timestamp */
-  timestamp: string;
-  /** Source branch that triggered the release PR */
-  sourceBranch: string;
   /** Projects to build and pack */
   projects: PRProjectMetadata[];
   /** Force rebuild - delete existing draft releases and rebuild all artifacts */

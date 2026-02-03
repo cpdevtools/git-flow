@@ -60450,15 +60450,7 @@ var require_build_pack = __commonJS({
       let currentProject = null;
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("runNumber:")) {
-          metadata.runNumber = parseInt(trimmed.split(":")[1].trim());
-        } else if (trimmed.startsWith("sha:")) {
-          metadata.sha = trimmed.split(":")[1].trim();
-        } else if (trimmed.startsWith("timestamp:")) {
-          metadata.timestamp = trimmed.split(":")[1].trim().replace(/'/g, "");
-        } else if (trimmed.startsWith("sourceBranch:")) {
-          metadata.sourceBranch = trimmed.split(":")[1].trim();
-        } else if (trimmed.startsWith("- name:")) {
+        if (trimmed.startsWith("- name:")) {
           if (currentProject) {
             metadata.projects.push(currentProject);
           }
@@ -60476,8 +60468,8 @@ var require_build_pack = __commonJS({
       if (currentProject) {
         metadata.projects.push(currentProject);
       }
-      if (!metadata.runNumber || !metadata.sha || !metadata.timestamp || !metadata.sourceBranch || !metadata.projects || metadata.projects.length === 0) {
-        throw new Error("Incomplete PR metadata: missing required fields");
+      if (!metadata.projects || metadata.projects.length === 0) {
+        throw new Error("Incomplete PR metadata: no projects found");
       }
       return {
         ...metadata,
@@ -61054,8 +61046,8 @@ ${processedMetadata}
       console.log("\u{1F680} Starting Phase 2: Build & Pack\n");
       const metadata = extractPRMetadata(prBody);
       console.log(`\u{1F4CB} Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
-      console.log(`   SHA: ${metadata.sha}`);
-      console.log(`   Source branch: ${metadata.sourceBranch}`);
+      console.log(`   Run: ${context.runNumber}`);
+      console.log(`   SHA: ${context.sha.substring(0, 7)}`);
       if (metadata.forceRebuild) {
         console.log("\n\u{1F504} Force Rebuild enabled - deleting existing draft releases...");
         const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";

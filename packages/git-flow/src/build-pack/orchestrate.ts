@@ -31,8 +31,8 @@ export async function runBuildPack(
   // Extract metadata from PR body
   const metadata = extractPRMetadata(prBody);
   console.log(`📋 Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
-  console.log(`   SHA: ${metadata.sha}`);
-  console.log(`   Source branch: ${metadata.sourceBranch}`);
+  console.log(`   Run: ${context.runNumber}`);
+  console.log(`   SHA: ${context.sha.substring(0, 7)}`);
   
   // Handle Force Rebuild if enabled
   if (metadata.forceRebuild) {

@@ -256,13 +256,7 @@ ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` → \`${p.resolv
 }
 
 function generateYamlMetadata(metadata: any): string {
-  const yaml = [
-    `sourceBranch: ${metadata.branch}`,
-    `runNumber: ${metadata.runNumber}`,
-    `sha: ${metadata.sha}`,
-    `timestamp: ${metadata.generatedAt}`,
-    'projects:',
-  ];
+  const yaml = ['projects:'];
 
   for (const project of metadata.projects) {
     yaml.push(`  - name: ${project.name}`);
