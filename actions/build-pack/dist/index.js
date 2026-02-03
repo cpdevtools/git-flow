@@ -60446,13 +60446,18 @@ var require_build_pack = __commonJS({
       }
       const yamlContent = yamlMatch[1];
       const lines = yamlContent.split("\n");
-      const metadata = { projects: [] };
+      const projectsByPlaceholder = {};
+      let currentPlaceholder = null;
       let currentProject = null;
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("- name:")) {
-          if (currentProject) {
-            metadata.projects.push(currentProject);
+        if (trimmed.match(/^[A-Z0-9_]+:$/)) {
+          currentPlaceholder = trimmed.slice(0, -1);
+          projectsByPlaceholder[currentPlaceholder] = [];
+        } else if (trimmed.startsWith("- name:")) {
+          if (currentProject && currentPlaceholder) {
+            currentProject.placeholder = currentPlaceholder;
+            projectsByPlaceholder[currentPlaceholder].push(currentProject);
           }
           currentProject = { name: trimmed.split(":")[1].trim() };
         } else if (currentProject) {
@@ -60465,14 +60470,15 @@ var require_build_pack = __commonJS({
           }
         }
       }
-      if (currentProject) {
-        metadata.projects.push(currentProject);
+      if (currentProject && currentPlaceholder) {
+        currentProject.placeholder = currentPlaceholder;
+        projectsByPlaceholder[currentPlaceholder].push(currentProject);
       }
-      if (!metadata.projects || metadata.projects.length === 0) {
+      if (Object.keys(projectsByPlaceholder).length === 0) {
         throw new Error("Incomplete PR metadata: no projects found");
       }
       return {
-        ...metadata,
+        projectsByPlaceholder,
         forceRebuild
       };
     }
@@ -61045,14 +61051,18 @@ ${processedMetadata}
     async function runBuildPack2(context, prBody) {
       console.log("\u{1F680} Starting Phase 2: Build & Pack\n");
       const metadata = extractPRMetadata(prBody);
-      console.log(`\u{1F4CB} Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
+      const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+      console.log(`\u{1F4CB} Processing ${allProjects.length} projects from PR #${context.prNumber}`);
       console.log(`   Run: ${context.runNumber}`);
       console.log(`   SHA: ${context.sha.substring(0, 7)}`);
+      for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
+        console.log(`   ${placeholder}: ${projects.map((p) => p.name).join(", ")}`);
+      }
       if (metadata.forceRebuild) {
         console.log("\n\u{1F504} Force Rebuild enabled - deleting existing draft releases...");
         const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";
         const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
-        for (const project of metadata.projects) {
+        for (const project of allProjects) {
           await deleteDraftRelease(
             context.githubToken,
             owner,
@@ -61184,7 +61194,8 @@ ${"=".repeat(80)}`);
     }
     function buildProjectConfigs(metadata, discoveredProjects, context) {
       const configs = [];
-      for (const prProject of metadata.projects) {
+      const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+      for (const prProject of allProjects) {
         console.log(`   Looking for project: "${prProject.name}"`);
         const discovered = discoveredProjects.find((p) => p.name === prProject.name);
         console.log(`   Found match: ${discovered ? "YES" : "NO"}`);

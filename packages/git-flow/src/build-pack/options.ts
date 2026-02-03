@@ -23,17 +23,23 @@ export function extractPRMetadata(prBody: string): PRMetadata {
 
   const yamlContent = yamlMatch[1];
 
-  // Simple YAML parsing (for our controlled format)
+  // Parse YAML organized by placeholder
   const lines = yamlContent.split('\n');
-  const metadata: Partial<PRMetadata> = { projects: [] };
+  const projectsByPlaceholder: Record<string, PRProjectMetadata[]> = {};
+  let currentPlaceholder: string | null = null;
   let currentProject: Partial<PRProjectMetadata> | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
 
-    if (trimmed.startsWith('- name:')) {
-      if (currentProject) {
-        metadata.projects!.push(currentProject as PRProjectMetadata);
+    // Match placeholder key (e.g., "DEFAULT:", "V1_8_LTS:")
+    if (trimmed.match(/^[A-Z0-9_]+:$/)) {
+      currentPlaceholder = trimmed.slice(0, -1); // Remove trailing colon
+      projectsByPlaceholder[currentPlaceholder] = [];
+    } else if (trimmed.startsWith('- name:')) {
+      if (currentProject && currentPlaceholder) {
+        currentProject.placeholder = currentPlaceholder;
+        projectsByPlaceholder[currentPlaceholder].push(currentProject as PRProjectMetadata);
       }
       currentProject = { name: trimmed.split(':')[1].trim() };
     } else if (currentProject) {
@@ -47,16 +53,18 @@ export function extractPRMetadata(prBody: string): PRMetadata {
     }
   }
 
-  if (currentProject) {
-    metadata.projects!.push(currentProject as PRProjectMetadata);
+  // Don't forget the last project
+  if (currentProject && currentPlaceholder) {
+    currentProject.placeholder = currentPlaceholder;
+    projectsByPlaceholder[currentPlaceholder].push(currentProject as PRProjectMetadata);
   }
 
-  if (!metadata.projects || metadata.projects.length === 0) {
+  if (Object.keys(projectsByPlaceholder).length === 0) {
     throw new Error('Incomplete PR metadata: no projects found');
   }
 
   return {
-    ...metadata,
+    projectsByPlaceholder,
     forceRebuild,
   } as PRMetadata;
 }

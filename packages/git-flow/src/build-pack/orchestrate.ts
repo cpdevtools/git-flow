@@ -30,9 +30,15 @@ export async function runBuildPack(
 
   // Extract metadata from PR body
   const metadata = extractPRMetadata(prBody);
-  console.log(`📋 Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
+  const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+  console.log(`📋 Processing ${allProjects.length} projects from PR #${context.prNumber}`);
   console.log(`   Run: ${context.runNumber}`);
   console.log(`   SHA: ${context.sha.substring(0, 7)}`);
+  
+  // Display projects grouped by placeholder
+  for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
+    console.log(`   ${placeholder}: ${projects.map(p => p.name).join(', ')}`);
+  }
   
   // Handle Force Rebuild if enabled
   if (metadata.forceRebuild) {
@@ -40,7 +46,7 @@ export async function runBuildPack(
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
     
-    for (const project of metadata.projects) {
+    for (const project of allProjects) {
       await deleteDraftRelease(
         context.githubToken,
         owner,
@@ -209,8 +215,9 @@ function buildProjectConfigs(
   context: BuildPackContext
 ): ProjectConfig[] {
   const configs: ProjectConfig[] = [];
+  const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
 
-  for (const prProject of metadata.projects) {
+  for (const prProject of allProjects) {
     console.log(`   Looking for project: "${prProject.name}"`);
     // Find matching discovered project
     const discovered = discoveredProjects.find((p) => p.name === prProject.name);
