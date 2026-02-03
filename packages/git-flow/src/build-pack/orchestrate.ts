@@ -2,19 +2,17 @@
  * Main orchestration for Phase 2 Build & Pack workflow
  */
 
-import { join } from 'path';
-import { discoverProjects, buildDependencyGraph } from '../lib/project';
-import type { Project, DependencyGraph } from '../lib/project';
-import { extractPRMetadata } from './options.js';
+import type { Project } from '../lib/project';
+import { buildDependencyGraph, discoverProjects } from '../lib/project';
 import { executeBuild, executePack, executeUpload } from './execute.js';
-import { getReleaseTag, findDraftReleaseByTag, isArtifactUploaded, deleteDraftRelease } from './github.js';
+import { deleteDraftRelease, findDraftReleaseByTag, getReleaseTag, isArtifactUploaded } from './github.js';
+import { extractPRMetadata } from './options.js';
 import type {
   BuildPackContext,
-  ProjectConfig,
+  BuildPackResult,
   ExecutionResult,
   PRMetadata,
-  PRProjectMetadata,
-  BuildPackResult,
+  ProjectConfig
 } from './types.js';
 
 /**
