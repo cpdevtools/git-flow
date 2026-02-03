@@ -2,19 +2,17 @@
  * Main orchestration for Phase 2 Build & Pack workflow
  */
 
-import { join } from 'path';
-import { discoverProjects, buildDependencyGraph } from '../lib/project';
-import type { Project, DependencyGraph } from '../lib/project';
-import { extractPRMetadata } from './options.js';
+import type { Project } from '../lib/project';
+import { buildDependencyGraph, discoverProjects } from '../lib/project';
 import { executeBuild, executePack, executeUpload } from './execute.js';
-import { getReleaseTag, findDraftReleaseByTag, isArtifactUploaded, deleteDraftRelease } from './github.js';
+import { deleteDraftRelease, findDraftReleaseByTag, getReleaseTag, isArtifactUploaded } from './github.js';
+import { extractPRMetadata } from './options.js';
 import type {
   BuildPackContext,
-  ProjectConfig,
+  BuildPackResult,
   ExecutionResult,
   PRMetadata,
-  PRProjectMetadata,
-  BuildPackResult,
+  ProjectConfig
 } from './types.js';
 
 /**
@@ -30,9 +28,15 @@ export async function runBuildPack(
 
   // Extract metadata from PR body
   const metadata = extractPRMetadata(prBody);
-  console.log(`📋 Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
-  console.log(`   SHA: ${metadata.sha}`);
-  console.log(`   Source branch: ${metadata.sourceBranch}`);
+  const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+  console.log(`📋 Processing ${allProjects.length} projects from PR #${context.prNumber}`);
+  console.log(`   Run: ${context.runNumber}`);
+  console.log(`   SHA: ${context.sha.substring(0, 7)}`);
+  
+  // Display projects grouped by placeholder
+  for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
+    console.log(`   ${placeholder}: ${projects.map(p => p.name).join(', ')}`);
+  }
   
   // Handle Force Rebuild if enabled
   if (metadata.forceRebuild) {
@@ -40,7 +44,7 @@ export async function runBuildPack(
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
     
-    for (const project of metadata.projects) {
+    for (const project of allProjects) {
       await deleteDraftRelease(
         context.githubToken,
         owner,
@@ -209,8 +213,9 @@ function buildProjectConfigs(
   context: BuildPackContext
 ): ProjectConfig[] {
   const configs: ProjectConfig[] = [];
+  const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
 
-  for (const prProject of metadata.projects) {
+  for (const prProject of allProjects) {
     console.log(`   Looking for project: "${prProject.name}"`);
     // Find matching discovered project
     const discovered = discoveredProjects.find((p) => p.name === prProject.name);

@@ -58,16 +58,8 @@ export interface BuildPackContext {
  * PR metadata from PR body YAML block
  */
 export interface PRMetadata {
-  /** Workflow run number */
-  runNumber: number;
-  /** Git commit SHA */
-  sha: string;
-  /** ISO timestamp */
-  timestamp: string;
-  /** Source branch that triggered the release PR */
-  sourceBranch: string;
-  /** Projects to build and pack */
-  projects: PRProjectMetadata[];
+  /** Projects grouped by version placeholder (e.g., 'DEFAULT', 'V1_8_LTS') */
+  projectsByPlaceholder: Record<string, PRProjectMetadata[]>;
   /** Force rebuild - delete existing draft releases and rebuild all artifacts */
   forceRebuild?: boolean;
 }
@@ -78,7 +70,9 @@ export interface PRMetadata {
 export interface PRProjectMetadata {
   /** Project name */
   name: string;
-  /** Version to build */
+  /** Version placeholder from package.json (e.g., '0.0.0-DEFAULT') */
+  placeholder: string;
+  /** Resolved version to build */
   version: string;
   /** Whether this is a prerelease */
   prerelease: boolean;

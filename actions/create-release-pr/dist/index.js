@@ -64372,53 +64372,6 @@ var require_build_pack = __commonJS({
         getTopologicalBatches: () => batches
       };
     }
-    function extractPRMetadata(prBody) {
-      const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
-      const forceRebuild = !!forceRebuildMatch;
-      const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
-      if (!yamlMatch) {
-        throw new Error("PR body does not contain required YAML metadata block");
-      }
-      const yamlContent = yamlMatch[1];
-      const lines = yamlContent.split("\n");
-      const metadata = { projects: [] };
-      let currentProject = null;
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("runNumber:")) {
-          metadata.runNumber = parseInt(trimmed.split(":")[1].trim());
-        } else if (trimmed.startsWith("sha:")) {
-          metadata.sha = trimmed.split(":")[1].trim();
-        } else if (trimmed.startsWith("timestamp:")) {
-          metadata.timestamp = trimmed.split(":")[1].trim().replace(/'/g, "");
-        } else if (trimmed.startsWith("sourceBranch:")) {
-          metadata.sourceBranch = trimmed.split(":")[1].trim();
-        } else if (trimmed.startsWith("- name:")) {
-          if (currentProject) {
-            metadata.projects.push(currentProject);
-          }
-          currentProject = { name: trimmed.split(":")[1].trim() };
-        } else if (currentProject) {
-          if (trimmed.startsWith("version:")) {
-            currentProject.version = trimmed.split(":")[1].trim();
-          } else if (trimmed.startsWith("prerelease:")) {
-            currentProject.prerelease = trimmed.split(":")[1].trim() === "true";
-          } else if (trimmed.startsWith("cwd:")) {
-            currentProject.cwd = trimmed.split(":")[1].trim();
-          }
-        }
-      }
-      if (currentProject) {
-        metadata.projects.push(currentProject);
-      }
-      if (!metadata.runNumber || !metadata.sha || !metadata.timestamp || !metadata.sourceBranch || !metadata.projects || metadata.projects.length === 0) {
-        throw new Error("Incomplete PR metadata: missing required fields");
-      }
-      return {
-        ...metadata,
-        forceRebuild
-      };
-    }
     var import_node_fs4 = require("fs");
     var import_promises42 = require("fs/promises");
     var import_node_path22 = require("path");
@@ -64985,17 +64938,66 @@ ${processedMetadata}
         };
       }
     }
+    function extractPRMetadata(prBody) {
+      const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
+      const forceRebuild = !!forceRebuildMatch;
+      const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
+      if (!yamlMatch) {
+        throw new Error("PR body does not contain required YAML metadata block");
+      }
+      const yamlContent = yamlMatch[1];
+      const lines = yamlContent.split("\n");
+      const projectsByPlaceholder = {};
+      let currentPlaceholder = null;
+      let currentProject = null;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.match(/^[A-Z0-9_]+:$/)) {
+          currentPlaceholder = trimmed.slice(0, -1);
+          projectsByPlaceholder[currentPlaceholder] = [];
+        } else if (trimmed.startsWith("- name:")) {
+          if (currentProject && currentPlaceholder) {
+            currentProject.placeholder = currentPlaceholder;
+            projectsByPlaceholder[currentPlaceholder].push(currentProject);
+          }
+          currentProject = { name: trimmed.split(":")[1].trim() };
+        } else if (currentProject) {
+          if (trimmed.startsWith("version:")) {
+            currentProject.version = trimmed.split(":")[1].trim();
+          } else if (trimmed.startsWith("prerelease:")) {
+            currentProject.prerelease = trimmed.split(":")[1].trim() === "true";
+          } else if (trimmed.startsWith("cwd:")) {
+            currentProject.cwd = trimmed.split(":")[1].trim();
+          }
+        }
+      }
+      if (currentProject && currentPlaceholder) {
+        currentProject.placeholder = currentPlaceholder;
+        projectsByPlaceholder[currentPlaceholder].push(currentProject);
+      }
+      if (Object.keys(projectsByPlaceholder).length === 0) {
+        throw new Error("Incomplete PR metadata: no projects found");
+      }
+      return {
+        projectsByPlaceholder,
+        forceRebuild
+      };
+    }
     async function runBuildPack(context2, prBody) {
       console.log("\u{1F680} Starting Phase 2: Build & Pack\n");
       const metadata = extractPRMetadata(prBody);
-      console.log(`\u{1F4CB} Processing ${metadata.projects.length} projects from PR #${context2.prNumber}`);
-      console.log(`   SHA: ${metadata.sha}`);
-      console.log(`   Source branch: ${metadata.sourceBranch}`);
+      const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+      console.log(`\u{1F4CB} Processing ${allProjects.length} projects from PR #${context2.prNumber}`);
+      console.log(`   Run: ${context2.runNumber}`);
+      console.log(`   SHA: ${context2.sha.substring(0, 7)}`);
+      for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
+        console.log(`   ${placeholder}: ${projects.map((p) => p.name).join(", ")}`);
+      }
       if (metadata.forceRebuild) {
         console.log("\n\u{1F504} Force Rebuild enabled - deleting existing draft releases...");
         const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";
         const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
-        for (const project of metadata.projects) {
+        for (const project of allProjects) {
           await deleteDraftRelease(
             context2.githubToken,
             owner,
@@ -65127,7 +65129,8 @@ ${"=".repeat(80)}`);
     }
     function buildProjectConfigs(metadata, discoveredProjects, context2) {
       const configs = [];
-      for (const prProject of metadata.projects) {
+      const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
+      for (const prProject of allProjects) {
         console.log(`   Looking for project: "${prProject.name}"`);
         const discovered = discoveredProjects.find((p) => p.name === prProject.name);
         console.log(`   Found match: ${discovered ? "YES" : "NO"}`);
@@ -65365,15 +65368,25 @@ async function run() {
         );
       }
     }
+    const projectsByPlaceholder = {};
+    for (const project of projectMetadata) {
+      const placeholderMatch = project.version.match(/0\.0\.0-(.+)/);
+      const placeholder = placeholderMatch ? placeholderMatch[1] : "DEFAULT";
+      if (!projectsByPlaceholder[placeholder]) {
+        projectsByPlaceholder[placeholder] = [];
+      }
+      projectsByPlaceholder[placeholder].push(project);
+    }
     const releaseBranch = `release/${branch}`;
     core.info(`Release branch: ${releaseBranch}`);
     const octokit = github.getOctokit(token);
     const { owner, repo } = github.context.repo;
+    const allProjects = Object.values(projectsByPlaceholder).flat();
     const hasDraftReleases = await (0, import_build_pack.detectDraftReleases)(
       token,
       owner,
       repo,
-      projectMetadata.map((p) => ({ name: p.name, version: p.resolvedVersion }))
+      allProjects.map((p) => ({ name: p.name, version: p.resolvedVersion }))
     );
     if (hasDraftReleases) {
       core.info("\u26A0\uFE0F  Draft releases detected from a previous attempt");
@@ -65406,7 +65419,7 @@ async function run() {
       branch,
       runNumber,
       sha,
-      projects: projectMetadata,
+      projectsByPlaceholder,
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     const prBody = `## Release from \`${branch}\`
@@ -65425,7 +65438,10 @@ ${hasDraftReleases ? `
 ` : ""}
 ### Projects
 
-${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` \u2192 \`${p.resolvedVersion}\``).join("\n")}
+${Object.entries(projectsByPlaceholder).map(
+      ([placeholder, projects2]) => `**${placeholder}**
+${projects2.map((p) => `- **${p.name}**: \`${p.version}\` \u2192 \`${p.resolvedVersion}\``).join("\n")}`
+    ).join("\n\n")}
 
 ---
 *Generated by create-release-pr action*
@@ -65497,18 +65513,15 @@ ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` \u2192 \`${p.res
   }
 }
 function generateYamlMetadata(metadata) {
-  const yaml = [
-    `sourceBranch: ${metadata.branch}`,
-    `runNumber: ${metadata.runNumber}`,
-    `sha: ${metadata.sha}`,
-    `timestamp: ${metadata.generatedAt}`,
-    "projects:"
-  ];
-  for (const project of metadata.projects) {
-    yaml.push(`  - name: ${project.name}`);
-    yaml.push(`    version: ${project.resolvedVersion}`);
-    yaml.push(`    prerelease: ${project.isPreRelease}`);
-    yaml.push(`    cwd: ${project.cwd}`);
+  const yaml = [];
+  for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
+    yaml.push(`${placeholder}:`);
+    for (const project of projects) {
+      yaml.push(`  - name: ${project.name}`);
+      yaml.push(`    version: ${project.resolvedVersion}`);
+      yaml.push(`    prerelease: ${project.isPreRelease}`);
+      yaml.push(`    cwd: ${project.cwd}`);
+    }
   }
   return yaml.join("\n");
 }
