@@ -62035,7 +62035,7 @@ async function run() {
       throw new Error(`PR #${prNumber} has no description`);
     }
     const metadata = (0, import_build_pack.extractPRMetadata)(pr.body);
-    const projects = metadata.projects.map((proj) => ({
+    const projects = Object.values(metadata.projectsByPlaceholder).flat().map((proj) => ({
       name: proj.name,
       version: proj.version,
       releaseTag: `${proj.name}/v${proj.version}`

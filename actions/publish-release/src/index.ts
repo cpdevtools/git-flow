@@ -27,12 +27,14 @@ async function run() {
     // Extract PR metadata (project list, versions, etc.)
     const metadata = extractPRMetadata(pr.body);
 
-    // Convert metadata to project list for publish
-    const projects = metadata.projects.map(proj => ({
-      name: proj.name,
-      version: proj.version,
-      releaseTag: `${proj.name}/v${proj.version}`,
-    }));
+    // Flatten grouped projects into single array for publish
+    const projects = Object.values(metadata.projectsByPlaceholder)
+      .flat()
+      .map(proj => ({
+        name: proj.name,
+        version: proj.version,
+        releaseTag: `${proj.name}/v${proj.version}`,
+      }));
 
     core.info(`Publishing ${projects.length} projects from PR #${prNumber}`);
 
