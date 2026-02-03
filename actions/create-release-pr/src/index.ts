@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
 import { resolveVersion } from '@cpdevtools/git-flow/version';
 import { parseJson } from '@cpdevtools/ts-dev-utilities/json';
-import { discoverProjects } from '@cpdevtools/git-flow/build-pack';
+import { discoverProjects, detectDraftReleases } from '@cpdevtools/git-flow/build-pack';
 
 interface VersionsConfig {
   [placeholder: string]: string;
@@ -101,6 +101,18 @@ async function run() {
     const octokit = github.getOctokit(token);
     const { owner, repo } = github.context.repo;
 
+    // Check if draft releases exist for any projects
+    const hasDraftReleases = await detectDraftReleases(
+      token,
+      owner,
+      repo,
+      projectMetadata.map(p => ({ name: p.name, version: p.resolvedVersion }))
+    );
+    
+    if (hasDraftReleases) {
+      core.info('⚠️  Draft releases detected from a previous attempt');
+    }
+
     // Get current commit SHA
     const { data: refData } = await octokit.rest.git.getRef({
       owner,
@@ -146,7 +158,13 @@ async function run() {
 \`\`\`yaml
 ${generateYamlMetadata(metadata)}
 \`\`\`
+${hasDraftReleases ? `
+### Build Options
 
+- [ ] Force Rebuild (delete existing drafts and rebuild all artifacts)
+
+> ⚠️ Draft releases detected from a previous attempt. Check "Force Rebuild" to delete existing drafts and rebuild everything, or leave unchecked to resume from existing artifacts.
+` : ''}
 ### Projects
 
 ${projectMetadata.map((p) => `- **${p.name}**: \`${p.version}\` → \`${p.resolvedVersion}\``).join('\n')}

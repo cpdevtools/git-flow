@@ -68,6 +68,8 @@ export interface PRMetadata {
   sourceBranch: string;
   /** Projects to build and pack */
   projects: PRProjectMetadata[];
+  /** Force rebuild - delete existing draft releases and rebuild all artifacts */
+  forceRebuild?: boolean;
 }
 
 /**

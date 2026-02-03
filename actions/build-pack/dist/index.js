@@ -60372,6 +60372,8 @@ var require_build_pack = __commonJS({
     __export2(build_pack_exports, {
       buildDependencyGraph: () => buildDependencyGraph,
       createDraftRelease: () => createDraftRelease,
+      deleteDraftRelease: () => deleteDraftRelease,
+      detectDraftReleases: () => detectDraftReleases,
       discoverProjects: () => discoverProjects,
       executeBuild: () => executeBuild,
       executePack: () => executePack,
@@ -60436,6 +60438,8 @@ var require_build_pack = __commonJS({
       };
     }
     function extractPRMetadata(prBody) {
+      const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
+      const forceRebuild = !!forceRebuildMatch;
       const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
       if (!yamlMatch) {
         throw new Error("PR body does not contain required YAML metadata block");
@@ -60475,7 +60479,10 @@ var require_build_pack = __commonJS({
       if (!metadata.runNumber || !metadata.sha || !metadata.timestamp || !metadata.sourceBranch || !metadata.projects || metadata.projects.length === 0) {
         throw new Error("Incomplete PR metadata: missing required fields");
       }
-      return metadata;
+      return {
+        ...metadata,
+        forceRebuild
+      };
     }
     var import_node_fs4 = require("fs");
     var import_promises4 = require("fs/promises");
@@ -60637,6 +60644,51 @@ ${processedMetadata}
         }
       });
       console.log(`  \u2713 Uploaded ${fileName}`);
+    }
+    async function deleteDraftRelease(githubToken, owner, repo, projectName, version) {
+      const octokit = (0, import_github.getOctokit)(githubToken);
+      const tag = getReleaseTag(projectName, version);
+      try {
+        const { data: release } = await octokit.rest.repos.getReleaseByTag({
+          owner,
+          repo,
+          tag
+        });
+        if (release && release.draft) {
+          await octokit.rest.repos.deleteRelease({
+            owner,
+            repo,
+            release_id: release.id
+          });
+          console.log(`  \u{1F5D1}\uFE0F  Deleted draft release: ${tag}`);
+        }
+      } catch (error) {
+        if (error.status === 404) {
+          return;
+        }
+        throw error;
+      }
+    }
+    async function detectDraftReleases(githubToken, owner, repo, projects) {
+      const octokit = (0, import_github.getOctokit)(githubToken);
+      for (const project of projects) {
+        const tag = getReleaseTag(project.name, project.version);
+        try {
+          const { data: release } = await octokit.rest.repos.getReleaseByTag({
+            owner,
+            repo,
+            tag
+          });
+          if (release && release.draft) {
+            return true;
+          }
+        } catch (error) {
+          if (error.status !== 404) {
+            throw error;
+          }
+        }
+      }
+      return false;
     }
     async function getDraftReleaseMetadata(githubToken, owner, repo, tag) {
       const octokit = (0, import_github.getOctokit)(githubToken);
@@ -61003,8 +61055,23 @@ ${processedMetadata}
       const metadata = extractPRMetadata(prBody);
       console.log(`\u{1F4CB} Processing ${metadata.projects.length} projects from PR #${context.prNumber}`);
       console.log(`   SHA: ${metadata.sha}`);
-      console.log(`   Source branch: ${metadata.sourceBranch}
-`);
+      console.log(`   Source branch: ${metadata.sourceBranch}`);
+      if (metadata.forceRebuild) {
+        console.log("\n\u{1F504} Force Rebuild enabled - deleting existing draft releases...");
+        const owner = process.env.GITHUB_REPOSITORY_OWNER || "cpdevtools";
+        const repo = process.env.GITHUB_REPOSITORY?.split("/")[1] || "unknown";
+        for (const project of metadata.projects) {
+          await deleteDraftRelease(
+            context.githubToken,
+            owner,
+            repo,
+            project.name,
+            project.version
+          );
+        }
+        console.log("   \u2713 Draft releases deleted");
+      }
+      console.log();
       console.log("\u{1F50D} Discovering workspace projects...");
       const discoveredProjects = await discoverProjects(context.workspaceRoot);
       console.log(`   Found ${discoveredProjects.length} projects:`);

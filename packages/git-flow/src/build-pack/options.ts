@@ -10,6 +10,10 @@ import type { PRMetadata, PRProjectMetadata } from './types.js';
  * @returns Parsed metadata
  */
 export function extractPRMetadata(prBody: string): PRMetadata {
+  // Check for Force Rebuild checkbox
+  const forceRebuildMatch = prBody.match(/- \[(x|X)\] Force Rebuild/);
+  const forceRebuild = !!forceRebuildMatch;
+
   // Find YAML block between ```yaml and ```
   const yamlMatch = prBody.match(/```yaml\s*\n([\s\S]*?)\n```/);
 
@@ -67,5 +71,8 @@ export function extractPRMetadata(prBody: string): PRMetadata {
     throw new Error('Incomplete PR metadata: missing required fields');
   }
 
-  return metadata as PRMetadata;
+  return {
+    ...metadata,
+    forceRebuild,
+  } as PRMetadata;
 }
