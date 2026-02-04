@@ -215,7 +215,7 @@ export async function executePack(
         console.error(`  PATH: ${env.PATH}`);
       }
       
-      result = await $({ cwd: project.cwd, env, verbose: true })`pnpm pack`;
+      result = await $({ cwd: project.cwd, env, verbose: true })`pnpm run github.actions.pack`;
       console.log(`  ✓ Pack completed`);
     } catch (error) {
       console.error(`  ✗ Pack failed:`, error);
