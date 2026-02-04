@@ -13,8 +13,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/git-flow": "workspace:*",
-    "tsx": "^4.19.2"
+    "@cpdevtools/git-flow": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.17.11",
