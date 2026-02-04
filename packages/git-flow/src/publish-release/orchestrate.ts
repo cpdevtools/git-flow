@@ -202,6 +202,17 @@ export async function runPublishRelease(
           artifactYml
         );
 
+        // Create git tag BEFORE finalizing release (required for GitHub to use the tag)
+        console.log(`  🏷️  Creating git tag...`);
+        await createGitTag(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          project.name,
+          project.version,
+          options.sha
+        );
+
         // Finalize GitHub Release (draft → published)
         console.log(`  ✅ Finalizing GitHub Release...`);
         await finalizeRelease(
@@ -211,17 +222,6 @@ export async function runPublishRelease(
           project.name,
           project.version,
           project.prerelease
-        );
-
-        // Create git tag
-        console.log(`  🏷️  Creating git tag...`);
-        await createGitTag(
-          options.githubToken,
-          options.owner,
-          options.repo,
-          project.name,
-          project.version,
-          options.sha
         );
 
         result.published.push(project.name);

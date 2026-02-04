@@ -32,7 +32,7 @@ export function extractPRMetadata(prBody: string): PRMetadata {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Match placeholder key (e.g., "DEFAULT:", "V1_8_LTS:")
+    // Match placeholder key (e.g., "MAIN:", "V1_8_LTS:")
     if (trimmed.match(/^[A-Z0-9_]+:$/)) {
       currentPlaceholder = trimmed.slice(0, -1); // Remove trailing colon
       projectsByPlaceholder[currentPlaceholder] = [];

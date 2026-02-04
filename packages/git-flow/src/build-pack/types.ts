@@ -56,7 +56,7 @@ export interface BuildPackContext {
  * PR metadata from PR body YAML block
  */
 export interface PRMetadata {
-  /** Projects grouped by version placeholder (e.g., 'DEFAULT', 'V1_8_LTS') */
+  /** Projects grouped by version placeholder (e.g., 'MAIN', 'V1_8_LTS') */
   projectsByPlaceholder: Record<string, PRProjectMetadata[]>;
   /** Force rebuild - delete existing draft releases and rebuild all artifacts */
   forceRebuild?: boolean;
@@ -68,7 +68,7 @@ export interface PRMetadata {
 export interface PRProjectMetadata {
   /** Project name */
   name: string;
-  /** Version placeholder from package.json (e.g., '0.0.0-DEFAULT') */
+  /** Version placeholder from package.json (e.g., '0.0.0-MAIN') */
   placeholder: string;
   /** Resolved version to build */
   version: string;

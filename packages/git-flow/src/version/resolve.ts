@@ -112,9 +112,9 @@ async function versionExists(version: string, projectName?: string): Promise<boo
  * @example
  * ```typescript
  * const result = await resolveVersion({
- *   placeholder: '0.0.0-DEFAULT',
+ *   placeholder: '0.0.0-MAIN',
  *   branch: 'main',
- *   versionsByPlaceholder: { '0.0.0-DEFAULT': '2.0.0' },
+ *   versionsByPlaceholder: { '0.0.0-MAIN': '2.0.0' },
  *   runNumber: 123,
  * });
  * // result.version might be "2.0.0" or "2.0.0-main.build.123"
