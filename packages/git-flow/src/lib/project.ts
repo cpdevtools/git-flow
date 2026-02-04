@@ -1,7 +1,3 @@
-import fg from 'fast-glob';
-import { readFile } from 'fs/promises';
-import { join, dirname } from 'path';
-
 export interface Project {
   /** Project name extracted from package.json */
   name: string;
@@ -26,7 +22,11 @@ export interface DependencyGraph {
  * Discover projects in workspace
  */
 export async function discoverProjects(workspaceRoot: string): Promise<Project[]> {
-  const packageJsonPaths = await fg(['**/package.json'], {
+  const { globby } = await import('globby');
+  const fs = await import('fs/promises');
+  const path = await import('path');
+
+  const packageJsonPaths = await globby(['**/package.json'], {
     cwd: workspaceRoot,
     ignore: ['**/node_modules/**']
   });
@@ -34,11 +34,11 @@ export async function discoverProjects(workspaceRoot: string): Promise<Project[]
   const projects: Project[] = [];
 
   for (const packagePath of packageJsonPaths) {
-    const fullPath = join(workspaceRoot, packagePath);
-    const directory = dirname(fullPath);
+    const fullPath = path.join(workspaceRoot, packagePath);
+    const directory = path.dirname(fullPath);
     
     try {
-      const content = await readFile(fullPath, 'utf-8');
+      const content = await fs.readFile(fullPath, 'utf-8');
       const packageJson = JSON.parse(content);
       
       if (packageJson.name) {

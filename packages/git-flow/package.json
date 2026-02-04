@@ -6,32 +6,32 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./version": {
-      "types": "./src/version/index.ts",
-      "default": "./src/version/index.ts"
+      "types": "./dist/version/index.d.ts",
+      "default": "./dist/version/index.js"
     },
     "./branch": {
-      "types": "./src/branch/index.ts",
-      "default": "./src/branch/index.ts"
+      "types": "./dist/branch/index.d.ts",
+      "default": "./dist/branch/index.js"
     },
     "./build-pack": {
-      "types": "./src/build-pack/index.ts",
-      "default": "./src/build-pack/index.ts"
+      "types": "./dist/build-pack/index.d.ts",
+      "default": "./dist/build-pack/index.js"
     },
     "./publishing": {
-      "types": "./src/publishing/index.ts",
-      "default": "./src/publishing/index.ts"
+      "types": "./dist/publishing/index.d.ts",
+      "default": "./dist/publishing/index.js"
     },
     "./publish-release": {
-      "types": "./src/publish-release/index.ts",
-      "default": "./src/publish-release/index.ts"
+      "types": "./dist/publish-release/index.d.ts",
+      "default": "./dist/publish-release/index.js"
     },
     "./cli": {
-      "types": "./src/cli/index.ts",
-      "default": "./src/cli/index.ts"
+      "types": "./dist/cli/index.d.ts",
+      "default": "./dist/cli/index.js"
     }
   },
   "bin": {
@@ -78,7 +78,7 @@
     "@oclif/core": "^4.8.0",
     "@oclif/plugin-autocomplete": "^3.2.40",
     "@oclif/plugin-help": "^6.2.37",
-    "fast-glob": "^3.3.2",
+    "globby": "^14.0.2",
     "semver": "^7.6.3",
     "yaml": "^2.8.2",
     "zx": "^8.2.4"
