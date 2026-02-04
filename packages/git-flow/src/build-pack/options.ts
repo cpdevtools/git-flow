@@ -28,6 +28,7 @@ export function extractPRMetadata(prBody: string): PRMetadata {
   const projectsByPlaceholder: Record<string, PRProjectMetadata[]> = {};
   let currentPlaceholder: string | null = null;
   let currentProject: Partial<PRProjectMetadata> | null = null;
+  let inProjects = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -36,7 +37,10 @@ export function extractPRMetadata(prBody: string): PRMetadata {
     if (trimmed.match(/^[A-Z0-9_]+:$/)) {
       currentPlaceholder = trimmed.slice(0, -1); // Remove trailing colon
       projectsByPlaceholder[currentPlaceholder] = [];
-    } else if (trimmed.startsWith('- name:')) {
+      inProjects = false;
+    } else if (trimmed === 'projects:') {
+      inProjects = true;
+    } else if (inProjects && trimmed.startsWith('- name:')) {
       if (currentProject && currentPlaceholder) {
         currentProject.placeholder = currentPlaceholder;
         projectsByPlaceholder[currentPlaceholder].push(currentProject as PRProjectMetadata);
@@ -50,6 +54,7 @@ export function extractPRMetadata(prBody: string): PRMetadata {
       } else if (trimmed.startsWith('cwd:')) {
         currentProject.cwd = trimmed.split(':')[1].trim();
       }
+      // Skip tags: and tag items (- v...) as they're for display only
     }
   }
 

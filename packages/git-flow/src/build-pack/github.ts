@@ -33,7 +33,7 @@ function addPublishedFlagsToMetadata(artifactYaml: string): string {
  * Get release tag name for a project
  */
 export function getReleaseTag(projectName: string, version: string): string {
-  return `${projectName}/v${version}`;
+  return `v${version}/${projectName}`;
 }
 
 /**
