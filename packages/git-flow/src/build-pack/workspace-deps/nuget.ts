@@ -23,7 +23,7 @@ export async function rewriteNugetProjectReferences(options: RewriteNugetDepsOpt
   const csprojFiles = await fg('**/*.csproj', {
     cwd: project.cwd,
     absolute: true,
-    gitignore: true,
+    ignore: ['**/node_modules/**', '**/bin/**', '**/obj/**'],
   });
 
   if (csprojFiles.length === 0) {
