@@ -38,6 +38,7 @@ export {
   getDraftReleaseMetadata,
   deleteDraftRelease,
   detectDraftReleases,
+  postPRReleaseComment,
 } from './github.js';
 
 // Options parsing

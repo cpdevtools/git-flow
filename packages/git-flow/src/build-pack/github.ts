@@ -44,7 +44,7 @@ export async function findDraftReleaseByTag(
   owner: string,
   repo: string,
   tag: string
-): Promise<{ id: number; upload_url: string } | null> {
+): Promise<{ id: number; upload_url: string; html_url: string } | null> {
   const octokit = getOctokit(githubToken);
 
   try {
@@ -71,6 +71,7 @@ export async function findDraftReleaseByTag(
       return {
         id: draftRelease.id,
         upload_url: draftRelease.upload_url,
+        html_url: draftRelease.html_url,
       };
     }
 
@@ -152,10 +153,12 @@ export async function findOrCreateDraftRelease(
   // Add published:false to artifact metadata if provided
   const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : undefined;
   
-  // Include artifact metadata in release body if provided
-  const body = processedMetadata 
-    ? `## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
-    : `Draft release for ${project.name} v${project.version}`;
+  // Build release body with PR link and artifact metadata
+  const prLink = `📋 **Created from PR:** #${context.prNumber}`;
+  const artifactSection = processedMetadata 
+    ? `\n\n## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
+    : '';
+  const body = `${prLink}${artifactSection}`;
 
   // Try to find existing draft release
   const existing = await findDraftReleaseByTag(
@@ -494,6 +497,43 @@ export async function getDraftReleaseMetadata(
   } catch (error: any) {
     console.error(`Error getting draft release metadata ${tag}:`, error);
     return null;
+  }
+}
+
+/**
+ * Post a comment on a PR with links to published releases
+ */
+export async function postPRReleaseComment(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  releases: Array<{ name: string; version: string; url: string; tag: string }>
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+
+  const releaseLinks = releases
+    .map((r) => `- **${r.name}** [${r.version}](${r.url}) - \`${r.tag}\``)
+    .join('\n');
+
+  const body = `## ✅ Releases Published
+
+${releaseLinks}
+
+All releases have been successfully published and are now available.`;
+
+  try {
+    await octokit.rest.issues.createComment({
+      owner,
+      repo,
+      issue_number: prNumber,
+      body,
+    });
+
+    console.log(`  ✓ Posted release comment to PR #${prNumber}`);
+  } catch (error: any) {
+    console.error(`  ⚠️  Failed to post PR comment:`, error.message);
+    // Don't throw - this is not critical
   }
 }
 
