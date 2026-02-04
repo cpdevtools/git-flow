@@ -61,12 +61,17 @@ runs:
       with:
         version: 8
     
-    - name: Install dependencies
+    - name: Install workspace dependencies
       shell: bash
       run: pnpm install
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
         GITHUB_TOKEN: ${{ inputs.token }}
+    
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm install --prod
     
     - name: Run Build & Pack
       shell: bash
