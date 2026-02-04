@@ -43,6 +43,9 @@ export {
 // Options parsing
 export { extractPRMetadata } from './options.js';
 
+// Artifact generation
+export { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR, type ArtifactConfig } from './generate-artifact.js';
+
 // Workspace dependency rewriting (for Phase 2)
 export {
   rewriteWorkspaceDependencies,

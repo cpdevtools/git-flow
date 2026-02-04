@@ -12,6 +12,7 @@ import {
     findOrCreateDraftRelease,
     uploadArtifact
 } from './github.js';
+import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import {
     rewriteWorkspaceDependencies,
@@ -126,7 +127,7 @@ export async function executeBuild(
       ...process.env,
       PROJECT_VERSION: project.version,
       PROJECT_NAME: project.name,
-      ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
+      ARTIFACT_OUTPUT_DIR,
       GITHUB_SHA: context.sha,
     };
 
@@ -190,7 +191,7 @@ export async function executePack(
       ...process.env,
       PROJECT_VERSION: project.version,
       PROJECT_NAME: project.name,
-      ARTIFACT_OUTPUT_DIR: context.artifactOutputDir,
+      ARTIFACT_OUTPUT_DIR,
       ARTIFACT_FILENAME: artifactFilename,
       GITHUB_SHA: context.sha,
     } as Record<string, string>;
@@ -215,9 +216,9 @@ export async function executePack(
       }
       
       result = await $({ cwd: project.cwd, env, verbose: true })`pnpm run github.actions.pack`;
-      console.log(`  ✓ Pack script completed`);
+      console.log(`  ✓ Pack completed`);
     } catch (error) {
-      console.error(`  ✗ Pack script failed:`, error);
+      console.error(`  ✗ Pack failed:`, error);
       throw error;
     } finally {
       // Always restore files, even if pack fails
@@ -225,14 +226,15 @@ export async function executePack(
       await restoreProjectFiles(project.cwd);
     }
 
-    // Verify artifact.yml was generated
-    const artifactPath = join(context.artifactOutputDir, `${artifactFilename}.artifact.yml`);
+    // Generate artifact descriptor
+    const artifactPath = await generateArtifactDescriptor(
+      project.cwd,
+      project.name,
+      project.version
+    );
 
     if (!existsSync(artifactPath)) {
-      throw new Error(
-        `Pack script must generate ${project.name}.artifact.yml in ARTIFACT_OUTPUT_DIR. ` +
-          `File not found at: ${artifactPath}`
-      );
+      throw new Error(`Artifact descriptor was not generated: ${artifactPath}`);
     }
 
     console.log(`✓ ${project.name}: Pack completed, artifact descriptor generated`);
@@ -269,7 +271,7 @@ export async function executeUpload(
 
   try {
     const artifactFilename = project.name.replace(/@/g, '').replace(/\//g, '-');
-    const artifactPath = join(context.artifactOutputDir, `${artifactFilename}.artifact.yml`);
+    const artifactPath = join(ARTIFACT_OUTPUT_DIR, `${artifactFilename}.artifact.yml`);
 
     if (!existsSync(artifactPath)) {
       console.log(`  ⊘ No artifact descriptor found, skipping upload`);

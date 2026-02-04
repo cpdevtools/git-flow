@@ -1,0 +1,26 @@
+# Example release-artifacts.yml configuration
+# This file is REQUIRED for projects that need to publish artifacts
+# Supported formats: .yml, .yaml, .json, .ts, .js, .cjs
+#
+# Available environment variables for YAML/JSON configs:
+#   ${PACKAGE_NAME} - Package name from package.json
+#   ${PACKAGE_VERSION} - Package version
+#   ${TARBALL_NAME} - Generated tarball filename (e.g., cpdevtools-git-flow-1.0.0.tgz)
+#   ${TARBALL_PATH} - Full path to tarball (e.g., /tmp/git-flow-artifacts/cpdevtools-git-flow-1.0.0.tgz)
+#   ${ARTIFACT_OUTPUT_DIR} - Artifact output directory (/tmp/git-flow-artifacts)
+#   ${PROJECT_NAME} - Sanitized project name (e.g., cpdevtools-git-flow)
+#
+# For .ts/.js/.cjs files, use process.env directly
+
+artifacts:
+  - type: npm
+    name: "${PACKAGE_NAME}"
+    path: "${TARBALL_PATH}"
+    registries:
+      - github-packages
+  # You can add additional artifacts here
+  # - type: docker
+  #   name: my-image
+  #   path: ./docker-image.tar
+  #   registries:
+  #     - dockerhub

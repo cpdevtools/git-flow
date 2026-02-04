@@ -13,9 +13,6 @@ async function run(): Promise<void> {
     const prNumber = parseInt(process.env['INPUT_PR-NUMBER'] || process.env.INPUT_PR_NUMBER || '0', 10);
     const token = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
     const workspaceRoot = process.env['INPUT_WORKSPACE-ROOT'] || process.env.INPUT_WORKSPACE_ROOT || process.cwd();
-    const artifactOutputDirInput = process.env['INPUT_ARTIFACT-OUTPUT-DIR'] || process.env.INPUT_ARTIFACT_OUTPUT_DIR || '.artifacts';
-    // Resolve to absolute path relative to workspace root
-    const artifactOutputDir = resolve(workspaceRoot, artifactOutputDirInput);
 
     // Validate inputs
     if (isNaN(prNumber) || prNumber < 0) {
@@ -72,14 +69,12 @@ projects:
     // Run build & pack workflow
     core.info(`Starting Build & Pack workflow for PR #${prNumber}`);
     core.info(`Workspace: ${workspaceRoot}`);
-    core.info(`Artifact output: ${artifactOutputDir}`);
     core.info(`SHA: ${sha}`);
     core.info(`Run: ${runNumber}`);
 
     const result = await runBuildPack(
       {
         workspaceRoot,
-        artifactOutputDir,
         githubToken: token,
         prNumber,
         sha,

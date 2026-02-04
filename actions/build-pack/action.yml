@@ -21,11 +21,6 @@ inputs:
     description: 'Workspace root directory'
     required: false
     default: ${{ github.workspace }}
-  
-  artifact-output-dir:
-    description: 'Directory for artifact output files'
-    required: false
-    default: '.artifacts'
 
 outputs:
   projects-built:

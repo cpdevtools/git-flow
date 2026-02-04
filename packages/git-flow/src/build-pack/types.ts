@@ -38,8 +38,6 @@ export interface ExecutionResult {
 export interface BuildPackContext {
   /** Workspace root directory */
   workspaceRoot: string;
-  /** Artifact output directory (for artifact.yml files) */
-  artifactOutputDir: string;
   /** GitHub token for API access */
   githubToken: string;
   /** Pull request number */
