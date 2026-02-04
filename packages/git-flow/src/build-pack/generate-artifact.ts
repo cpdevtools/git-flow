@@ -106,32 +106,23 @@ export async function generateArtifactDescriptor(
   process.env.PROJECT_NAME = artifactFilename;
   process.env.ARTIFACT_OUTPUT_DIR = ARTIFACT_OUTPUT_DIR;
   
-  // Try to load custom config
-  const customConfig = await loadArtifactConfig(packageDir);
+  // Load artifact config - required
+  const config = await loadArtifactConfig(packageDir);
   
-  const descriptor: ProjectArtifactDescriptor = customConfig
-    ? {
-        project: packageName,
-        artifacts: customConfig.artifacts
-      }
-    : {
-        // Default configuration for npm packages
-        project: packageName,
-        artifacts: [
-          {
-            type: 'npm',
-            name: packageName,
-            path: `${ARTIFACT_OUTPUT_DIR}/${tarballName}`,
-            registries: ['github-packages']
-          }
-        ]
-      };
-  
-  if (customConfig) {
-    console.log(`  ✓ Using custom artifact configuration`);
-  } else {
-    console.log(`  ✓ Using default npm artifact configuration`);
+  if (!config) {
+    throw new Error(
+      `No release-artifacts configuration found in ${packageDir}\n` +
+      `Please create one of: release-artifacts.yml, release-artifacts.json, release-artifacts.ts, release-artifacts.js, release-artifacts.cjs\n` +
+      `See release-artifacts.example.yml for format`
+    );
   }
+  
+  console.log(`  ✓ Using artifact configuration from package root`);
+  
+  const descriptor: ProjectArtifactDescriptor = {
+    project: packageName,
+    artifacts: config.artifacts
+  };
   
   // Generate artifact descriptor
   await writeArtifact(descriptor);
