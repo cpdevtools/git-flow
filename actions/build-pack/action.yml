@@ -80,7 +80,7 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/index.ts
       env:
-        INPUT_PR-NUMBER: ${{ inputs.pr-number }}
+        INPUT_PR_NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}
-        INPUT_WORKSPACE-ROOT: ${{ inputs.workspace-root }}
-        INPUT_ARTIFACT-OUTPUT-DIR: ${{ inputs.artifact-output-dir }}
+        INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
+        INPUT_ARTIFACT_OUTPUT_DIR: ${{ inputs.artifact-output-dir }}
