@@ -16,9 +16,5 @@
     "@cpdevtools/git-flow": "workspace:*",
     "tsx": "^4.19.2"
   },
-  "devDependencies": {
-    "@types/node": "^20.17.11",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
-  }
+  "devDependencies": {}
 }
