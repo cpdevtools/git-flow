@@ -429,28 +429,44 @@ export async function createGitTag(
   repo: string,
   projectName: string,
   version: string,
-  sha: string
+  sha: string,
+  placeholder: string
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
 
-  try {
-    // Create tag reference
-    await octokit.rest.git.createRef({
-      owner,
-      repo,
-      ref: `refs/tags/${tag}`,
-      sha,
-    });
+  // Extract version group from placeholder (e.g., "0.0.0-MAIN" -> "MAIN")
+  const versionGroup = placeholder.split('-')[1] || 'MAIN';
 
-    console.log(`  🏷️  Created git tag: ${tag}`);
-  } catch (error: any) {
-    if (error.status === 422) {
-      // Tag already exists
-      console.log(`  ✓ Git tag already exists: ${tag}`);
-      return;
+  const tagsToCreate = [
+    { tag, label: 'package-specific tag' },
+    { tag: `v${version}/${versionGroup}`, label: 'version group tag' },
+  ];
+
+  // If version group is MAIN, also create simple vX.Y.Z tag
+  if (versionGroup === 'MAIN') {
+    tagsToCreate.push({ tag: `v${version}`, label: 'simple version tag' });
+  }
+
+  for (const { tag: tagName, label } of tagsToCreate) {
+    try {
+      // Create tag reference
+      await octokit.rest.git.createRef({
+        owner,
+        repo,
+        ref: `refs/tags/${tagName}`,
+        sha,
+      });
+
+      console.log(`  🏷️  Created ${label}: ${tagName}`);
+    } catch (error: any) {
+      if (error.status === 422) {
+        // Tag already exists
+        console.log(`  ✓ ${label} already exists: ${tagName}`);
+      } else {
+        throw error;
+      }
     }
-    throw error;
   }
 }
 

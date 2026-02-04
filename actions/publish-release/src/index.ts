@@ -35,6 +35,8 @@ async function run() {
         name: proj.name,
         version: proj.version,
         releaseTag: `${proj.name}/v${proj.version}`,
+        prerelease: proj.prerelease,
+        placeholder: proj.placeholder,
       }));
 
     core.info(`Publishing ${projects.length} projects from PR #${prNumber}`);

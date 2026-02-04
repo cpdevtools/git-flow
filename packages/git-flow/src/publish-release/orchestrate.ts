@@ -211,7 +211,8 @@ export async function runPublishRelease(
           options.repo,
           project.name,
           project.version,
-          options.sha
+          options.sha,
+          project.placeholder
         );
 
         // Finalize GitHub Release (draft → published)

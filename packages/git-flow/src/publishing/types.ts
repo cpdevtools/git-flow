@@ -104,6 +104,7 @@ export interface PublishProjectInfo {
   version: string;
   releaseTag: string;
   prerelease: boolean;
+  placeholder: string;
 }
 
 /**
