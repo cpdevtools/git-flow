@@ -22,11 +22,11 @@ export interface DependencyGraph {
  * Discover projects in workspace
  */
 export async function discoverProjects(workspaceRoot: string): Promise<Project[]> {
-  const { globby } = await import('globby');
+  const fg = (await import('fast-glob')).default;
   const fs = await import('fs/promises');
   const path = await import('path');
 
-  const packageJsonPaths = await globby(['**/package.json'], {
+  const packageJsonPaths = await fg(['**/package.json'], {
     cwd: workspaceRoot,
     ignore: ['**/node_modules/**']
   });
