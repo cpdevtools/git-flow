@@ -75,7 +75,7 @@ export async function restoreCsprojFiles(projectCwd: string): Promise<void> {
   const csprojFiles = await fg('**/*.csproj', {
     cwd: projectCwd,
     absolute: true,
-    gitignore: true,
+    ignore: ['**/node_modules/**', '**/.git/**']
   });
 
   for (const csprojPath of csprojFiles) {
