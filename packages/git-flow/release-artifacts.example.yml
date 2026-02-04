@@ -1,0 +1,16 @@
+# Example release-artifacts.yml configuration
+# This file is optional - if not present, default npm artifact will be generated
+# Supported formats: .yml, .yaml, .json, .ts, .js, .cjs
+
+artifacts:
+  - type: npm
+    name: "@cpdevtools/git-flow"
+    path: "${ARTIFACT_OUTPUT_DIR}/${TARBALL_NAME}"
+    registries:
+      - github-packages
+  # You can add additional artifacts here
+  # - type: docker
+  #   name: my-image
+  #   path: ./docker-image.tar
+  #   registries:
+  #     - dockerhub
