@@ -5,7 +5,7 @@
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { parseDocument } from 'yaml';
 import { $ } from 'zx';
 import {
@@ -300,7 +300,10 @@ export async function executeUpload(
       switch (artifact.type) {
         case 'npm':
           // Upload npm package file
-          const npmPath = join(context.workspaceRoot, artifact.path);
+          // Path may be absolute (from artifact generation) or relative (from config)
+          const npmPath = isAbsolute(artifact.path) 
+            ? artifact.path 
+            : join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
             owner,
@@ -313,7 +316,9 @@ export async function executeUpload(
 
         case 'nuget':
           // Upload nuget package file
-          const nugetPath = join(context.workspaceRoot, artifact.path);
+          const nugetPath = isAbsolute(artifact.path)
+            ? artifact.path
+            : join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
             owner,
@@ -326,7 +331,9 @@ export async function executeUpload(
 
         case 'release-attachment':
           // Upload release attachment file
-          const attachmentPath = join(context.workspaceRoot, artifact.path);
+          const attachmentPath = isAbsolute(artifact.path)
+            ? artifact.path
+            : join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
             owner,
