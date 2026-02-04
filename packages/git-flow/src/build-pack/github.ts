@@ -378,6 +378,13 @@ export async function finalizeRelease(
     // Parse tag to get name for fallback search
     const expectedName = `${projectName} ${version}`;
 
+    // Check if a published release with this tag already exists
+    const existingPublished = releases.find((r) => r.tag_name === tag && !r.draft);
+    if (existingPublished) {
+      console.log(`  ℹ️  Release already published: ${tag} (ID: ${existingPublished.id})`);
+      return;
+    }
+
     // First try to find by exact tag match
     let release = releases.find((r) => r.tag_name === tag && r.draft);
     
