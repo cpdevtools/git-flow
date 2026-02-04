@@ -2,40 +2,33 @@
   "name": "@cpdevtools/git-flow",
   "version": "0.0.0-DEFAULT",
   "description": "Core library for Git-based versioning and release workflows",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "default": "./src/index.ts"
     },
     "./version": {
-      "types": "./dist/version/index.d.ts",
-      "default": "./dist/version/index.js"
+      "default": "./src/version/index.ts"
     },
     "./branch": {
-      "types": "./dist/branch/index.d.ts",
-      "default": "./dist/branch/index.js"
+      "default": "./src/branch/index.ts"
     },
     "./build-pack": {
-      "types": "./dist/build-pack/index.d.ts",
-      "default": "./dist/build-pack/index.js"
+      "default": "./src/build-pack/index.ts"
     },
     "./publishing": {
-      "types": "./dist/publishing/index.d.ts",
-      "default": "./dist/publishing/index.js"
+      "default": "./src/publishing/index.ts"
     },
     "./publish-release": {
-      "types": "./dist/publish-release/index.d.ts",
-      "default": "./dist/publish-release/index.js"
+      "default": "./src/publish-release/index.ts"
     },
     "./cli": {
-      "types": "./dist/cli/index.d.ts",
-      "default": "./dist/cli/index.js"
+      "default": "./src/cli/index.ts"
     }
   },
   "bin": {
-    "cpdt-gitflow": "./dist/cli/bin.js"
+    "cpdt-gitflow": "./src/cli/bin.ts"
   },
   "oclif": {
     "bin": "cpdt-gitflow",
@@ -78,7 +71,7 @@
     "@oclif/core": "^4.8.0",
     "@oclif/plugin-autocomplete": "^3.2.40",
     "@oclif/plugin-help": "^6.2.37",
-    "globby": "^14.0.2",
+    "fast-glob": "^3.3.2",
     "semver": "^7.6.3",
     "yaml": "^2.8.2",
     "zx": "^8.2.4"
