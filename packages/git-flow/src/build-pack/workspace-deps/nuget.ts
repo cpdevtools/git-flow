@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'fs/promises';
 import { $ } from 'zx';
-import { globby } from 'globby';
+import fg from 'fast-glob';
 
 export interface ProjectConfig {
   name: string;
@@ -20,10 +20,10 @@ export async function rewriteNugetProjectReferences(options: RewriteNugetDepsOpt
   const { project, allProjects } = options;
 
   // Find all .csproj files
-  const csprojFiles = await globby('**/*.csproj', {
+  const csprojFiles = await fg('**/*.csproj', {
     cwd: project.cwd,
     absolute: true,
-    gitignore: true,
+    ignore: ['**/node_modules/**', '**/bin/**', '**/obj/**'],
   });
 
   if (csprojFiles.length === 0) {

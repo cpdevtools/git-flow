@@ -30,15 +30,19 @@ inputs:
 outputs:
   projects-built:
     description: 'Number of projects successfully built'
+    value: ${{ steps.build-pack.outputs.projects-built }}
   
   projects-packed:
     description: 'Number of projects successfully packed'
+    value: ${{ steps.build-pack.outputs.projects-packed }}
   
   projects-uploaded:
     description: 'Number of projects successfully uploaded'
+    value: ${{ steps.build-pack.outputs.projects-uploaded }}
   
   projects-skipped:
     description: 'Number of projects skipped (already completed)'
+    value: ${{ steps.build-pack.outputs.projects-skipped }}
 
 runs:
   using: 'composite'
@@ -57,16 +61,24 @@ runs:
       with:
         version: 8
     
-    - name: Install dependencies
+    - name: Install workspace dependencies
       shell: bash
       run: pnpm install
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
         GITHUB_TOKEN: ${{ inputs.token }}
     
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm install --prod
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+    
     - name: Run Build & Pack
       shell: bash
-      run: node ${{ github.action_path }}/dist/index.js
+      run: npx tsx ${{ github.action_path }}/src/index.ts
       env:
         INPUT_PR-NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}
