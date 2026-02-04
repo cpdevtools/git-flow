@@ -1,6 +1,6 @@
 artifacts:
   - type: npm
-    name: "@cpdevtools/git-flow"
-    path: "${ARTIFACT_OUTPUT_DIR}/${TARBALL_NAME}"
+    name: "${PACKAGE_NAME}"
+    path: "${TARBALL_PATH}"
     registries:
       - github-packages
