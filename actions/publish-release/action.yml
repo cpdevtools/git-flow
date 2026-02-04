@@ -32,7 +32,7 @@ runs:
     
     - name: Run Publish Release
       shell: bash
-      run: node ${{ github.action_path }}/dist/index.js
+      run: npx tsx ${{ github.action_path }}/src/index.ts
       env:
         INPUT_PR-NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}

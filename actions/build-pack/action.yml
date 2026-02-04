@@ -30,15 +30,19 @@ inputs:
 outputs:
   projects-built:
     description: 'Number of projects successfully built'
+    value: ${{ steps.build-pack.outputs.projects-built }}
   
   projects-packed:
     description: 'Number of projects successfully packed'
+    value: ${{ steps.build-pack.outputs.projects-packed }}
   
   projects-uploaded:
     description: 'Number of projects successfully uploaded'
+    value: ${{ steps.build-pack.outputs.projects-uploaded }}
   
   projects-skipped:
     description: 'Number of projects skipped (already completed)'
+    value: ${{ steps.build-pack.outputs.projects-skipped }}
 
 runs:
   using: 'composite'
@@ -66,7 +70,7 @@ runs:
     
     - name: Run Build & Pack
       shell: bash
-      run: node ${{ github.action_path }}/dist/index.js
+      run: npx tsx ${{ github.action_path }}/src/index.ts
       env:
         INPUT_PR-NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}
