@@ -47,7 +47,8 @@
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "github.actions.build": "pnpm build"
+    "github.actions.build": "pnpm build",
+    "github.actions.pack": "pnpm pack"
   },
   "keywords": [
     "git",
