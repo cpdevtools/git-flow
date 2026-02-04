@@ -30,7 +30,8 @@ import {
   getReleaseTag,
   getDraftReleaseMetadata,
   updateDraftReleaseBody,
-  findDraftReleaseByTag
+  findDraftReleaseByTag,
+  postPRReleaseComment
 } from '../build-pack/github.js';
 
 /**
@@ -250,6 +251,37 @@ export async function runPublishRelease(
     }
 
     console.log('✅ All projects published and finalized');
+
+    // Post comment on PR with release links
+    if (result.published.length > 0) {
+      console.log(`\n💬 Posting release links to PR #${options.prNumber}...`);
+      const releaseLinks = await Promise.all(
+        options.projects.map(async (project) => {
+          const tag = getReleaseTag(project.name, project.version);
+          const release = await findDraftReleaseByTag(
+            options.githubToken,
+            options.owner,
+            options.repo,
+            tag
+          );
+          return {
+            name: project.name,
+            version: project.version,
+            url: release?.html_url || `https://github.com/${options.owner}/${options.repo}/releases/tag/${tag}`,
+            tag,
+          };
+        })
+      );
+
+      await postPRReleaseComment(
+        options.githubToken,
+        options.owner,
+        options.repo,
+        options.prNumber,
+        releaseLinks
+      );
+    }
+
     return result;
   } catch (error) {
     console.error('❌ Release failed:', error);
