@@ -5,38 +5,37 @@
   "description": "Git-based versioning and release workflow automation",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
     "format": "prettier --write \"**/*.{ts,js,json,md,yml}\"",
+    "lint": "pnpm -r lint",
+    "syncpack.fix": "syncpack fix-mismatches",
+    "syncpack.format": "syncpack format",
+    "syncpack.list": "syncpack list-mismatches",
+    "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   },
-  "keywords": [
-    "git",
-    "versioning",
-    "release",
-    "workflow",
-    "github-actions"
-  ],
-  "author": "CPDevTools",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/cpdevtools/git-flow.git"
-  },
-  "bugs": {
-    "url": "https://github.com/cpdevtools/git-flow/issues"
-  },
-  "homepage": "https://github.com/cpdevtools/git-flow#readme",
   "devDependencies": {
     "@types/node": "^20.17.11",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "^9.18.0",
     "prettier": "^3.4.2",
+    "syncpack": "^13.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
   },
+  "keywords": [
+    "git",
+    "github-actions",
+    "release",
+    "versioning",
+    "workflow"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "repository": "cpdevtools/git-flow.git",
+  "bugs": "https://github.com/cpdevtools/git-flow/issues",
+  "homepage": "https://github.com/cpdevtools/git-flow#readme",
   "engines": {
     "node": ">=20"
   }
