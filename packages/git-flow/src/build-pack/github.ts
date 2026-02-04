@@ -150,15 +150,28 @@ export async function findOrCreateDraftRelease(
   const tag = getReleaseTag(project.name, project.version);
   const name = `${project.name} ${project.version}`;
   
+  // Calculate all tags that will be created
+  const versionGroup = project.placeholder.split('-')[1] || 'MAIN';
+  const tags = [
+    tag, // Package-specific tag (e.g., @cpdevtools/git-flow/v0.2.1)
+    `v${project.version}/${versionGroup}`, // Version group tag (e.g., v0.2.1/MAIN)
+  ];
+  // Add simple version tag for MAIN group only
+  if (versionGroup === 'MAIN') {
+    tags.push(`v${project.version}`); // Simple version tag (e.g., v0.2.1)
+  }
+  
   // Add published:false to artifact metadata if provided
   const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : undefined;
   
-  // Build release body with PR link and artifact metadata
+  // Build release body with PR link, tags, and artifact metadata
   const prLink = `📋 **Created from PR:** #${context.prNumber}`;
+  const tagsList = tags.map(t => `- \`${t}\``).join('\n');
+  const tagsSection = `\n\n🏷️ **Tags:**\n${tagsList}`;
   const artifactSection = processedMetadata 
     ? `\n\n## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
     : '';
-  const body = `${prLink}${artifactSection}`;
+  const body = `${prLink}${tagsSection}${artifactSection}`;
 
   // Try to find existing draft release
   const existing = await findDraftReleaseByTag(

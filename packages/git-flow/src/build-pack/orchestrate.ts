@@ -234,6 +234,7 @@ function buildProjectConfigs(
       cwd: discovered.directory, // Use the discovered project's actual directory
       version: prProject.version,
       prerelease: prProject.prerelease,
+      placeholder: prProject.placeholder,
     });
   }
 
@@ -338,6 +339,7 @@ function findAllDependencies(
           cwd: depProject.directory,
           version: depProject.packageJson.version || '0.0.0',
           prerelease: false,
+          placeholder: depProject.packageJson.version || '0.0.0',
         };
 
         allProjects.set(depName, depConfig);
