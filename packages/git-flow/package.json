@@ -6,32 +6,32 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./version": {
-      "types": "./dist/version/index.d.ts",
-      "default": "./dist/version/index.js"
+      "types": "./src/version/index.ts",
+      "default": "./src/version/index.ts"
     },
     "./branch": {
-      "types": "./dist/branch/index.d.ts",
-      "default": "./dist/branch/index.js"
+      "types": "./src/branch/index.ts",
+      "default": "./src/branch/index.ts"
     },
     "./build-pack": {
-      "types": "./dist/build-pack/index.d.ts",
-      "default": "./dist/build-pack/index.js"
+      "types": "./src/build-pack/index.ts",
+      "default": "./src/build-pack/index.ts"
     },
     "./publishing": {
-      "types": "./dist/publishing/index.d.ts",
-      "default": "./dist/publishing/index.js"
+      "types": "./src/publishing/index.ts",
+      "default": "./src/publishing/index.ts"
     },
     "./publish-release": {
-      "types": "./dist/publish-release/index.d.ts",
-      "default": "./dist/publish-release/index.js"
+      "types": "./src/publish-release/index.ts",
+      "default": "./src/publish-release/index.ts"
     },
     "./cli": {
-      "types": "./dist/cli/index.d.ts",
-      "default": "./dist/cli/index.js"
+      "types": "./src/cli/index.ts",
+      "default": "./src/cli/index.ts"
     }
   },
   "bin": {
