@@ -16,6 +16,8 @@ export interface ProjectConfig extends Project {
   version: string;
   /** Whether this is a prerelease version */
   prerelease: boolean;
+  /** Version placeholder from package.json (e.g., '0.0.0-MAIN') */
+  placeholder: string;
 }
 
 /**

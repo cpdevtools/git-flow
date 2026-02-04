@@ -34,7 +34,9 @@ async function run() {
       .map(proj => ({
         name: proj.name,
         version: proj.version,
-        releaseTag: `${proj.name}/v${proj.version}`,
+        releaseTag: `v${proj.version}/${proj.name}`,
+        prerelease: proj.prerelease,
+        placeholder: proj.placeholder,
       }));
 
     core.info(`Publishing ${projects.length} projects from PR #${prNumber}`);

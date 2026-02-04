@@ -280,11 +280,35 @@ function generateYamlMetadata(metadata: any): string {
 
   for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
     yaml.push(`${placeholder}:`);
+    
+    // Calculate group-level tags
+    const versionGroup = placeholder;
+    const firstProject = (projects as any[])[0];
+    if (firstProject) {
+      const groupTags = [`v${firstProject.resolvedVersion}/${versionGroup}`];
+      
+      // Add simple version tag for MAIN group only
+      if (versionGroup === 'MAIN') {
+        groupTags.push(`v${firstProject.resolvedVersion}`);
+      }
+      
+      yaml.push(`  tags:`);
+      for (const tag of groupTags) {
+        yaml.push(`    - ${tag}`);
+      }
+    }
+    
+    yaml.push(`  projects:`);
     for (const project of projects as any[]) {
-      yaml.push(`  - name: ${project.name}`);
-      yaml.push(`    version: ${project.resolvedVersion}`);
-      yaml.push(`    prerelease: ${project.isPreRelease}`);
-      yaml.push(`    cwd: ${project.cwd}`);
+      // Calculate project-specific tag
+      const packageTag = `v${project.resolvedVersion}/${project.name}`;
+      
+      yaml.push(`    - name: ${project.name}`);
+      yaml.push(`      version: ${project.resolvedVersion}`);
+      yaml.push(`      prerelease: ${project.isPreRelease}`);
+      yaml.push(`      cwd: ${project.cwd}`);
+      yaml.push(`      tags:`);
+      yaml.push(`        - ${packageTag}`);
     }
   }
 

@@ -33,7 +33,7 @@ function addPublishedFlagsToMetadata(artifactYaml: string): string {
  * Get release tag name for a project
  */
 export function getReleaseTag(projectName: string, version: string): string {
-  return `${projectName}/v${version}`;
+  return `v${version}/${projectName}`;
 }
 
 /**
@@ -150,15 +150,28 @@ export async function findOrCreateDraftRelease(
   const tag = getReleaseTag(project.name, project.version);
   const name = `${project.name} ${project.version}`;
   
+  // Calculate all tags that will be created
+  const versionGroup = project.placeholder.split('-')[1] || 'MAIN';
+  const tags = [
+    tag, // Package-specific tag (e.g., v0.2.1/@cpdevtools/git-flow)
+    `v${project.version}/${versionGroup}`, // Version group tag (e.g., v0.2.1/MAIN)
+  ];
+  // Add simple version tag for MAIN group only
+  if (versionGroup === 'MAIN') {
+    tags.push(`v${project.version}`); // Simple version tag (e.g., v0.2.1)
+  }
+  
   // Add published:false to artifact metadata if provided
   const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : undefined;
   
-  // Build release body with PR link and artifact metadata
+  // Build release body with PR link, tags, and artifact metadata
   const prLink = `📋 **Created from PR:** #${context.prNumber}`;
+  const tagsList = tags.map(t => `- \`${t}\``).join('\n');
+  const tagsSection = `\n\n🏷️ **Tags:**\n${tagsList}`;
   const artifactSection = processedMetadata 
     ? `\n\n## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
     : '';
-  const body = `${prLink}${artifactSection}`;
+  const body = `${prLink}${tagsSection}${artifactSection}`;
 
   // Try to find existing draft release
   const existing = await findDraftReleaseByTag(
@@ -429,28 +442,44 @@ export async function createGitTag(
   repo: string,
   projectName: string,
   version: string,
-  sha: string
+  sha: string,
+  placeholder: string
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
 
-  try {
-    // Create tag reference
-    await octokit.rest.git.createRef({
-      owner,
-      repo,
-      ref: `refs/tags/${tag}`,
-      sha,
-    });
+  // Extract version group from placeholder (e.g., "0.0.0-MAIN" -> "MAIN")
+  const versionGroup = placeholder.split('-')[1] || 'MAIN';
 
-    console.log(`  🏷️  Created git tag: ${tag}`);
-  } catch (error: any) {
-    if (error.status === 422) {
-      // Tag already exists
-      console.log(`  ✓ Git tag already exists: ${tag}`);
-      return;
+  const tagsToCreate = [
+    { tag, label: 'package-specific tag' },
+    { tag: `v${version}/${versionGroup}`, label: 'version group tag' },
+  ];
+
+  // If version group is MAIN, also create simple vX.Y.Z tag
+  if (versionGroup === 'MAIN') {
+    tagsToCreate.push({ tag: `v${version}`, label: 'simple version tag' });
+  }
+
+  for (const { tag: tagName, label } of tagsToCreate) {
+    try {
+      // Create tag reference
+      await octokit.rest.git.createRef({
+        owner,
+        repo,
+        ref: `refs/tags/${tagName}`,
+        sha,
+      });
+
+      console.log(`  🏷️  Created ${label}: ${tagName}`);
+    } catch (error: any) {
+      if (error.status === 422) {
+        // Tag already exists
+        console.log(`  ✓ ${label} already exists: ${tagName}`);
+      } else {
+        throw error;
+      }
     }
-    throw error;
   }
 }
 
