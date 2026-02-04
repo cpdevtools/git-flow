@@ -40,11 +40,22 @@ function replaceEnvVars(str: string, envVars: Record<string, string>): string {
 function substituteEnvVars(config: ArtifactConfig, envVars: Record<string, string>): ArtifactConfig {
   return {
     ...config,
-    artifacts: config.artifacts.map(artifact => ({
-      ...artifact,
-      path: replaceEnvVars(artifact.path, envVars),
-      name: replaceEnvVars(artifact.name, envVars),
-    }))
+    artifacts: config.artifacts.map(artifact => {
+      const base = {
+        ...artifact,
+        name: replaceEnvVars(artifact.name, envVars),
+      };
+      
+      // Handle path property for artifact types that have it
+      if ('path' in artifact && artifact.path) {
+        return {
+          ...base,
+          path: replaceEnvVars(artifact.path, envVars),
+        } as Artifact;
+      }
+      
+      return base as Artifact;
+    })
   };
 }
 
