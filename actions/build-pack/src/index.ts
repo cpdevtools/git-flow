@@ -10,8 +10,8 @@ import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
 async function run(): Promise<void> {
   try {
     // Get inputs
-    const prNumber = parseInt(core.getInput('pr-number', { required: true }), 10);
-    const token = core.getInput('token', { required: true });
+    const prNumber = parseInt(core.getInput('pr-number', { required: false }) || '0', 10);
+    const token = core.getInput('token', { required: false }) || process.env.GITHUB_TOKEN || '';
     const workspaceRoot = core.getInput('workspace-root', { required: false }) || process.cwd();
     const artifactOutputDirInput = core.getInput('artifact-output-dir', { required: false }) || '.artifacts';
     // Resolve to absolute path relative to workspace root
