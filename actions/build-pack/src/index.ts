@@ -9,11 +9,11 @@ import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
 
 async function run(): Promise<void> {
   try {
-    // Get inputs
-    const prNumber = parseInt(core.getInput('pr-number', { required: false }) || '0', 10);
-    const token = core.getInput('token', { required: false }) || process.env.GITHUB_TOKEN || '';
-    const workspaceRoot = core.getInput('workspace-root', { required: false }) || process.cwd();
-    const artifactOutputDirInput = core.getInput('artifact-output-dir', { required: false }) || '.artifacts';
+    // Get inputs - read from environment variables directly since we run tsx from workspace root
+    const prNumber = parseInt(process.env['INPUT_PR-NUMBER'] || process.env.INPUT_PR_NUMBER || '0', 10);
+    const token = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
+    const workspaceRoot = process.env['INPUT_WORKSPACE-ROOT'] || process.env.INPUT_WORKSPACE_ROOT || process.cwd();
+    const artifactOutputDirInput = process.env['INPUT_ARTIFACT-OUTPUT-DIR'] || process.env.INPUT_ARTIFACT_OUTPUT_DIR || '.artifacts';
     // Resolve to absolute path relative to workspace root
     const artifactOutputDir = resolve(workspaceRoot, artifactOutputDirInput);
 
