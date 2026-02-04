@@ -9,13 +9,13 @@ inputs:
     description: 'GitHub token for API access'
     required: true
 
-outputs:
-  published-count:
-    description: 'Number of projects successfully published'
-  verified-count:
-    description: 'Number of projects verified'
-  failed-count:
-    description: 'Number of projects that failed'
+# outputs:
+#   published-count:
+#     description: 'Number of projects successfully published'
+#   verified-count:
+#     description: 'Number of projects verified'
+#   failed-count:
+#     description: 'Number of projects that failed'
 
 runs:
   using: 'composite'
