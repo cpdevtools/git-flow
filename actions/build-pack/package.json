@@ -3,12 +3,10 @@
   "version": "0.0.0-DEFAULT",
   "private": true,
   "description": "GitHub Action for Phase 2 Build & Pack workflow",
-  "author": "CPDevTools",
-  "license": "MIT",
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
@@ -16,9 +14,7 @@
     "@cpdevtools/git-flow": "workspace:*",
     "tsx": "^4.19.2"
   },
-  "devDependencies": {
-    "@types/node": "^20.17.11",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
-  }
+  "devDependencies": {},
+  "author": "CPDevTools",
+  "license": "MIT"
 }
