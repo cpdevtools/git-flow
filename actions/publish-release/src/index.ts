@@ -5,8 +5,9 @@ import { runPublishRelease } from '@cpdevtools/git-flow/publish-release';
 
 async function run() {
   try {
-    const prNumber = parseInt(core.getInput('pr-number', { required: true }));
-    const githubToken = core.getInput('token', { required: true });
+    // Get inputs - read from environment variables directly since we run tsx from workspace root
+    const prNumber = parseInt(process.env['INPUT_PR-NUMBER'] || process.env.INPUT_PR_NUMBER || '0', 10);
+    const githubToken = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
 
     // Extract repository info from GitHub context
     const { owner, repo } = github.context.repo;
