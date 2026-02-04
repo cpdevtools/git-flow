@@ -3,4 +3,4 @@ artifacts:
     name: "${PACKAGE_NAME}"
     path: "${TARBALL_PATH}"
     registries:
-      - github-packages
+      - github-npm
