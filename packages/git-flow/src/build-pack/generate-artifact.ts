@@ -4,7 +4,7 @@
  * Generates artifact descriptors after packing, supporting multiple config formats.
  */
 
-import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+import type { Artifact, ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { writeArtifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile } from 'node:fs/promises';
@@ -16,12 +16,7 @@ import { parse as parseYaml } from 'yaml';
  * Artifact configuration that can be provided in release-artifacts.* files
  */
 export interface ArtifactConfig {
-  artifacts: Array<{
-    type: string;
-    name: string;
-    path: string;
-    registries: string[];
-  }>;
+  artifacts: Artifact[];
 }
 
 /**
