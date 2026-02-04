@@ -72,7 +72,7 @@ export async function rewriteNugetProjectReferences(options: RewriteNugetDepsOpt
  * Restore original .csproj files from git
  */
 export async function restoreCsprojFiles(projectCwd: string): Promise<void> {
-  const csprojFiles = await globby('**/*.csproj', {
+  const csprojFiles = await fg('**/*.csproj', {
     cwd: projectCwd,
     absolute: true,
     gitignore: true,
