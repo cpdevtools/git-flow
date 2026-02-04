@@ -3,7 +3,7 @@
  */
 
 export interface VersionResolutionInput {
-  /** Version placeholder from package.json (e.g., "0.0.0-DEFAULT") */
+  /** Version placeholder from package.json (e.g., "0.0.0-MAIN") */
   placeholder: string;
 
   /** Current branch name */
