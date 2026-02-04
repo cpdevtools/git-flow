@@ -9,6 +9,12 @@ import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
 
 async function run(): Promise<void> {
   try {
+    // Debug: log all INPUT_* environment variables
+    console.log('Environment variables with INPUT_:');
+    Object.keys(process.env)
+      .filter(key => key.startsWith('INPUT_'))
+      .forEach(key => console.log(`  ${key}=${process.env[key]}`));
+    
     // Get inputs - read from environment variables directly since we run tsx from workspace root
     const prNumber = parseInt(process.env['INPUT_PR-NUMBER'] || process.env.INPUT_PR_NUMBER || '0', 10);
     const token = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
