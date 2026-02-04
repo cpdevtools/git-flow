@@ -153,7 +153,7 @@ export async function findOrCreateDraftRelease(
   // Calculate all tags that will be created
   const versionGroup = project.placeholder.split('-')[1] || 'MAIN';
   const tags = [
-    tag, // Package-specific tag (e.g., @cpdevtools/git-flow/v0.2.1)
+    tag, // Package-specific tag (e.g., v0.2.1/@cpdevtools/git-flow)
     `v${project.version}/${versionGroup}`, // Version group tag (e.g., v0.2.1/MAIN)
   ];
   // Add simple version tag for MAIN group only
