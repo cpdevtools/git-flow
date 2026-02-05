@@ -24,8 +24,7 @@ inputs:
   
   run-number:
     description: 'CI run number for build suffix'
-    required: false
-    default: ${{ github.run_number }}
+    required: true
 
 outputs:
   pr-number:
