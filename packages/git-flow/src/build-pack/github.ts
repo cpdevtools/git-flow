@@ -44,7 +44,7 @@ export async function findDraftReleaseByTag(
   owner: string,
   repo: string,
   tag: string
-): Promise<{ id: number; upload_url: string; html_url: string } | null> {
+): Promise<{ id: number; upload_url: string; html_url: string; body: string | null | undefined } | null> {
   const octokit = getOctokit(githubToken);
 
   try {
@@ -72,6 +72,7 @@ export async function findDraftReleaseByTag(
         id: draftRelease.id,
         upload_url: draftRelease.upload_url,
         html_url: draftRelease.html_url,
+        body: draftRelease.body,
       };
     }
 

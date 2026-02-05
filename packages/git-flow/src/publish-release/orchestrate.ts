@@ -118,14 +118,26 @@ async function updateReleaseBodyPublishedFlags(
     throw new Error(`Draft release not found for tag: ${tag}`);
   }
   
-  // Extract project name and version from tag for body
-  const tagMatch = tag.match(/^(.+)\/v(.+)$/);
-  const projectName = tagMatch ? tagMatch[1] : 'Unknown';
-  const version = tagMatch ? tagMatch[2] : '0.0.0';
+  // Parse existing body to preserve PR link and tags sections
+  const existingBody = release.body || '';
+  const artifactMetadataMatch = existingBody.match(/## Artifact Metadata\n```yaml\n[\s\S]*?\n```/);
   
-  // Update release body with new YAML
+  // Extract PR link and tags sections from existing body
+  let prAndTagsSections = '';
+  if (artifactMetadataMatch) {
+    // Extract everything before the artifact metadata section
+    prAndTagsSections = existingBody.substring(0, artifactMetadataMatch.index || 0).trim();
+  } else {
+    // No artifact metadata section found, preserve entire existing body
+    prAndTagsSections = existingBody.trim();
+  }
+  
+  // Update release body preserving PR link, tags, and updating artifact metadata
   const updatedYaml = doc.toString();
-  const body = `## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``;
+  const artifactSection = `## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``;
+  const body = prAndTagsSections 
+    ? `${prAndTagsSections}\n\n${artifactSection}`
+    : artifactSection;
   
   await updateDraftReleaseBody(githubToken, owner, repo, release.id, body);
 }
