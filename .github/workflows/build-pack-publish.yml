@@ -33,6 +33,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      pull-requests: write
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
