@@ -75,8 +75,12 @@ jobs:
             [ -z "$package_name" ] && continue
             echo "  📦 Checking package: $package_name"
             
+            # GitHub Packages strips the scope from package names
+            # @cpdevtools/git-flow becomes just git-flow
+            package_name_no_scope="${package_name##*/}"
+            
             # Get versions for this package
-            gh api "/orgs/${{ github.repository_owner }}/packages/npm/${package_name//@/%40}/versions" --paginate 2>/dev/null | \
+            gh api "/orgs/${{ github.repository_owner }}/packages/npm/${package_name_no_scope}/versions" --paginate 2>/dev/null | \
             jq -r ".[] | select(.name | contains(\".build.\")) | 
                    select(.created_at < \"$cutoff_date\") | 
                    \"\(.id) \(.name)\"" | \
@@ -86,7 +90,7 @@ jobs:
               else
                 echo "    🗑️  Deleting: $package_name@$version_name"
                 gh api --method DELETE \
-                  "/orgs/${{ github.repository_owner }}/packages/npm/${package_name//@/%40}/versions/$version_id" \
+                  "/orgs/${{ github.repository_owner }}/packages/npm/${package_name_no_scope}/versions/$version_id" \
                   2>/dev/null || echo "    ⚠️  Failed to delete (may already be deleted)"
               fi
             done
