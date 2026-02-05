@@ -71,5 +71,5 @@ runs:
       env:
         INPUT_BRANCH: ${{ inputs.branch }}
         INPUT_TOKEN: ${{ inputs.token }}
-        INPUT_VERSIONS-FILE: ${{ inputs.versions-file }}
-        INPUT_RUN-NUMBER: ${{ inputs.run-number }}
+        INPUT_VERSIONS_FILE: ${{ inputs.versions-file }}
+        INPUT_RUN_NUMBER: ${{ inputs.run-number }}
