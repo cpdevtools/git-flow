@@ -184,16 +184,14 @@ export async function findOrCreateDraftRelease(
   if (existing) {
     console.log(`  ✓ Found existing draft release: ${tag}`);
     
-    // Update release body with artifact metadata if provided
-    if (processedMetadata) {
-      await updateDraftReleaseBody(
-        context.githubToken,
-        owner,
-        repo,
-        existing.id,
-        body
-      );
-    }
+    // Always update release body with PR link, tags, and artifact metadata
+    await updateDraftReleaseBody(
+      context.githubToken,
+      owner,
+      repo,
+      existing.id,
+      body
+    );
     
     return existing;
   }
