@@ -6,8 +6,7 @@ import { getOctokit } from '@actions/github';
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parseDocument } from 'yaml';
-import type { ProjectConfig, BuildPackContext } from './types.js';
-import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+import type { BuildPackContext, ProjectConfig } from './types.js';
 
 /**
  * Add published:false to all artifacts in YAML metadata
