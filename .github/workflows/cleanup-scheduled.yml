@@ -16,7 +16,7 @@ on:
 
 jobs:
   cleanup:
-    uses: cpdevtools/git-flow/.github/workflows/cleanup-old-builds.yml@main
+    uses: ./.github/workflows/cleanup-old-builds.yml
     with:
       days_old: ${{ inputs.days_old || 14 }}
       dry_run: ${{ inputs.dry_run || false }}
