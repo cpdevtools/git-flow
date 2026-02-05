@@ -57,10 +57,22 @@ jobs:
           echo "🧹 Cleaning up npm packages from GitHub Packages..."
           cutoff_date=$(date -d "$DAYS_OLD days ago" --iso-8601=seconds)
           
-          # Get all npm packages for the org
-          gh api /orgs/${{ github.repository_owner }}/packages?package_type=npm --paginate | \
-          jq -r '.[].name' | \
-          while read package_name; do
+          # Get unique package names from this repo's releases
+          echo "  📋 Discovering packages published in this repository's releases..."
+          package_names=$(gh release list --limit 1000 --json tagName,body | \
+            jq -r '.[].body' | \
+            grep -A 20 "## Artifact Metadata" | \
+            grep "name:" | \
+            sed 's/.*name: *"\?\([^"]*\)"\?.*/\1/' | \
+            sort -u)
+          
+          if [ -z "$package_names" ]; then
+            echo "  ℹ️  No packages found in release metadata"
+            exit 0
+          fi
+          
+          echo "$package_names" | while read package_name; do
+            [ -z "$package_name" ] && continue
             echo "  📦 Checking package: $package_name"
             
             # Get versions for this package
