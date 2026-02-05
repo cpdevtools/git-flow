@@ -303,6 +303,29 @@ export async function runPublishRelease(
 }
 
 /**
+ * Check if a registry is a GitHub-hosted registry
+ */
+function isGitHubRegistry(registry: Registry): boolean {
+  switch (registry.type) {
+    case 'npm':
+      return registry.url.includes('npm.pkg.github.com');
+    case 'nuget':
+      return registry.url.includes('nuget.pkg.github.com');
+    case 'docker':
+      return registry.registry.includes('ghcr.io') || registry.registry.includes('docker.pkg.github.com');
+    default:
+      return false;
+  }
+}
+
+/**
+ * Check if a version is a build version (contains '.build.')
+ */
+function isBuildVersion(version: string): boolean {
+  return version.includes('.build.');
+}
+
+/**
  * Publish all artifacts for a project
  */
 async function publishProjectArtifacts(
@@ -318,12 +341,24 @@ async function publishProjectArtifacts(
     verified: [],
   };
 
+  const isBuild = isBuildVersion(projectVersion);
+  if (isBuild) {
+    console.log(`  ℹ️  Build version detected (.build.) - will only publish to GitHub registries`);
+  }
+
   try {
     for (const artifact of descriptor.artifacts) {
       const registries = getArtifactRegistries(artifact);
 
       for (const registryId of registries) {
         const registry = getRegistry(registryConfig, registryId);
+        
+        // Skip non-GitHub registries for build versions
+        if (isBuild && !isGitHubRegistry(registry)) {
+          console.log(`  ⏭️  Skipping ${artifact.name} → ${registryId} (build versions only publish to GitHub registries)`);
+          continue;
+        }
+        
         const token = getToken(registry);
 
         // Skip if already published

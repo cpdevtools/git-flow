@@ -1,0 +1,90 @@
+name: Cleanup Old Build Versions
+
+on:
+  workflow_call:
+    inputs:
+      days_old:
+        description: 'Delete builds older than X days'
+        type: number
+        default: 14
+      dry_run:
+        description: 'Dry run (show what would be deleted without deleting)'
+        type: boolean
+        default: false
+    secrets:
+      token:
+        description: 'GitHub token with packages:write and contents:write'
+        required: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Cleanup GitHub Releases & Tags
+        env:
+          GH_TOKEN: ${{ secrets.token || github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          DAYS_OLD: ${{ inputs.days_old }}
+        run: |
+          echo "🧹 Cleaning up build versions older than $DAYS_OLD days..."
+          cutoff_date=$(date -d "$DAYS_OLD days ago" +%s)
+          
+          gh release list --limit 200 --json tagName,publishedAt | \
+          jq -r ".[] | select(.tagName | contains(\".build.\")) | 
+                 select(.publishedAt | fromdateiso8601 < $cutoff_date) | 
+                 .tagName" | \
+          while read tag; do
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "  [DRY RUN] Would delete release: $tag"
+            else
+              echo "  🗑️  Deleting release: $tag"
+              gh release delete "$tag" -y 2>/dev/null || true
+              git push origin ":refs/tags/$tag" 2>/dev/null || true
+            fi
+          done
+      
+      - name: Cleanup NPM Packages (GitHub Packages)
+        env:
+          GH_TOKEN: ${{ secrets.token || github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          DAYS_OLD: ${{ inputs.days_old }}
+        run: |
+          echo "🧹 Cleaning up npm packages from GitHub Packages..."
+          cutoff_date=$(date -d "$DAYS_OLD days ago" --iso-8601=seconds)
+          
+          # Get all npm packages for the org
+          gh api /orgs/${{ github.repository_owner }}/packages?package_type=npm --paginate | \
+          jq -r '.[].name' | \
+          while read package_name; do
+            echo "  📦 Checking package: $package_name"
+            
+            # Get versions for this package
+            gh api "/orgs/${{ github.repository_owner }}/packages/npm/${package_name//@/%40}/versions" --paginate 2>/dev/null | \
+            jq -r ".[] | select(.name | contains(\".build.\")) | 
+                   select(.created_at < \"$cutoff_date\") | 
+                   \"\(.id) \(.name)\"" | \
+            while read version_id version_name; do
+              if [ "$DRY_RUN" = "true" ]; then
+                echo "    [DRY RUN] Would delete: $package_name@$version_name (ID: $version_id)"
+              else
+                echo "    🗑️  Deleting: $package_name@$version_name"
+                gh api --method DELETE \
+                  "/orgs/${{ github.repository_owner }}/packages/npm/${package_name//@/%40}/versions/$version_id" \
+                  2>/dev/null || echo "    ⚠️  Failed to delete (may already be deleted)"
+              fi
+            done
+          done
+      
+      - name: Summary
+        run: |
+          echo "✅ Cleanup complete!"
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "This was a DRY RUN - no actual deletions were performed."
+          else
+            echo "Removed all .build.* versions older than ${{ inputs.days_old }} days."
+          fi
