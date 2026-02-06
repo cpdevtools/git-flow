@@ -8,11 +8,11 @@ on:
       days_old:
         description: 'Delete builds older than X days'
         type: number
-        required: false
+        default: '14'
       dry_run:
         description: 'Dry run (do not delete, just show what would be deleted)'
         type: boolean
-        required: false
+        default: 'true'
 
 jobs:
   cleanup-scheduled:
