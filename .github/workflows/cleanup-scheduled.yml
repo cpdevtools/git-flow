@@ -18,7 +18,7 @@ jobs:
   cleanup-scheduled:
     uses: ./.github/workflows/cleanup-old-builds.yml
     with:
-      dry_run: "${{ inputs.dry_run }}"
-    #   days_old: "${{ inputs.days_old }}"
+      days_old: ${{ inputs.days_old }}
+      dry_run: ${{ inputs.dry_run }}
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
