@@ -5,12 +5,15 @@ on:
     inputs:
       days_old:
         description: 'Delete builds older than X days'
-        type: number
-        default: 14
+        type: string
+        default: '14'
       dry_run:
         description: 'Dry run (do not delete, just show what would be deleted)'
-        type: boolean
-        default: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
 
 jobs:
   cleanup-scheduled:
