@@ -16,6 +16,13 @@ on:
 
 jobs:
   cleanup-scheduled:
+    if: github.event_name == 'schedule'
+    uses: ./.github/workflows/cleanup-old-builds.yml
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
+  
+  cleanup-manual:
+    if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/cleanup-old-builds.yml
     with:
       days_old: ${{ inputs.days_old }}
