@@ -1,0 +1,19 @@
+{
+  "name": "@cpdevtools/git-flow-action-test",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "description": "GitHub Action for Phase 4 Test orchestration",
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@cpdevtools/git-flow": "workspace:*",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {},
+  "author": "CPDevTools",
+  "license": "MIT"
+}

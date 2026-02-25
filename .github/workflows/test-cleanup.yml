@@ -1,0 +1,63 @@
+name: Cleanup Test Tags
+
+on:
+  delete: {}   # Fires when a branch (or tag) is deleted
+
+permissions:
+  contents: write  # Delete refs via API
+
+jobs:
+  cleanup:
+    name: Delete test-pass tags for deleted branch
+    runs-on: ubuntu-latest
+    # Only act on branch deletions (not tag deletions)
+    if: github.event.ref_type == 'branch'
+
+    steps:
+      - name: Delete test-pass tags for branch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.payload.ref;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            console.log(`Cleaning up test-pass tags for branch: ${branch}`);
+
+            // Escape the branch name for use in the prefix (/ is valid in tag names)
+            const prefix = `test-pass/${branch}/`;
+
+            // List all matching refs
+            let deleted = 0;
+            let page = 1;
+            while (true) {
+              const { data: refs } = await github.rest.git.listMatchingRefs({
+                owner,
+                repo,
+                ref: `tags/${prefix}`,
+                per_page: 100,
+                page,
+              });
+
+              if (refs.length === 0) break;
+
+              for (const ref of refs) {
+                try {
+                  await github.rest.git.deleteRef({
+                    owner,
+                    repo,
+                    ref: ref.ref.replace('refs/', ''),
+                  });
+                  console.log(`  Deleted: ${ref.ref}`);
+                  deleted++;
+                } catch (err) {
+                  console.warn(`  Failed to delete ${ref.ref}: ${err.message}`);
+                }
+              }
+
+              if (refs.length < 100) break;
+              page++;
+            }
+
+            console.log(`Done. Deleted ${deleted} tag(s) for branch '${branch}'.`);

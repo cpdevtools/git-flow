@@ -1,0 +1,94 @@
+name: 'Test Projects'
+description: 'Phase 4: Runs build/test scripts with change detection and topological execution'
+author: 'CPDevTools'
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  mode:
+    description: 'Test mode: build (build only), test (test only), or test-optional (both where available)'
+    required: false
+    default: 'test-optional'
+
+  skip-unchanged:
+    description: 'Skip projects that have not changed since the last successful run on this branch'
+    required: false
+    default: 'true'
+
+  rerun-all:
+    description: 'Force re-run all projects, bypassing change detection entirely'
+    required: false
+    default: 'false'
+
+  token:
+    description: 'GitHub token with contents:write permission (for creating/pushing pass tags)'
+    required: false
+    default: ${{ github.token }}
+
+  workspace-root:
+    description: 'Workspace root directory'
+    required: false
+    default: ${{ github.workspace }}
+
+outputs:
+  projects-passed:
+    description: 'Number of projects that passed'
+    value: ${{ steps.test.outputs.projects-passed }}
+
+  projects-failed:
+    description: 'Number of projects that failed'
+    value: ${{ steps.test.outputs.projects-failed }}
+
+  projects-skipped:
+    description: 'Number of projects skipped due to a dependency failure'
+    value: ${{ steps.test.outputs.projects-skipped }}
+
+  projects-unchanged:
+    description: 'Number of projects skipped because no files changed since the last pass'
+    value: ${{ steps.test.outputs.projects-unchanged }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@cpdevtools'
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+
+    - name: Install workspace dependencies
+      shell: bash
+      run: pnpm install
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm install --prod
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Run Tests
+      id: test
+      shell: bash
+      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_SKIP_UNCHANGED: ${{ inputs.skip-unchanged }}
+        INPUT_RERUN_ALL: ${{ inputs.rerun-all }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
+        GITHUB_TOKEN: ${{ inputs.token }}

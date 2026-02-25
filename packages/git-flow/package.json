@@ -25,6 +25,9 @@
     },
     "./cli": {
       "default": "./src/cli/index.ts"
+    },
+    "./test-runner": {
+      "default": "./src/test-runner/index.ts"
     }
   },
   "bin": {
