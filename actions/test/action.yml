@@ -72,6 +72,7 @@ runs:
       shell: bash
       run: pnpm install --lockfile-dir .pnpm-prod
       env:
+        HUSKY: '0'
         NODE_AUTH_TOKEN: ${{ inputs.token }}
         GITHUB_TOKEN: ${{ inputs.token }}
 
@@ -80,6 +81,7 @@ runs:
       working-directory: ${{ github.action_path }}
       run: pnpm install --prod --lockfile-dir ${{ github.workspace }}/.pnpm-prod
       env:
+        HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
 
