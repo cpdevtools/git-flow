@@ -34,10 +34,16 @@ runs:
       with:
         version: 11
     
+    - name: Configure registry auth
+      shell: bash
+      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+    
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm install --prod --lockfile-dir .pnpm-prod
+      run: pnpm install --prod --lockfile-dir ${{ github.workspace }}/.pnpm-prod
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
