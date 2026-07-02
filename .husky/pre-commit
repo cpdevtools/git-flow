@@ -1,7 +1,7 @@
 echo "pre-commit: regenerating .pnpm-prod/pnpm-lock.yaml..."
 
 mkdir -p .pnpm-prod
-DEV_LOCAL=false pnpm install --lockfile-dir .pnpm-prod --lockfile-only --silent
+DEV_LOCAL=false pnpm install --lockfile-dir .pnpm-prod --lockfile-only --config.minimumReleaseAge=0 --silent
 
 if [ $? -ne 0 ]; then
   echo "ERROR: failed to generate .pnpm-prod/pnpm-lock.yaml" >&2
