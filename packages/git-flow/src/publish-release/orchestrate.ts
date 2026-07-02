@@ -54,9 +54,10 @@ async function downloadReleaseAssets(
   });
 
   // Parse tag to get expected release name
-  // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
-  const tagMatch = tag.match(/^(.+)\/v(.+)$/);
-  const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+  // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
+  // GitHub stores tags containing @ or / as untagged-<hash>, so we fall back to name match.
+  const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
+  const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
 
   // First try exact tag match, then fall back to name match for untagged releases
   const release = releases.find(r => r.tag_name === tag) || 
