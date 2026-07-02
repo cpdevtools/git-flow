@@ -3,3 +3,5 @@ packages:
   - 'actions/*'
 allowBuilds:
   esbuild: false
+minimumReleaseAgeExclude:
+  - '@cpdevtools/ts-dev-utilities@0.2.3'

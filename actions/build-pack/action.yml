@@ -58,15 +58,14 @@ runs:
     
     - name: Install workspace dependencies
       shell: bash
-      run: pnpm install
-      env:
+      run: pnpm install --lockfile-dir .pnpm-prod      env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
         GITHUB_TOKEN: ${{ inputs.token }}
     
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm install --prod
+      run: pnpm install --prod --lockfile-dir .pnpm-prod
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
