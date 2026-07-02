@@ -71,7 +71,7 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
 /**
  * Apply version to project files
  */
-async function applyVersion(cwd: string, version: string): Promise<void> {
+export async function applyVersion(cwd: string, version: string): Promise<void> {
   await applyVersionToPackageJson(cwd, version);
   await applyVersionToCsproj(cwd, version);
 }
@@ -86,76 +86,11 @@ async function readPackageJson(cwd: string): Promise<any> {
 }
 
 /**
- * Check if project has a build script
- */
-async function hasBuildScript(project: ProjectConfig): Promise<boolean> {
-  const packageJson = await readPackageJson(project.cwd);
-  return !!packageJson.scripts?.['github.actions.build'];
-}
-
-/**
  * Check if project has a pack script
  */
 async function hasPackScript(project: ProjectConfig): Promise<boolean> {
   const packageJson = await readPackageJson(project.cwd);
   return !!packageJson.scripts?.['github.actions.pack'];
-}
-
-/**
- * Execute build script for a project
- * @param project - Project configuration
- * @param context - Workflow context
- * @returns Execution result
- */
-export async function executeBuild(
-  project: ProjectConfig,
-  context: BuildPackContext
-): Promise<ExecutionResult> {
-  if (!(await hasBuildScript(project))) {
-    console.log(`⊘ ${project.name}: No build script, skipping...`);
-    return {
-      project: project.name,
-      success: true,
-    };
-  }
-
-  console.log(`🔨 ${project.name}: Building...`);
-
-  try {
-    // Set environment variables
-    const env = {
-      ...process.env,
-      PROJECT_VERSION: project.version,
-      PROJECT_NAME: project.name,
-      ARTIFACT_OUTPUT_DIR,
-      GITHUB_SHA: context.sha,
-    };
-
-    // Apply version to project files before building
-    console.log(`  📝 Applying version ${project.version}...`);
-    await applyVersion(project.cwd, project.version);
-
-    // Execute build script
-    const result = await $({ cwd: project.cwd, env })`pnpm run github.actions.build`;
-
-    console.log(`✓ ${project.name}: Build completed`);
-
-    return {
-      project: project.name,
-      success: true,
-      exitCode: result.exitCode ?? 0,
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`✗ ${project.name}: Build failed - ${errorMessage}`);
-
-    return {
-      project: project.name,
-      success: false,
-      error: errorMessage,
-      exitCode: 1,
-    };
-  }
 }
 
 /**

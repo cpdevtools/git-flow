@@ -111,8 +111,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.0-dev.1
-        version: 0.3.0-dev.1
+        specifier: dev
+        version: 0.3.0-dev.2
       '@oclif/core':
         specifier: ^4.8.0
         version: 4.11.11
@@ -193,6 +193,11 @@ packages:
 
   '@cpdevtools/ts-dev-utilities@0.3.0-dev.1':
     resolution: {integrity: sha512-Dj2lga3nVZm5m5QRt83pNJgn/5Bo4nHcf2tS402LvXC90xbxRmDozwFZmOzyIA7PCLU8MYVyknPwfabHHmaR8Q==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.0-dev.1/b0fde6b093ef385e96a2b42764fc8473e0beeb24}
+    engines: {node: '>=24'}
+    hasBin: true
+
+  '@cpdevtools/ts-dev-utilities@0.3.0-dev.2':
+    resolution: {integrity: sha512-Xx5e0GY4Wyrmp/90efekdEA3Nu9ki/6DmKsr9nJfZOgrxyuow84kiOyGcssXIg1WsP6hpHZGsZ613ouucJAR3Q==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.0-dev.2/96aa3683e7c4cf95e5518aab2451d891c3ee9fed}
     engines: {node: '>=24'}
     hasBin: true
 
@@ -2103,6 +2108,13 @@ snapshots:
   '@babel/helper-validator-identifier@7.29.7': {}
 
   '@cpdevtools/ts-dev-utilities@0.3.0-dev.1':
+    dependencies:
+      change-case: 5.4.4
+      globby: 14.1.0
+      jsonc-parser: 3.3.1
+      yaml: 2.9.0
+
+  '@cpdevtools/ts-dev-utilities@0.3.0-dev.2':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
