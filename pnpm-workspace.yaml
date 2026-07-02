@@ -1,3 +1,5 @@
 packages:
   - 'packages/*'
   - 'actions/*'
+allowBuilds:
+  esbuild: false

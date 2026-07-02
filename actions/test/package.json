@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@cpdevtools/ts-dev-utilities": "^0.2.0",
+    "@cpdevtools/ts-dev-utilities": "^0.2.3",
     "tsx": "^4.19.2"
   },
   "devDependencies": {},
