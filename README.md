@@ -10,6 +10,9 @@ Git-based versioning and release workflow automation.
 ## Actions
 
 - [`test`](./actions/test) - Runs build/test scripts across workspace projects in dependency order using [`@cpdevtools/ts-dev-utilities/runner`](https://github.com/cpdevtools/ts-dev-utilities)
+- [`build-pack`](./actions/build-pack) - Builds and packs release artifacts from a release PR
+- [`create-release-pr`](./actions/create-release-pr) - Creates a release PR with resolved version metadata
+- [`publish-release`](./actions/publish-release) - Publishes artifacts to registries and finalises releases
 
 **Inputs:**
 

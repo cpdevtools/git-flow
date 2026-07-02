@@ -1,5 +1,5 @@
 /**
- * cpdt-gitflow pack command
+ * gitflow pack command
  * Default pack implementation with hook support
  */
 

@@ -10,22 +10,22 @@ pnpm add @cpdevtools/git-flow
 
 ## Features
 
-### CLI Tool (`cpdt-gitflow`)
+### CLI Tool (`gitflow`)
 
 A modern CLI with autocomplete support for build and pack operations:
 
 ```bash
 # Display all available commands
-cpdt-gitflow --help
+gitflow --help
 
 # Pack project artifacts
-cpdt-gitflow pack
+gitflow pack
 
 # Apply version to project files
-cpdt-gitflow apply-version 1.2.3
+gitflow apply-version 1.2.3
 
 # Enable autocomplete (bash/zsh)
-cpdt-gitflow autocomplete
+gitflow autocomplete
 ```
 
 **Subcommands:**
@@ -38,7 +38,7 @@ cpdt-gitflow autocomplete
 ```json
 {
   "scripts": {
-    "github.actions.pack": "cpdt-gitflow pack",
+    "github.actions.pack": "gitflow pack",
     "github.actions.build": "npm run build"
   }
 }

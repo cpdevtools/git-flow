@@ -28,11 +28,11 @@
     }
   },
   "bin": {
-    "cpdt-gitflow": "./src/cli/bin.ts"
+    "gitflow": "./src/cli/bin.ts"
   },
   "oclif": {
-    "bin": "cpdt-gitflow",
-    "dirname": "cpdt-gitflow",
+    "bin": "gitflow",
+    "dirname": "gitflow",
     "commands": "./dist/cli/commands",
     "topicSeparator": " "
   },

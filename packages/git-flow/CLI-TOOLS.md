@@ -1,26 +1,43 @@
 # CLI Tools Documentation
 
-The `@cpdevtools/git-flow` package provides a unified CLI tool (`cpdt-gitflow`) with subcommands for standardizing build and pack operations across projects.
+The git-flow ecosystem provides two CLI tools:
 
-## Overview
+| CLI | Package | Purpose |
+|-----|---------|----------|
+| `gitflow` | `@cpdevtools/git-flow` | Build and pack operations (artifact creation, version application) |
+| `devutil` | `@cpdevtools/ts-dev-utilities` | Workspace script runner and inspector |
 
-Instead of requiring every project to write custom scripts, the CLI provides:
-- **Default implementations** for common tasks (pack npm/nuget packages, apply versions)
-- **Hook system** for customization without rewriting logic  
-- **Configuration override** via `cpdevtools.config.ts`
-- **Modern CLI** with autocomplete support and modular architecture
+---
+
+## `gitflow` — Build & Pack CLI
+
+Provides standardized build and pack operations across projects.
 
 ## Installation
 
-The CLI is automatically available when you install `@cpdevtools/git-flow`:
+Both CLIs are installed as part of their respective packages:
 
 ```bash
+# gitflow
 pnpm add -D @cpdevtools/git-flow
+
+# devutil
+pnpm add -D @cpdevtools/ts-dev-utilities
 ```
 
-## CLI Commands
+---
 
-### cpdt-gitflow pack
+## CLI Commands — `gitflow`
+
+### Overview
+
+Instead of requiring every project to write custom scripts, the CLI provides:
+- **Default implementations** for common tasks (pack npm/nuget packages, apply versions)
+- **Hook system** for customization without rewriting logic
+- **Configuration override** via `cpdevtools.config.ts`
+- **Modern CLI** with autocomplete support and modular architecture
+
+### gitflow pack
 
 Automatically detects project type and creates distribution artifacts with descriptors.
 
@@ -32,7 +49,7 @@ Automatically detects project type and creates distribution artifacts with descr
 ```json
 {
   "scripts": {
-    "github.actions.pack": "cpdt-gitflow pack"
+    "github.actions.pack": "gitflow pack"
   }
 }
 ```
@@ -40,13 +57,13 @@ Automatically detects project type and creates distribution artifacts with descr
 **Direct usage:**
 ```bash
 # Using environment variables
-PROJECT_NAME=my-package PROJECT_VERSION=1.0.0 cpdt-gitflow pack
+PROJECT_NAME=my-package PROJECT_VERSION=1.0.0 gitflow pack
 
 # Using flags
-cpdt-gitflow pack --project-name my-package --version 1.0.0
+gitflow pack --project-name my-package --version 1.0.0
 
 # With custom output directory
-cpdt-gitflow pack --output-dir ./dist
+gitflow pack --output-dir ./dist
 ```
 
 **Flags:**
@@ -61,7 +78,7 @@ cpdt-gitflow pack --output-dir ./dist
 - `ARTIFACT_FILENAME` - Sanitized filename (@ and / removed)
 - `GITHUB_SHA` - Git commit SHA
 
-### cpdt-gitflow apply-version
+### gitflow apply-version
 
 Applies version to project files before building.
 
@@ -72,13 +89,13 @@ Applies version to project files before building.
 **Usage:**
 ```bash
 # Using environment variable
-PROJECT_VERSION=1.2.3 cpdt-gitflow apply-version
+PROJECT_VERSION=1.2.3 gitflow apply-version
 
 # Using argument
-cpdt-gitflow apply-version 1.2.3
+gitflow apply-version 1.2.3
 
 # Using flag
-cpdt-gitflow apply-version --version 1.2.3
+gitflow apply-version --version 1.2.3
 ```
 
 **Flags:**
@@ -197,7 +214,7 @@ artifacts:
   "scripts": {
     "build": "tsc",
     "github.actions.build": "npm run build",
-    "github.actions.pack": "cpdevtools-pack"
+    "github.actions.pack": "gitflow pack"
   }
 }
 ```
@@ -242,3 +259,89 @@ export const pack = {
 ✅ **Type-safe overrides** - Full TypeScript support for config
 ✅ **Automatic version management** - Versions applied before build
 ✅ **Multi-project support** - Works with monorepos
+
+---
+
+## CLI Commands — `devutil`
+
+A lightweight workspace runner and inspector from `@cpdevtools/ts-dev-utilities`.
+Runs scripts across all projects in dependency order — projects start as soon as
+their workspace dependencies have passed, not in fixed waves.
+
+### devutil run
+
+Run one or more scripts across the workspace:
+
+```bash
+# Run github.actions.test across all projects
+devutil run github.actions.test
+
+# Run build then test per project (test-optional equivalent)
+devutil run github.actions.build github.actions.test
+
+# Stop on first failure, cancel in-flight tasks
+devutil run github.actions.test --fail-fast
+
+# Cap parallelism
+devutil run github.actions.test --concurrency 4
+
+# Treat a missing script as an error instead of a no-op
+devutil run github.actions.test --missing-script error
+
+# Use a specific workspace root
+devutil run github.actions.test --cwd /path/to/workspace
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--fail-fast` | off | Stop on first failure, cancel in-flight tasks |
+| `--concurrency <n>` | unlimited | Max tasks to run in parallel |
+| `--cwd <path>` | `process.cwd()` | Workspace root |
+| `--missing-script skip\|error` | `skip` | What to do when a project doesn't define the script |
+| `--max-output <bytes>` | `1000000` | Max bytes of output to capture per task |
+
+**Exit code:** 0 if all tasks passed or were no-script; 1 if any task failed.
+
+### devutil discover
+
+List all projects found in the workspace with their names, directories, and defined scripts:
+
+```bash
+devutil discover
+devutil discover --cwd /path/to/workspace
+```
+
+### devutil graph
+
+Print the workspace dependency graph:
+
+```bash
+devutil graph
+devutil graph --cwd /path/to/workspace
+```
+
+### Standard CI script convention
+
+Projects should define these scripts in `package.json` to participate in the
+automated workflow:
+
+| Script | Purpose | Provided by |
+|--------|---------|-------------|
+| `github.actions.build` | Compile, transpile, or otherwise prepare the project | Project author |
+| `github.actions.test` | Run tests | Project author |
+| `github.actions.pack` | Create distribution artifacts | `gitflow pack` |
+
+Projects only need to define the scripts that apply. A project with no
+`github.actions.test` is simply skipped (treated as a pass) by `devutil run`.
+
+```json
+{
+  "scripts": {
+    "github.actions.build": "pnpm run build",
+    "github.actions.test": "pnpm run test",
+    "github.actions.pack": "gitflow pack"
+  }
+}
+```
