@@ -64,7 +64,8 @@ runs:
     
     - name: Install workspace dependencies
       shell: bash
-      run: pnpm install --lockfile-dir .pnpm-prod      env:
+      run: pnpm install --lockfile-dir .pnpm-prod
+      env:
         HUSKY: '0'
         NODE_AUTH_TOKEN: ${{ inputs.token }}
         GITHUB_TOKEN: ${{ inputs.token }}
