@@ -66,8 +66,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.2.5
-        version: 0.2.5
+        specifier: ^0.3.0-dev.1
+        version: 0.3.0-dev.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -96,8 +96,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.2.5
-        version: 0.2.5
+        specifier: ^0.3.0-dev.1
+        version: 0.3.0-dev.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -111,8 +111,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.2.5
-        version: 0.2.5
+        specifier: ^0.3.0-dev.1
+        version: 0.3.0-dev.1
       '@oclif/core':
         specifier: ^4.8.0
         version: 4.11.11
@@ -191,8 +191,8 @@ packages:
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
 
-  '@cpdevtools/ts-dev-utilities@0.2.5':
-    resolution: {integrity: sha512-HpMa7Z9BiaZrj8lbGaDLKJ4t5xgUFjPGz9ZQVwlaW8kJFI0TpgiSb2zLiY2izDWR4ep8Ht3ivJ4GbFzmPxJFEQ==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.2.5/55c3d86dc36044b6a5f0d95cba4a4a1e022596a9}
+  '@cpdevtools/ts-dev-utilities@0.3.0-dev.1':
+    resolution: {integrity: sha512-Dj2lga3nVZm5m5QRt83pNJgn/5Bo4nHcf2tS402LvXC90xbxRmDozwFZmOzyIA7PCLU8MYVyknPwfabHHmaR8Q==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.0-dev.1/b0fde6b093ef385e96a2b42764fc8473e0beeb24}
     engines: {node: '>=24'}
     hasBin: true
 
@@ -2102,7 +2102,7 @@ snapshots:
 
   '@babel/helper-validator-identifier@7.29.7': {}
 
-  '@cpdevtools/ts-dev-utilities@0.2.5':
+  '@cpdevtools/ts-dev-utilities@0.3.0-dev.1':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
