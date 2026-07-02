@@ -1,5 +1,5 @@
 name: 'Test Projects'
-description: 'Phase 4: Runs build/test scripts with change detection and topological execution'
+description: 'Runs build/test scripts across workspace projects in dependency order'
 author: 'CPDevTools'
 
 branding:
@@ -12,18 +12,18 @@ inputs:
     required: false
     default: 'test-optional'
 
-  skip-unchanged:
-    description: 'Skip projects that have not changed since the last successful run on this branch'
-    required: false
-    default: 'true'
-
-  rerun-all:
-    description: 'Force re-run all projects, bypassing change detection entirely'
+  fail-fast:
+    description: 'Stop on first failure, cancelling in-flight tasks'
     required: false
     default: 'false'
 
+  concurrency:
+    description: 'Maximum number of projects to run in parallel (default: unlimited)'
+    required: false
+    default: ''
+
   token:
-    description: 'GitHub token with contents:write permission (for creating/pushing pass tags)'
+    description: 'GitHub token (used for installing packages)'
     required: false
     default: ${{ github.token }}
 
@@ -44,10 +44,6 @@ outputs:
   projects-skipped:
     description: 'Number of projects skipped due to a dependency failure'
     value: ${{ steps.test.outputs.projects-skipped }}
-
-  projects-unchanged:
-    description: 'Number of projects skipped because no files changed since the last pass'
-    value: ${{ steps.test.outputs.projects-unchanged }}
 
 runs:
   using: 'composite'
@@ -87,8 +83,7 @@ runs:
       run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
       env:
         INPUT_MODE: ${{ inputs.mode }}
-        INPUT_SKIP_UNCHANGED: ${{ inputs.skip-unchanged }}
-        INPUT_RERUN_ALL: ${{ inputs.rerun-all }}
-        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_FAIL_FAST: ${{ inputs.fail-fast }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
         INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
         GITHUB_TOKEN: ${{ inputs.token }}

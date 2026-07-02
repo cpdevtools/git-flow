@@ -6,7 +6,6 @@ on:
       - 'release/**'
 
 permissions:
-  contents: write  # Push test-pass tags
   checks: write    # Write step summaries / check runs
   actions: read    # Read workflow context
 
@@ -19,18 +18,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0       # Full history — needed for git diff in change detection
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Run Tests
         uses: ./actions/test
         with:
           mode: test-optional
-          skip-unchanged: true
-          rerun-all: ${{ github.event.inputs.rerun-all || 'false' }}
+          fail-fast: ${{ github.event.inputs.fail-fast || 'false' }}
+          concurrency: ${{ github.event.inputs.concurrency || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
