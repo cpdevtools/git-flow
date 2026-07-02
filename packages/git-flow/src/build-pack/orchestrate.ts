@@ -2,9 +2,13 @@
  * Main orchestration for Phase 2 Build & Pack workflow
  */
 
+import type { Project as SchedulerProject } from '@cpdevtools/ts-dev-utilities/project';
+import { runScripts } from '@cpdevtools/ts-dev-utilities/runner';
+import { join } from 'path';
 import type { Project } from '../lib/project';
-import { buildDependencyGraph, discoverProjects } from '../lib/project';
-import { executeBuild, executePack, executeUpload } from './execute.js';
+import { discoverProjects } from '../lib/project';
+import { applyVersion, executePack, executeUpload } from './execute.js';
+import { ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import { deleteDraftRelease, findDraftReleaseByTag, getReleaseTag, isArtifactUploaded } from './github.js';
 import { extractPRMetadata } from './options.js';
 import type {
@@ -127,64 +131,84 @@ export async function runBuildPack(
     allProjects: allProjectsToProcess,
   };
 
-  // Build dependency graph and get topological batches (all projects)
-  console.log('📊 Building dependency graph...');
-  const graph = buildDependencyGraph(allProjectsToProcess);
-  const batches = graph.batches;
-  console.log(`   Organized into ${batches.length} dependency batches\n`);
-
   // Display execution plan
-  displayExecutionPlan(batches, allProjectsToProcess, projectsToProcess);
+  displayExecutionPlan(allProjectsToProcess, projectsToProcess);
 
-  // Execute batches
-  let allResults: ExecutionResult[] = [];
-  const builtProjects: string[] = [];
-  const packedProjects: string[] = [];
-  const uploadedProjects: string[] = [];
+  // Build lookup structures for hooks
+  const projectConfigMap = new Map<string, ProjectConfig>(
+    allProjectsToProcess.map((p) => [p.name, p])
+  );
+  const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
 
-  for (let i = 0; i < batches.length; i++) {
-    const batchNum = i + 1;
-    const batch = batches[i];
-    const batchProjects = batch.map((p: Project) =>
-      allProjectsToProcess.find((pc) => pc.name === p.name)!
-    );
+  // Map ProjectConfig[] to the scheduler's Project type so the scheduler can
+  // build a real dependency graph from packageJson.dependencies.
+  const schedulerProjects: SchedulerProject[] = allProjectsToProcess.map((config) => ({
+    packageJsonPath: join(config.cwd, 'package.json'),
+    directory: config.cwd,
+    packageJson: config.packageJson as any,
+    name: config.name,
+    dependencies: config.packageJson?.dependencies,
+    devDependencies: config.packageJson?.devDependencies,
+  }));
 
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`📦 Batch ${batchNum}/${batches.length} (${batchProjects.length} projects)`);
-    console.log(`${'='.repeat(80)}\n`);
-
-    // Execute batch in parallel
-    const results = await executeBatch(batchProjects, projectsToProcess, contextWithProjects);
-    allResults.push(...results);
-
-    // Track what was done
-    for (const result of results) {
-      if (result.success) {
-        builtProjects.push(result.project);
-        const isRelease = projectsToProcess.find(p => p.name === result.project);
-        if (isRelease) {
-          packedProjects.push(result.project);
-          uploadedProjects.push(result.project);
+  // Run builds via scheduler (handles dependency ordering, concurrency, fail-fast)
+  const summary = await runScripts({
+    scripts: ['github.actions.build'],
+    failFast: true,
+    env: {
+      ARTIFACT_OUTPUT_DIR,
+      GITHUB_SHA: context.sha,
+    },
+    beforeTask: async (project) => {
+      const config = projectConfigMap.get(project.name)!;
+      console.log(`  📝 ${project.name}: Applying version ${config.version}...`);
+      await applyVersion(config.cwd, config.version);
+    },
+    afterTask: async (project, result) => {
+      if (result.state !== 'passed') return;
+      const config = projectConfigMap.get(project.name)!;
+      if (!releaseSet.has(project.name)) {
+        console.log(`✓ ${project.name}: Build completed (dependency only, skipping pack/upload)`);
+        return;
+      }
+      const packResult = await executePack(config, contextWithProjects);
+      if (!packResult.success) {
+        throw new Error(packResult.error || 'Pack failed');
+      }
+      if (!context.skipUpload) {
+        const uploadResult = await executeUpload(config, contextWithProjects);
+        if (!uploadResult.success) {
+          throw new Error(uploadResult.error || 'Upload failed');
         }
       }
-    }
+    },
+    _discover: async () => schedulerProjects,
+  });
 
-    // Count results
-    const succeeded = results.filter((r) => r.success).length;
-    const failed = results.filter((r) => !r.success).length;
+  // Map RunSummary back to the legacy result shapes
+  const builtProjects = [
+    ...summary.passed.map((t) => t.project),
+    ...summary.noScript.map((t) => t.project),
+  ];
+  const packedProjects = summary.passed
+    .filter((t) => releaseSet.has(t.project))
+    .map((t) => t.project);
+  const uploadedProjects = context.skipUpload ? [] : [...packedProjects];
 
-    console.log(`\n✓ Batch ${batchNum} completed: ${succeeded} succeeded, ${failed} failed`);
+  const failedResults: ExecutionResult[] = [
+    ...summary.failed.map((t) => ({
+      project: t.project,
+      success: false,
+      error: t.output || 'Build failed',
+    })),
+    ...summary.cancelled.map((t) => ({
+      project: t.project,
+      success: false,
+      error: 'Cancelled due to dependency failure',
+    })),
+  ];
 
-    // Stop on first failure
-    if (failed > 0) {
-      console.error(`\n❌ Build & Pack failed. Stopping execution.\n`);
-      displayFailures(results.filter((r) => !r.success));
-      break;
-    }
-  }
-
-  const failedResults = allResults.filter(r => !r.success);
-  const totalSuccess = allResults.filter(r => r.success).length;
+  const totalSuccess = builtProjects.length;
 
   // Final summary
   console.log(`\n${'='.repeat(80)}`);
@@ -355,98 +379,19 @@ function findAllDependencies(
  * Display execution plan
  */
 function displayExecutionPlan(
-  batches: Project[][],
   allProjects: ProjectConfig[],
   projectsToRelease: ProjectConfig[]
 ): void {
   console.log('📋 Execution Plan:');
   console.log('─'.repeat(80));
 
-  for (let i = 0; i < batches.length; i++) {
-    const batchProjects = batches[i];
-    console.log(`\nBatch ${i + 1}:`);
-
-    for (const project of batchProjects) {
-      const config = allProjects.find((p) => p.name === project.name)!;
-      const isRelease = projectsToRelease.find(p => p.name === config.name);
-      const flags: string[] = [];
-
-      if (isRelease) {
-        flags.push('RELEASE');
-      } else {
-        flags.push('build-only');
-      }
-
-      const flagsStr = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
-      console.log(`  • ${config.name} v${config.version}${flagsStr}`);
-    }
+  for (const config of allProjects) {
+    const isRelease = projectsToRelease.find((p) => p.name === config.name);
+    const label = isRelease ? 'RELEASE' : 'build-only';
+    console.log(`  • ${config.name} v${config.version} [${label}]`);
   }
 
   console.log();
-}
-
-/**
- * Execute a batch of projects in parallel
- */
-async function executeBatch(
-  projects: ProjectConfig[],
-  projectsToRelease: ProjectConfig[],
-  context: BuildPackContext
-): Promise<ExecutionResult[]> {
-  const results: ExecutionResult[] = [];
-
-  // Execute each project's pipeline: Build → Pack (if releasing) → Upload (if releasing)
-  const promises = projects.map(async (project) => {
-    const isRelease = projectsToRelease.find(p => p.name === project.name);
-    const releaseLabel = isRelease ? '📦 RELEASE' : '🔧 DEPENDENCY';
-    
-    console.log(`\n▶️  ${releaseLabel} ${project.name} v${project.version}: Starting pipeline...`);
-
-    // Build (always required)
-    const buildResult = await executeBuild(project, context);
-    if (!buildResult.success) {
-      return buildResult;
-    }
-
-    // Only pack and upload if this project is in the release list
-    if (isRelease) {
-      // Pack
-      const packResult = await executePack(project, context);
-      if (!packResult.success) {
-        return packResult;
-      }
-
-      // Upload (skip if configured)
-      if (context.skipUpload) {
-        console.log(`⊘ ${project.name}: Skipping upload (SKIP_UPLOAD enabled)`);
-        return packResult;
-      }
-
-      const uploadResult = await executeUpload(project, context);
-      return uploadResult;
-    } else {
-      console.log(`✓ ${project.name}: Build completed (dependency only, skipping pack/upload)`);
-      return buildResult;
-    }
-  });
-
-  // Wait for all projects to complete
-  const settled = await Promise.allSettled(promises);
-
-  for (const result of settled) {
-    if (result.status === 'fulfilled') {
-      results.push(result.value);
-    } else {
-      // Unexpected promise rejection
-      results.push({
-        project: 'unknown',
-        success: false,
-        error: result.reason?.message || String(result.reason),
-      });
-    }
-  }
-
-  return results;
 }
 
 /**

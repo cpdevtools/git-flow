@@ -3,7 +3,7 @@
  */
 
 /**
- * Registry configuration (loaded from .github/registries.yml)
+ * Registry configuration (loaded from .publish/registries.yml)
  */
 export interface RegistryConfig {
   /** Registry configurations by name */

@@ -50,7 +50,7 @@ export async function discoverProjects(workspaceRoot: string): Promise<Project[]
         });
       }
     } catch (error) {
-      console.warn(`Failed to parse ${packagePath}:`, error);
+      console.error(`Failed to parse ${packagePath}:`, error);
     }
   }
 

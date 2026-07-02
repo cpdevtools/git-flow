@@ -21,7 +21,7 @@ export type {
 } from './types.js';
 
 // Execution functions (for advanced usage/testing)
-export { executeBuild, executePack, executeUpload } from './execute.js';
+export { applyVersion, executePack, executeUpload } from './execute.js';
 
 // Project discovery (shared utility)
 export { discoverProjects, buildDependencyGraph, type Project, type DependencyGraph } from '../lib/project.js';
@@ -55,5 +55,4 @@ export {
   restorePackageJson,
   rewriteNugetProjectReferences,
   restoreCsprojFiles,
-  verifyDockerImageTags,
 } from './workspace-deps/index.js';
