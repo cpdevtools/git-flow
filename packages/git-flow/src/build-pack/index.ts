@@ -55,5 +55,4 @@ export {
   restorePackageJson,
   rewriteNugetProjectReferences,
   restoreCsprojFiles,
-  verifyDockerImageTags,
 } from './workspace-deps/index.js';

@@ -4,10 +4,10 @@ import { parse as parseYaml } from 'yaml';
 import type { RegistryConfig, Registry } from './types.js';
 
 /**
- * Load registry configuration from .github/registries.yml
+ * Load registry configuration from .publish/registries.yml
  */
 export async function loadRegistryConfig(workspaceRoot: string): Promise<RegistryConfig> {
-  const configPath = join(workspaceRoot, '.github', 'registries.yml');
+  const configPath = join(workspaceRoot, '.publish', 'registries.yml');
   
   try {
     const content = await readFile(configPath, 'utf-8');

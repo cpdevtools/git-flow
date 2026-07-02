@@ -350,7 +350,7 @@ export async function executeUpload(
           break;
 
         default:
-          console.warn(`  ⚠️  Unknown artifact type: ${(artifact as any).type}`);
+          console.error(`  ⚠️  Unknown artifact type: ${(artifact as any).type}`);
       }
     }
 

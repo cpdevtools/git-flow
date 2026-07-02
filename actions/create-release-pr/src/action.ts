@@ -24,7 +24,7 @@ async function run() {
     // Get inputs
     const branch = core.getInput('branch', { required: true });
     const token = core.getInput('token', { required: true });
-    const versionsFile = core.getInput('versions_file') || '.github/versions.yml';
+    const versionsFile = core.getInput('versions_file') || '.publish/versions.yml';
     const runNumber = parseInt(core.getInput('run_number') || '0', 10);
 
     // Set GITHUB_TOKEN for gh CLI commands in version resolution
