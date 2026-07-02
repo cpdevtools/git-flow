@@ -37,6 +37,6 @@
   "bugs": "https://github.com/cpdevtools/git-flow/issues",
   "homepage": "https://github.com/cpdevtools/git-flow#readme",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   }
 }
