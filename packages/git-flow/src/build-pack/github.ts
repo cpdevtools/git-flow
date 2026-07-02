@@ -54,9 +54,9 @@ export async function findDraftReleaseByTag(
     });
 
     // Parse tag to get name and version for fallback search
-    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
-    const tagMatch = tag.match(/^(.+)\/v(.+)$/);
-    const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+    // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
+    const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
+    const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
 
     // First try to find by exact tag match
     let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
@@ -502,9 +502,9 @@ export async function getDraftReleaseMetadata(
     });
 
     // Parse tag to get name and version for fallback search
-    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
-    const tagMatch = tag.match(/^(.+)\/v(.+)$/);
-    const expectedName = tagMatch ? `${tagMatch[1]} ${tagMatch[2]}` : null;
+    // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
+    const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
+    const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
 
     // First try to find by exact tag match
     let release = releases.find(r => r.tag_name === tag && r.draft);

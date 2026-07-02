@@ -2,23 +2,26 @@ name: Scheduled Cleanup
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+    - cron: '0 7 * * *'  # Daily at 2 AM EST
   workflow_dispatch:
     inputs:
       days_old:
         description: 'Delete builds older than X days'
-        type: number
-        default: 14
+        type: string
+        default: '14'
       dry_run:
         description: 'Dry run (do not delete, just show what would be deleted)'
-        type: boolean
-        default: true
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+        default: 'true'
 
 jobs:
-  cleanup:
-    uses: cpdevtools/git-flow/.github/workflows/cleanup-old-builds.yml@main
+  cleanup-scheduled:
+    uses: ./.github/workflows/cleanup-old-builds.yml
     with:
-      days_old: ${{ inputs.days_old || 14 }}
-      dry_run: ${{ inputs.dry_run || false }}
+      days_old: ${{ inputs.days_old }}
+      dry_run: ${{ inputs.dry_run }}
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}

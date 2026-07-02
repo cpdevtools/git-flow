@@ -6,6 +6,10 @@ coverage/
 .env.local
 .artifacts/
 
+# Production lockfile dir — only the lockfile is committed
+.pnpm-prod/*
+!.pnpm-prod/pnpm-lock.yaml
+
 # Ignore most dist except CLI
 packages/*/dist/*
 !packages/git-flow/dist/

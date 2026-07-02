@@ -208,10 +208,10 @@ export async function executePack(
     try {
       // Verify CLI is available
       try {
-        await $({ cwd: project.cwd, env })`which cpdt-gitflow`;
-        console.log(`  ✓ cpdt-gitflow CLI found in PATH`);
+        await $({ cwd: project.cwd, env })`which gitflow`;
+        console.log(`  ✓ gitflow CLI found in PATH`);
       } catch {
-        console.error(`  ⚠️  cpdt-gitflow not found in PATH`);
+        console.error(`  ⚠️  gitflow not found in PATH`);
         console.error(`  PATH: ${env.PATH}`);
       }
       

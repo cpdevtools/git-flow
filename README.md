@@ -7,9 +7,28 @@ Git-based versioning and release workflow automation.
 - [`@cpdevtools/git-flow`](./packages/git-flow) - Core library for version resolution and branch operations
 - [`create-release-pr`](./actions/create-release-pr) - GitHub composite action for creating release PRs
 
+## Actions
+
+- [`test`](./actions/test) - Runs build/test scripts across workspace projects in dependency order using [`@cpdevtools/ts-dev-utilities/runner`](https://github.com/cpdevtools/ts-dev-utilities)
+- [`build-pack`](./actions/build-pack) - Builds and packs release artifacts from a release PR
+- [`create-release-pr`](./actions/create-release-pr) - Creates a release PR with resolved version metadata
+- [`publish-release`](./actions/publish-release) - Publishes artifacts to registries and finalises releases
+
+**Inputs:**
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `mode` | `test-optional` | `build`, `test`, or `test-optional` (both where available) |
+| `fail-fast` | `false` | Stop on first failure, cancel in-flight tasks |
+| `concurrency` | _(unlimited)_ | Max projects to run in parallel |
+| `workspace-root` | `${{ github.workspace }}` | Workspace root |
+
+**Outputs:** `projects-passed`, `projects-failed`, `projects-skipped`
+
 ## Workflows
 
 - [Create Release PR](./.github/workflows/create-release-pr.yml) - Reusable workflow for automating release PRs
+- [Test](./.github/workflows/test.yml) - Runs build/test scripts across the workspace on every push
 
 ## Development
 

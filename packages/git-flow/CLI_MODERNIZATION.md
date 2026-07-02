@@ -8,11 +8,11 @@
 - `cpdevtools-apply-version` - Standalone apply-version command
 
 **After:**
-- `cpdt-gitflow` - Single CLI with subcommands
-  - `cpdt-gitflow pack`
-  - `cpdt-gitflow apply-version`
-  - `cpdt-gitflow help`
-  - `cpdt-gitflow autocomplete`
+- `gitflow` - Single CLI with subcommands
+  - `gitflow pack`
+  - `gitflow apply-version`
+  - `gitflow help`
+  - `gitflow autocomplete`
 
 ### 2. Modern CLI Framework (oclif)
 
@@ -43,7 +43,7 @@
 
 **Updated:**
 - `package.json`:
-  - Single bin entry: `cpdt-gitflow`
+  - Single bin entry: `gitflow`
   - oclif configuration section
   - Plugin registrations
 - `tsup.config.ts`:
@@ -57,7 +57,7 @@
 ```json
 {
   "scripts": {
-    "github.actions.pack": "cpdt-gitflow pack"
+    "github.actions.pack": "gitflow pack"
   }
 }
 ```
@@ -65,18 +65,18 @@
 **Command-line usage:**
 ```bash
 # Display help
-cpdt-gitflow --help
-cpdt-gitflow pack --help
+gitflow --help
+gitflow pack --help
 
 # Pack with flags
-cpdt-gitflow pack --project-name my-package --version 1.0.0
+gitflow pack --project-name my-package --version 1.0.0
 
 # Apply version
-cpdt-gitflow apply-version 1.2.3
-cpdt-gitflow apply-version --version 1.2.3
+gitflow apply-version 1.2.3
+gitflow apply-version --version 1.2.3
 
 # Setup autocomplete
-cpdt-gitflow autocomplete
+gitflow autocomplete
 ```
 
 ### 5. Benefits
@@ -87,7 +87,7 @@ cpdt-gitflow autocomplete
    - Better help documentation
 
 2. **Scalability**
-   - Easy to add new commands (e.g., `cpdt-gitflow version`, `cpdt-gitflow branch`)
+   - Easy to add new commands (e.g., `gitflow version`, `gitflow branch`)
    - Plugin system for future extensions
    - Clean command organization
 
@@ -103,14 +103,14 @@ cpdt-gitflow autocomplete
 
 ### 6. Backward Compatibility
 
-The old commands (`cpdevtools-pack`, `cpdevtools-apply-version`) are **deprecated** but still linked in node_modules for now. Projects should update to the new `cpdt-gitflow` commands.
+The old commands (`cpdevtools-pack`, `cpdevtools-apply-version`) are **deprecated** but still linked in node_modules for now. Projects should update to the new `gitflow` commands.
 
 **Migration:**
 ```diff
 {
   "scripts": {
 -   "github.actions.pack": "cpdevtools-pack"
-+   "github.actions.pack": "cpdt-gitflow pack"
++   "github.actions.pack": "gitflow pack"
   }
 }
 ```
@@ -128,17 +128,17 @@ All tests passing:
 
 - ✅ [README.md](./README.md) - Added CLI overview
 - ✅ [CLI-TOOLS.md](./CLI-TOOLS.md) - Updated with new command structure
-- ✅ All examples updated to use `cpdt-gitflow` format
+- ✅ All examples updated to use `gitflow` format
 
 ## Future Expansion
 
 The new architecture easily supports additional commands:
 
 ```bash
-cpdt-gitflow version create 1.2.3    # Create new version
-cpdt-gitflow branch create feature/x # Create new branch
-cpdt-gitflow release publish         # Publish release
-cpdt-gitflow config validate         # Validate config
+gitflow version create 1.2.3    # Create new version
+gitflow branch create feature/x # Create new branch
+gitflow release publish         # Publish release
+gitflow config validate         # Validate config
 ```
 
 Each command would be added as `src/cli/commands/<name>.ts` with automatic help and autocomplete support.

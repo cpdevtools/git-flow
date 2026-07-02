@@ -1,5 +1,5 @@
 /**
- * cpdt-gitflow apply-version command
+ * gitflow apply-version command
  * Applies version to project files with hook support
  */
 

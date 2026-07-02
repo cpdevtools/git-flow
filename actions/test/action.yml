@@ -1,43 +1,49 @@
-name: 'Build & Pack Projects'
-description: 'Phase 2: Builds and packages projects from release PR, creates draft releases with artifacts'
+name: 'Test Projects'
+description: 'Runs build/test scripts across workspace projects in dependency order'
 author: 'CPDevTools'
 
 branding:
-  icon: 'package'
-  color: 'purple'
+  icon: 'check-circle'
+  color: 'green'
 
 inputs:
-  pr-number:
-    description: 'Pull request number containing release metadata'
+  mode:
+    description: 'Test mode: build (build only), test (test only), or test-optional (both where available)'
     required: false
-    default: '0'
-  
+    default: 'test-optional'
+
+  fail-fast:
+    description: 'Stop on first failure, cancelling in-flight tasks'
+    required: false
+    default: 'false'
+
+  concurrency:
+    description: 'Maximum number of projects to run in parallel (default: unlimited)'
+    required: false
+    default: ''
+
   token:
-    description: 'GitHub token with release permissions'
+    description: 'GitHub token (used for installing packages)'
     required: false
     default: ${{ github.token }}
-  
+
   workspace-root:
     description: 'Workspace root directory'
     required: false
     default: ${{ github.workspace }}
 
 outputs:
-  projects-built:
-    description: 'Number of projects successfully built'
-    value: ${{ steps.build-pack.outputs.projects-built }}
-  
-  projects-packed:
-    description: 'Number of projects successfully packed'
-    value: ${{ steps.build-pack.outputs.projects-packed }}
-  
-  projects-uploaded:
-    description: 'Number of projects successfully uploaded'
-    value: ${{ steps.build-pack.outputs.projects-uploaded }}
-  
+  projects-passed:
+    description: 'Number of projects that passed'
+    value: ${{ steps.test.outputs.projects-passed }}
+
+  projects-failed:
+    description: 'Number of projects that failed'
+    value: ${{ steps.test.outputs.projects-failed }}
+
   projects-skipped:
-    description: 'Number of projects skipped (already completed)'
-    value: ${{ steps.build-pack.outputs.projects-skipped }}
+    description: 'Number of projects skipped due to a dependency failure'
+    value: ${{ steps.test.outputs.projects-skipped }}
 
 runs:
   using: 'composite'
@@ -50,18 +56,18 @@ runs:
         scope: '@cpdevtools'
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
-    
+
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
       with:
         version: 11
-    
+
     - name: Configure registry auth
       shell: bash
       run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
-    
+
     - name: Install workspace dependencies
       shell: bash
       run: pnpm install --lockfile-dir .pnpm-prod
@@ -69,7 +75,7 @@ runs:
         HUSKY: '0'
         NODE_AUTH_TOKEN: ${{ inputs.token }}
         GITHUB_TOKEN: ${{ inputs.token }}
-    
+
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
@@ -78,12 +84,14 @@ runs:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
-    
-    - name: Run Build & Pack
+
+    - name: Run Tests
+      id: test
       shell: bash
       run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
       env:
-        INPUT_PR_NUMBER: ${{ inputs.pr-number }}
-        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_FAIL_FAST: ${{ inputs.fail-fast }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
         INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
-        INPUT_ARTIFACT_OUTPUT_DIR: ${{ inputs.artifact-output-dir }}
+        GITHUB_TOKEN: ${{ inputs.token }}

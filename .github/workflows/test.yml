@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  push:
+    branches-ignore:
+      - 'release/**'
+
+permissions:
+  checks: write    # Write step summaries / check runs
+  actions: read    # Read workflow context
+  packages: read   # Install from GitHub Package Registry
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Tests
+        uses: ./actions/test
+        with:
+          mode: test-optional
+          fail-fast: ${{ github.event.inputs.fail-fast || 'false' }}
+          concurrency: ${{ github.event.inputs.concurrency || '' }}
+          token: ${{ secrets.GITHUB_TOKEN }}

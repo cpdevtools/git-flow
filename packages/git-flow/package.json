@@ -28,11 +28,11 @@
     }
   },
   "bin": {
-    "cpdt-gitflow": "./src/cli/bin.ts"
+    "gitflow": "./src/cli/bin.ts"
   },
   "oclif": {
-    "bin": "cpdt-gitflow",
-    "dirname": "cpdt-gitflow",
+    "bin": "gitflow",
+    "dirname": "gitflow",
     "commands": "./dist/cli/commands",
     "topicSeparator": " "
   },
@@ -67,7 +67,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/ts-dev-utilities": "^0.1.1-dev.0",
+    "@cpdevtools/ts-dev-utilities": "^0.2.5",
     "@oclif/core": "^4.8.0",
     "@oclif/plugin-autocomplete": "^3.2.40",
     "@oclif/plugin-help": "^6.2.37",
@@ -89,6 +89,6 @@
     "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   }
 }

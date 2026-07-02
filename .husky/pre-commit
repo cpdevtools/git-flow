@@ -1,0 +1,11 @@
+echo "pre-commit: regenerating .pnpm-prod/pnpm-lock.yaml..."
+
+mkdir -p .pnpm-prod
+if ! pnpm_out=$(DEV_LOCAL=false pnpm install --lockfile-dir .pnpm-prod --lockfile-only --config.minimumReleaseAge=0 2>&1); then
+  printf '%s\n' "$pnpm_out" >&2
+  echo "" >&2
+  echo "pre-commit FAILED: could not regenerate .pnpm-prod/pnpm-lock.yaml" >&2
+  exit 1
+fi
+
+git add .pnpm-prod/pnpm-lock.yaml
