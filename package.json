@@ -7,7 +7,7 @@
     "build": "pnpm -r build",
     "format": "prettier --write \"**/*.{ts,js,json,md,yml}\"",
     "lint": "pnpm -r lint",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "syncpack.fix": "syncpack fix-mismatches",
     "syncpack.format": "syncpack format",
     "syncpack.list": "syncpack list-mismatches",
