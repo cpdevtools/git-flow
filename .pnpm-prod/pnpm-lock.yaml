@@ -111,8 +111,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.1.1-dev.0
-        version: 0.1.1-dev.2
+        specifier: ^0.2.5
+        version: 0.2.5
       '@oclif/core':
         specifier: ^4.8.0
         version: 4.11.11
@@ -190,10 +190,6 @@ packages:
   '@babel/helper-validator-identifier@7.29.7':
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
-
-  '@cpdevtools/ts-dev-utilities@0.1.1-dev.2':
-    resolution: {integrity: sha512-/mV7ujX+8lb6QwoLKQef8e9LSmXVcUbKgFj6M8RTgSfTSUZ3ynd41fY3VKvckLrvgLEBbxvbZebiqeHntWJQJw==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.1.1-dev.2/548e3d589566c39b8e4cb2d7fe00028d540744f5}
-    engines: {node: '>=20'}
 
   '@cpdevtools/ts-dev-utilities@0.2.5':
     resolution: {integrity: sha512-HpMa7Z9BiaZrj8lbGaDLKJ4t5xgUFjPGz9ZQVwlaW8kJFI0TpgiSb2zLiY2izDWR4ep8Ht3ivJ4GbFzmPxJFEQ==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.2.5/55c3d86dc36044b6a5f0d95cba4a4a1e022596a9}
@@ -2105,13 +2101,6 @@ snapshots:
       picocolors: 1.1.1
 
   '@babel/helper-validator-identifier@7.29.7': {}
-
-  '@cpdevtools/ts-dev-utilities@0.1.1-dev.2':
-    dependencies:
-      change-case: 5.4.4
-      globby: 14.1.0
-      jsonc-parser: 3.3.1
-      yaml: 2.9.0
 
   '@cpdevtools/ts-dev-utilities@0.2.5':
     dependencies:

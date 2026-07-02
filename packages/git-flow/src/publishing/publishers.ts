@@ -1,5 +1,5 @@
 import { writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import { $ } from 'zx';
 import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';
@@ -25,9 +25,18 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   console.log(`  📝 Writing .npmrc to ${npmrcPath}`);
   await writeFile(npmrcPath, npmrcContent);
 
+  // Detect prerelease tag from tarball filename (e.g. pkg-1.2.3-dev.0.tgz → 'dev')
+  const filenameVersion = basename(artifactPath).match(/(\d+\.\d+\.\d+(?:-.+?)?)\.tgz$/)?.[1];
+  const prereleaseTag = filenameVersion?.includes('-')
+    ? filenameVersion.split('-')[1].split('.')[0]
+    : undefined;
+
   try {
-    // Publish the tarball using npm (pnpm publish repacks from cwd instead of using the tarball)
-    await $`npm publish ${artifactPath} --registry ${registry.url}`;
+    if (prereleaseTag) {
+      await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${prereleaseTag}`;
+    } else {
+      await $`npm publish ${artifactPath} --registry ${registry.url}`;
+    }
   } finally {
     // Clean up .npmrc
     await $`rm -f ${npmrcPath}`.catch(() => {});
