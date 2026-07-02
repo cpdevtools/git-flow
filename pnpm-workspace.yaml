@@ -4,5 +4,4 @@ packages:
 allowBuilds:
   esbuild: false
 minimumReleaseAgeExclude:
-  - '@cpdevtools/ts-dev-utilities@0.2.3'
-  - '@cpdevtools/ts-dev-utilities@0.2.5'
+  - '@cpdevtools/ts-dev-utilities'
