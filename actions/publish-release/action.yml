@@ -30,9 +30,9 @@ runs:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
     
     - name: Setup pnpm
-      uses: pnpm/action-setup@v2
+      uses: pnpm/action-setup@v4
       with:
-        version: 8
+        version: 9
     
     - name: Install dependencies
       shell: bash
