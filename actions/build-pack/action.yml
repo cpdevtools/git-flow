@@ -58,7 +58,9 @@ runs:
     
     - name: Configure registry auth
       shell: bash
-      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      run: |
+        pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+        pnpm config set "verifyDepsBeforeRun" "false"
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
     
