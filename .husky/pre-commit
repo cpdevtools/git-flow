@@ -1,7 +1,3 @@
-#!/bin/sh
-# Regenerate the production lockfile (no DEV_LOCAL) before every commit.
-# This ensures .pnpm-prod/pnpm-lock.yaml always reflects published packages.
-
 echo "pre-commit: regenerating .pnpm-prod/pnpm-lock.yaml..."
 
 mkdir -p .pnpm-prod
