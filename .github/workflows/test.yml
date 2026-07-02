@@ -8,6 +8,7 @@ on:
 permissions:
   checks: write    # Write step summaries / check runs
   actions: read    # Read workflow context
+  packages: read   # Install from GitHub Package Registry
 
 jobs:
   test:
