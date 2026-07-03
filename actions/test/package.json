@@ -5,7 +5,7 @@
   "description": "GitHub Action for Phase 4 Test orchestration",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@cpdevtools/ts-dev-utilities": "^0.3.1",
+    "@cpdevtools/ts-dev-utilities": "^0.3.2-dev.1",
     "tsx": "^4.19.2"
   },
   "author": "CPDevTools",

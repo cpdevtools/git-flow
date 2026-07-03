@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@cpdevtools/ts-dev-utilities': ^0.3.1
+  '@cpdevtools/ts-dev-utilities': ^0.3.2-dev.1
 
 importers:
 
@@ -72,8 +72,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.3.2-dev.1
+        version: 0.3.2-dev.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -102,8 +102,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.3.2-dev.1
+        version: 0.3.2-dev.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -160,8 +160,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.1
-        version: 0.3.1
+        specifier: ^0.3.2-dev.1
+        version: 0.3.2-dev.1
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -231,10 +231,9 @@ packages:
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
 
-  '@cpdevtools/ts-dev-utilities@0.3.1':
-    resolution: {integrity: sha512-PSxRN9DOMWXCKnirJnfmnsA631IKjeGt9hBfoqjBu1vDApIEPL/6mmq7zs9GMvT31SuvRokqaYF7/q/PPQ3eEQ==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.1/6194542a727dd2f4ebf7fa7c053aee887196d894}
+  '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
+    resolution: {integrity: sha512-0Dsw1QIqGsv9RVwK0AcnM4EWkQWHqteJ2hhJt3k2F0iM4n6pR/vYjMgtpTfW3hAsFd3MTeESrqLZ1cZuMCX6TA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.2-dev.1/de7cc593c5edb7a0f3d32b8478e3f139681c9132}
     engines: {node: '>=24'}
-    hasBin: true
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -2184,7 +2183,7 @@ snapshots:
 
   '@babel/helper-validator-identifier@7.29.7': {}
 
-  '@cpdevtools/ts-dev-utilities@0.3.1':
+  '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
