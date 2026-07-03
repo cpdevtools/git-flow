@@ -43,7 +43,7 @@ runs:
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm install --prod --no-frozen-lockfile
+      run: pnpm i --no-frozen-lockfile
       env:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}
@@ -51,7 +51,7 @@ runs:
     
     - name: Run Publish Release
       shell: bash
-      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      run: npx tsx ${{ github.action_path }}/src/action.ts
       env:
         INPUT_PR_NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}

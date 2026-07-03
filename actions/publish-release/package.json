@@ -2,30 +2,13 @@
   "name": "@cpdevtools/publish-release-action",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/index.js",
-  "scripts": {
-    "build": "wireit",
-    "dev": "tsup --watch"
-  },
+  "description": "GitHub Action to publish release artifacts",
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/git-flow": "workspace:*",
     "tsx": "^4.19.2"
   },
-  "wireit": {
-    "build": {
-      "command": "tsup",
-      "dependencies": [
-        "../../packages/git-flow:build"
-      ],
-      "files": [
-        "src/**/*.ts",
-        "tsup.config.ts"
-      ],
-      "output": [
-        "dist/**"
-      ]
-    }
-  }
+  "author": "CPDevTools",
+  "license": "MIT"
 }

@@ -20,18 +20,14 @@
     "build": {
       "dependencies": [
         "./packages/git-flow:build",
-        "./packages/cli:build",
-        "./actions/build-pack:build",
-        "./actions/create-release-pr:build",
-        "./actions/publish-release:build",
-        "./actions/test:build"
+        "./packages/cli:build"
       ]
     },
     "test": {
-      "dependencies": ["./packages/git-flow:test", "./actions/create-release-pr:test"]
+      "dependencies": ["./packages/git-flow:test"]
     },
     "typecheck": {
-      "dependencies": ["./packages/git-flow:typecheck", "./packages/cli:typecheck", "./actions/create-release-pr:typecheck"]
+      "dependencies": ["./packages/git-flow:typecheck", "./packages/cli:typecheck"]
     }
   },
   "devDependencies": {
