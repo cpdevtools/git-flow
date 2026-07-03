@@ -22,33 +22,35 @@
     },
     "./publish-release": {
       "default": "./src/publish-release/index.ts"
-    },
-    "./cli": {
-      "default": "./src/cli/index.ts"
     }
   },
-  "bin": {
-    "gitflow": "./src/cli/bin.ts"
-  },
-  "oclif": {
-    "bin": "gitflow",
-    "dirname": "gitflow",
-    "commands": "./dist/cli/commands",
-    "topicSeparator": " "
-  },
   "files": [
-    "dist",
-    "oclif.manifest.json"
+    "dist"
   ],
   "scripts": {
-    "build": "tsup",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "build": "wireit",
+    "test": "wireit",
+    "typecheck": "wireit",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "typecheck": "tsc --noEmit",
     "github.actions.build": "pnpm build",
     "github.actions.pack": "pnpm pack"
+  },
+  "wireit": {
+    "build": {
+      "command": "tsup",
+      "files": ["src/**/*.ts", "tsup.config.ts", "tsconfig.json"],
+      "output": ["dist/**"]
+    },
+    "test": {
+      "command": "vitest run",
+      "dependencies": ["build"],
+      "files": ["src/**/*.ts", "vitest.config.ts"]
+    },
+    "typecheck": {
+      "command": "tsc --noEmit",
+      "files": ["src/**/*.ts", "tsconfig.json"]
+    }
   },
   "keywords": [
     "git",
@@ -68,9 +70,6 @@
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/ts-dev-utilities": "^0.3.1",
-    "@oclif/core": "^4.8.0",
-    "@oclif/plugin-autocomplete": "^3.2.40",
-    "@oclif/plugin-help": "^6.2.37",
     "fast-glob": "^3.3.2",
     "semver": "^7.6.3",
     "yaml": "^2.8.2",

@@ -4,7 +4,9 @@
   "private": true,
   "description": "Git-based versioning and release workflow automation",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "wireit",
+    "test": "wireit",
+    "typecheck": "wireit",
     "format": "prettier --write \"**/*.{ts,js,json,md,yml}\"",
     "lint": "pnpm -r lint",
     "prepare": "husky || true",
@@ -12,9 +14,25 @@
     "syncpack.format": "syncpack format",
     "syncpack.list": "syncpack list-mismatches",
     "dep-versions.check": "devutil dep-versions check .publish/deps.yml",
-    "dep-versions.fix": "devutil dep-versions fix .publish/deps.yml",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "dep-versions.fix": "devutil dep-versions fix .publish/deps.yml"
+  },
+  "wireit": {
+    "build": {
+      "dependencies": [
+        "./packages/git-flow:build",
+        "./packages/cli:build",
+        "./actions/build-pack:build",
+        "./actions/create-release-pr:build",
+        "./actions/publish-release:build",
+        "./actions/test:build"
+      ]
+    },
+    "test": {
+      "dependencies": ["./packages/git-flow:test", "./actions/create-release-pr:test"]
+    },
+    "typecheck": {
+      "dependencies": ["./packages/git-flow:typecheck", "./packages/cli:typecheck", "./actions/create-release-pr:typecheck"]
+    }
   },
   "devDependencies": {
     "@types/node": "^20.17.11",
@@ -26,7 +44,8 @@
     "syncpack": "^13.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wireit": "^0.14.13"
   },
   "keywords": [
     "git",

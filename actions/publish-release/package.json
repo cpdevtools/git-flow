@@ -4,7 +4,7 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsup",
+    "build": "wireit",
     "dev": "tsup --watch"
   },
   "dependencies": {
@@ -12,5 +12,20 @@
     "@actions/github": "^6.0.0",
     "@cpdevtools/git-flow": "workspace:*",
     "tsx": "^4.19.2"
+  },
+  "wireit": {
+    "build": {
+      "command": "tsup",
+      "dependencies": [
+        "../../packages/git-flow:build"
+      ],
+      "files": [
+        "src/**/*.ts",
+        "tsup.config.ts"
+      ],
+      "output": [
+        "dist/**"
+      ]
+    }
   }
 }

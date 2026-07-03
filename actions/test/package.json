@@ -4,7 +4,7 @@
   "private": true,
   "description": "GitHub Action for Phase 4 Test orchestration",
   "scripts": {
-    "build": "tsup",
+    "build": "wireit",
     "clean": "rm -rf dist",
     "dev": "tsup --watch"
   },
@@ -15,5 +15,20 @@
   },
   "devDependencies": {},
   "author": "CPDevTools",
-  "license": "MIT"
+  "license": "MIT",
+  "wireit": {
+    "build": {
+      "command": "tsup",
+      "dependencies": [
+        "../../packages/git-flow:build"
+      ],
+      "files": [
+        "src/**/*.ts",
+        "tsup.config.ts"
+      ],
+      "output": [
+        "dist/**"
+      ]
+    }
+  }
 }
