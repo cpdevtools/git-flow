@@ -4,19 +4,30 @@
   "private": true,
   "description": "Git-based versioning and release workflow automation",
   "scripts": {
+    "prepare": "wireit",
     "build": "wireit",
     "test": "wireit",
     "typecheck": "wireit",
-    "format": "prettier --write \"**/*.{ts,js,json,md,yml}\"",
     "lint": "pnpm -r lint",
-    "prepare": "husky || true",
-    "syncpack.fix": "syncpack fix-mismatches",
-    "syncpack.format": "syncpack format",
-    "syncpack.list": "syncpack list-mismatches",
-    "dep-versions.check": "devutil dep-versions check .publish/deps.yml",
-    "dep-versions.fix": "devutil dep-versions fix .publish/deps.yml"
+    "fix": "wireit",
+    "format": "wireit",
+    "check": "wireit",
+    "clean": "wireit",
+    "reset": "wireit"
   },
   "wireit": {
+    "prepare": {
+      "dependencies": [
+        "prepare.husky"
+      ]
+    },
+    "prepare.husky": {
+      "command": "husky",
+      "files": [
+        ".husky/**"
+      ],
+      "output": []
+    },
     "build": {
       "dependencies": [
         "./packages/git-flow:build",
@@ -28,6 +39,74 @@
     },
     "typecheck": {
       "dependencies": ["./packages/git-flow:typecheck", "./packages/cli:typecheck"]
+    },
+    "fix": {
+      "dependencies": [
+        "fix.syncpack",
+        "fix.git-remove-tags"
+      ]
+    },
+    "fix.deps": {
+      "command": "devutil dep-versions fix .publish/deps.yml"
+    },
+    "fix.git-remove-tags": {
+      "command": "git tag | xargs -r git tag -d"
+    },
+    "fix.syncpack": {
+      "command": "syncpack fix-mismatches",
+      "dependencies": [
+        "fix.deps"
+      ]
+    },
+    "format": {
+      "dependencies": [
+        "format.prettier"
+      ]
+    },
+    "format.syncpack": {
+      "command": "syncpack format"
+    },
+    "format.prettier": {
+      "command": "prettier --write \"**/*.{ts,js,json,md,yml}\"",
+      "dependencies": [
+        "format.syncpack"
+      ]
+    },
+    "check": {
+      "dependencies": [
+        "check.deps",
+        "check.syncpack"
+      ]
+    },
+    "check.deps": {
+      "command": "devutil dep-versions check .publish/deps.yml"
+    },
+    "check.syncpack": {
+      "command": "syncpack list-mismatches"
+    },
+    "clean": {
+      "dependencies": [
+        "clean.git",
+        "pnpm.install"
+      ]
+    },
+    "clean.git": {
+      "command": "git clean -dfX",
+      "cache": false
+    },
+    "reset": {
+      "dependencies": [
+        "reset.git",
+        "pnpm.install"
+      ]
+    },
+    "reset.git": {
+      "command": "git reset --hard",
+      "cache": false
+    },
+    "pnpm.install": {
+      "command": "pnpm install",
+      "cache": false
     }
   },
   "devDependencies": {
