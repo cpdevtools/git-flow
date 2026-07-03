@@ -11,6 +11,8 @@
     "syncpack.fix": "syncpack fix-mismatches",
     "syncpack.format": "syncpack format",
     "syncpack.list": "syncpack list-mismatches",
+    "dep-versions.check": "devutil dep-versions check .publish/deps.yml",
+    "dep-versions.fix": "devutil dep-versions fix .publish/deps.yml",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   },
