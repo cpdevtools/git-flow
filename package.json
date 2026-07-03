@@ -3,6 +3,7 @@
   "version": "0.0.0-MAIN",
   "private": true,
   "description": "Git-based versioning and release workflow automation",
+  "packageManager": "pnpm@11.5.0",
   "scripts": {
     "build": "wireit",
     "check": "wireit",
