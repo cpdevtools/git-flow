@@ -1,0 +1,18 @@
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: {
+    bin: 'src/bin.ts',
+    index: 'src/index.ts',
+    'config-loader': 'src/config-loader.ts',
+    'commands/pack': 'src/commands/pack.ts',
+    'commands/apply-version': 'src/commands/apply-version.ts',
+  },
+  format: ['cjs'],
+  target: 'node24',
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  bundle: false,
+  platform: 'node',
+});

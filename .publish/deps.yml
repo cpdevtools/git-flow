@@ -1,0 +1,28 @@
+npm:
+  "@actions/core": "^1.11.1"
+  "@actions/github": "^6.0.0"
+  "@cpdevtools/ts-dev-utilities": "^0.3.2-dev.1"
+  "@oclif/core": "^4.8.0"
+  "@oclif/plugin-autocomplete": "^3.2.40"
+  "@oclif/plugin-help": "^6.2.37"
+  "@types/node": "^20.17.11"
+  "@types/semver": "^7.5.8"
+  "@typescript-eslint/eslint-plugin": "^8.20.0"
+  "@typescript-eslint/parser": "^8.20.0"
+  eslint: "^9.18.0"
+  fast-glob: "^3.3.2"
+  husky: "^9.1.7"
+  prettier: "^3.4.2"
+  semver: "^7.6.3"
+  syncpack: "^13.0.0"
+  tsup: "^8.5.1"
+  tsx: "^4.19.2"
+  typescript: "^5.9.3"
+  vitest: "^2.1.8"
+  yaml: "^2.8.2"
+  zx: "^8.2.4"
+
+github-actions:
+  actions/checkout: v7
+  actions/setup-node: v6
+  pnpm/action-setup: v6

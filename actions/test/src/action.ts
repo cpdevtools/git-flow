@@ -37,6 +37,18 @@ async function run(): Promise<void> {
       cwd: workspaceRoot,
       failFast,
       concurrency,
+      beforeTask: (project) => {
+        core.info(`▶ ${project.name}`);
+      },
+      afterTask: (_project, result) => {
+        const icon = result.state === 'passed' ? '✅' : '❌';
+        core.info(`${icon} ${result.project} (${(result.durationMs / 1000).toFixed(1)}s)`);
+        if (result.output?.trim()) {
+          for (const line of result.output.trimEnd().split('\n')) {
+            core.info(`  ${line}`);
+          }
+        }
+      },
     });
 
     await renderSummary(summary);
