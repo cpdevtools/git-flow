@@ -11,6 +11,9 @@ importers:
 
   ..:
     devDependencies:
+      '@cpdevtools/ts-dev-utilities-cli':
+        specifier: file:../ts-dev-utilities/packages/cli
+        version: file:../../ts-dev-utilities/packages/cli
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43
@@ -176,7 +179,7 @@ importers:
         version: 8.8.5
     devDependencies:
       '@types/node':
-        specifier: ^20.17.10
+        specifier: ^20.17.11
         version: 20.19.43
       '@types/semver':
         specifier: ^7.5.8
@@ -194,7 +197,7 @@ importers:
         specifier: ^3.4.2
         version: 3.9.4
       tsup:
-        specifier: ^8.3.5
+        specifier: ^8.5.1
         version: 8.5.1(postcss@8.5.16)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
       tsx:
         specifier: ^4.19.2
@@ -230,6 +233,11 @@ packages:
   '@babel/helper-validator-identifier@7.29.7':
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
+
+  '@cpdevtools/ts-dev-utilities-cli@file:../../ts-dev-utilities/packages/cli':
+    resolution: {directory: ../../ts-dev-utilities/packages/cli, type: directory}
+    engines: {node: '>=24'}
+    hasBin: true
 
   '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
     resolution: {integrity: sha512-0Dsw1QIqGsv9RVwK0AcnM4EWkQWHqteJ2hhJt3k2F0iM4n6pR/vYjMgtpTfW3hAsFd3MTeESrqLZ1cZuMCX6TA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.2-dev.1/de7cc593c5edb7a0f3d32b8478e3f139681c9132}
@@ -2182,6 +2190,10 @@ snapshots:
       picocolors: 1.1.1
 
   '@babel/helper-validator-identifier@7.29.7': {}
+
+  '@cpdevtools/ts-dev-utilities-cli@file:../../ts-dev-utilities/packages/cli':
+    dependencies:
+      '@cpdevtools/ts-dev-utilities': 0.3.2-dev.1
 
   '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
     dependencies:

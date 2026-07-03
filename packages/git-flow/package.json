@@ -39,17 +39,31 @@
   "wireit": {
     "build": {
       "command": "tsup",
-      "files": ["src/**/*.ts", "tsup.config.ts", "tsconfig.json"],
-      "output": ["dist/**"]
+      "files": [
+        "src/**/*.ts",
+        "tsup.config.ts",
+        "tsconfig.json"
+      ],
+      "output": [
+        "dist/**"
+      ]
     },
     "test": {
       "command": "vitest run",
-      "dependencies": ["build"],
-      "files": ["src/**/*.ts", "vitest.config.ts"]
+      "dependencies": [
+        "build"
+      ],
+      "files": [
+        "src/**/*.ts",
+        "vitest.config.ts"
+      ]
     },
     "typecheck": {
       "command": "tsc --noEmit",
-      "files": ["src/**/*.ts", "tsconfig.json"]
+      "files": [
+        "src/**/*.ts",
+        "tsconfig.json"
+      ]
     }
   },
   "keywords": [
@@ -76,13 +90,13 @@
     "zx": "^8.2.4"
   },
   "devDependencies": {
-    "@types/node": "^20.17.10",
+    "@types/node": "^20.17.11",
     "@types/semver": "^7.5.8",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "^9.18.0",
     "prettier": "^3.4.2",
-    "tsup": "^8.3.5",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
