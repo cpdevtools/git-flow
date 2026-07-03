@@ -7,14 +7,14 @@ settings:
 overrides:
   '@cpdevtools/ts-dev-utilities': ^0.3.2-dev.1
 
-pnpmfileChecksum: sha256-5104KrqpyTJS7/vJemF/X9cmr/6X2v61fq8534ivH8g=
+pnpmfileChecksum: sha256-JUsvOx43Tl5igXa+5NifxtB1hsb1SnO3Lr27iOeZo8Y=
 
 importers:
 
   .:
     devDependencies:
       '@cpdevtools/ts-dev-utilities-cli':
-        specifier: file:../ts-dev-utilities/packages/cli
+        specifier: file:/devcontainer/repos/ts-dev-utilities/packages/cli
         version: file:../ts-dev-utilities/packages/cli
       '@types/node':
         specifier: ^20.17.11

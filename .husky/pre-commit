@@ -8,4 +8,33 @@ if ! pnpm_out=$(DEV_LOCAL=false pnpm install --lockfile-dir .pnpm-prod --lockfil
   exit 1
 fi
 
+# Post-process: strip local-only file: packages that can't be resolved in CI.
+# pnpm's readPackage hook is not called during --lockfile-only, so we do it here.
+node --input-type=module << 'EOF'
+import { readFileSync, writeFileSync } from 'fs';
+const file = '.pnpm-prod/pnpm-lock.yaml';
+const lines = readFileSync(file, 'utf8').split('\n');
+const out = [];
+let i = 0;
+while (i < lines.length) {
+  const line = lines[i];
+  // 6-space indent importer devDep entry (followed by 2 indented value lines)
+  if (/^      '@cpdevtools\/ts-dev-utilities-cli':/.test(line)) {
+    i += 3; // skip key + specifier + version lines
+    continue;
+  }
+  // 2-space indent packages or snapshots top-level entry
+  if (/^  '@cpdevtools\/ts-dev-utilities-cli@file:/.test(line)) {
+    i++; // skip the key line
+    while (i < lines.length && /^    /.test(lines[i])) i++; // skip indented body
+    if (i < lines.length && lines[i] === '') i++; // skip trailing blank
+    continue;
+  }
+  out.push(line);
+  i++;
+}
+writeFileSync(file, out.join('\n'));
+console.log('Stripped local-only CLI entries from .pnpm-prod/pnpm-lock.yaml');
+EOF
+
 git add .pnpm-prod/pnpm-lock.yaml

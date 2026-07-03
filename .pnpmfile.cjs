@@ -31,6 +31,17 @@ function readPackage(pkg, context) {
       hasLoggedInit = true;
     }
 
+    // Inject CLI into the root workspace package for local development.
+    // The CLI is not in package.json (to avoid CI failures with file: paths),
+    // so we add it here only when DEV_LOCAL=true.
+    if (pkg.name === '@cpdevtools/git-flow-monorepo') {
+      const cliPath = path.resolve(__dirname, '../ts-dev-utilities/packages/cli');
+      if (fs.existsSync(path.join(cliPath, 'package.json'))) {
+        pkg.devDependencies = pkg.devDependencies || {};
+        pkg.devDependencies['@cpdevtools/ts-dev-utilities-cli'] = `file:${cliPath}`;
+      }
+    }
+
     // Check which packages actually exist (only check once and cache the results)
     Object.entries(localPackagesConfig).forEach(([pkgName, relativePath]) => {
       if (!checkedPackages.has(pkgName)) {

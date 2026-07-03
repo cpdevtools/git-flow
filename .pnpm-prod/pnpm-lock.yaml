@@ -11,9 +11,6 @@ importers:
 
   ..:
     devDependencies:
-      '@cpdevtools/ts-dev-utilities-cli':
-        specifier: file:../ts-dev-utilities/packages/cli
-        version: file:../../ts-dev-utilities/packages/cli
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43
@@ -76,7 +73,7 @@ importers:
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.3.2-dev.1
-        version: 0.3.2-dev.1
+        version: 0.3.2-dev.5
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -106,7 +103,7 @@ importers:
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.3.2-dev.1
-        version: 0.3.2-dev.1
+        version: 0.3.2-dev.5
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -164,7 +161,7 @@ importers:
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.3.2-dev.1
-        version: 0.3.2-dev.1
+        version: 0.3.2-dev.5
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -234,13 +231,8 @@ packages:
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
 
-  '@cpdevtools/ts-dev-utilities-cli@file:../../ts-dev-utilities/packages/cli':
-    resolution: {directory: ../../ts-dev-utilities/packages/cli, type: directory}
-    engines: {node: '>=24'}
-    hasBin: true
-
-  '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
-    resolution: {integrity: sha512-0Dsw1QIqGsv9RVwK0AcnM4EWkQWHqteJ2hhJt3k2F0iM4n6pR/vYjMgtpTfW3hAsFd3MTeESrqLZ1cZuMCX6TA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.2-dev.1/de7cc593c5edb7a0f3d32b8478e3f139681c9132}
+  '@cpdevtools/ts-dev-utilities@0.3.2-dev.5':
+    resolution: {integrity: sha512-tP364hpehOKukU8MO0JZhrd1cw8udjOWCUWb88DrCZJc4xsaFtpYW+xl+l1Yz9o2cD4OnhEkF4V5cFl86L+UkA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.2-dev.5/e95005c3223fd2007b49240c1c61c4c89cd4b031}
     engines: {node: '>=24'}
 
   '@esbuild/aix-ppc64@0.21.5':
@@ -2191,11 +2183,7 @@ snapshots:
 
   '@babel/helper-validator-identifier@7.29.7': {}
 
-  '@cpdevtools/ts-dev-utilities-cli@file:../../ts-dev-utilities/packages/cli':
-    dependencies:
-      '@cpdevtools/ts-dev-utilities': 0.3.2-dev.1
-
-  '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
+  '@cpdevtools/ts-dev-utilities@0.3.2-dev.5':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
