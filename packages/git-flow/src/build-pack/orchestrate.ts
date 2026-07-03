@@ -141,14 +141,12 @@ export async function runBuildPack(
   const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
 
   // Map ProjectConfig[] to the scheduler's Project type so the scheduler can
-  // build a real dependency graph from packageJson.dependencies.
+  // build a real dependency graph from packageJson.dependencies/devDependencies.
   const schedulerProjects: SchedulerProject[] = allProjectsToProcess.map((config) => ({
     packageJsonPath: join(config.cwd, 'package.json'),
     directory: config.cwd,
-    packageJson: config.packageJson as any,
+    packageJson: config.packageJson,
     name: config.name,
-    dependencies: config.packageJson?.dependencies,
-    devDependencies: config.packageJson?.devDependencies,
   }));
 
   // Run builds via scheduler (handles dependency ordering, concurrency, fail-fast)
