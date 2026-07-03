@@ -16,7 +16,7 @@
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/git-flow": "workspace:*",
-    "@cpdevtools/ts-dev-utilities": "^0.3.1",
+    "@cpdevtools/ts-dev-utilities": "^0.3.2-dev.1",
     "tsx": "^4.19.2",
     "yaml": "^2.8.2"
   },
