@@ -71,24 +71,11 @@ function readPackage(pkg, context) {
         });
       }
     });
-  } else {
-    // Strip file: protocol dependencies — they are local-only and must not appear in CI lockfiles
-    ['dependencies', 'devDependencies', 'peerDependencies'].forEach((depType) => {
-      if (pkg[depType]) {
-        for (const [name, version] of Object.entries(pkg[depType])) {
-          if (typeof version === 'string' && version.startsWith('file:')) {
-            delete pkg[depType][name];
-          }
-        }
-      }
-    });
   }
 
   return pkg;
 }
 
-// Always export hooks so pnpm consistently hashes the pnpmfile and the
-// file: stripping logic applies whether DEV_LOCAL is set or not.
 module.exports = {
   hooks: {
     readPackage,
