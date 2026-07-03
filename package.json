@@ -60,7 +60,8 @@
     },
     "format": {
       "dependencies": [
-        "format.prettier"
+        "format.prettier",
+        "format.projects"
       ]
     },
     "format.syncpack": {
@@ -71,6 +72,9 @@
       "dependencies": [
         "format.syncpack"
       ]
+    },
+    "format.projects": {
+      "command": "devutil run format"
     },
     "check": {
       "dependencies": [
