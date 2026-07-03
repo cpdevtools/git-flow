@@ -4,16 +4,16 @@
   "private": true,
   "description": "Git-based versioning and release workflow automation",
   "scripts": {
-    "prepare": "wireit",
     "build": "wireit",
-    "test": "wireit",
-    "typecheck": "wireit",
-    "lint": "pnpm -r lint",
-    "fix": "wireit",
-    "format": "wireit",
     "check": "wireit",
     "clean": "wireit",
-    "reset": "wireit"
+    "fix": "wireit",
+    "format": "wireit",
+    "lint": "pnpm -r lint",
+    "prepare": "wireit",
+    "reset": "wireit",
+    "test": "wireit",
+    "typecheck": "wireit"
   },
   "wireit": {
     "prepare": {
@@ -43,7 +43,8 @@
     "fix": {
       "dependencies": [
         "fix.syncpack",
-        "fix.git-remove-tags"
+        "fix.git-remove-tags",
+        "format"
       ]
     },
     "fix.deps": {
