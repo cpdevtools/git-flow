@@ -37,6 +37,20 @@ async function run(): Promise<void> {
       cwd: workspaceRoot,
       failFast,
       concurrency,
+      beforeTask: (project) => {
+        core.info(`▶ ${project.name}`);
+      },
+      afterTask: (_project, result) => {
+        const icon = result.state === 'passed' ? '✅' : '❌';
+        const label = `${icon} ${result.project} (${(result.durationMs / 1000).toFixed(1)}s)`;
+        if (result.output?.trim()) {
+          core.startGroup(label);
+          process.stdout.write(result.output);
+          core.endGroup();
+        } else {
+          core.info(label);
+        }
+      },
     });
 
     await renderSummary(summary);
