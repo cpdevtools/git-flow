@@ -86,7 +86,7 @@ runs:
     - name: Run Tests
       id: test
       shell: bash
-      run: npx tsx ${{ github.action_path }}/src/action.ts
+      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
       env:
         INPUT_MODE: ${{ inputs.mode }}
         INPUT_FAIL_FAST: ${{ inputs.fail-fast }}
