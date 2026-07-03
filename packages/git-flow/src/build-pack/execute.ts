@@ -8,32 +8,26 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { parseDocument } from 'yaml';
 import { $ } from 'zx';
-import {
-    findOrCreateDraftRelease,
-    uploadArtifact
-} from './github.js';
+import { findOrCreateDraftRelease, uploadArtifact } from './github.js';
 import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
-import {
-    rewriteWorkspaceDependencies,
-    restoreProjectFiles
-} from './workspace-deps/index.js';
+import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
 
 /**
  * Apply version to package.json
  */
 async function applyVersionToPackageJson(cwd: string, version: string): Promise<void> {
   const pkgPath = join(cwd, 'package.json');
-  
+
   if (!existsSync(pkgPath)) {
     return;
   }
-  
+
   const content = await readFile(pkgPath, 'utf-8');
   const pkg = JSON.parse(content);
-  
+
   pkg.version = version;
-  
+
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 }
 
@@ -45,11 +39,11 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
   try {
     const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj"`;
     const csprojFiles = stdout.trim().split('\n').filter(Boolean);
-    
+
     for (const csprojFile of csprojFiles) {
       const csprojPath = join(cwd, csprojFile);
       let content = await readFile(csprojPath, 'utf-8');
-      
+
       // Update <Version> tag
       if (content.includes('<Version>')) {
         content = content.replace(/<Version>.*?<\/Version>/, `<Version>${version}</Version>`);
@@ -57,10 +51,10 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
         // Add Version tag if not present
         content = content.replace(
           /<PropertyGroup>/,
-          `<PropertyGroup>\n    <Version>${version}</Version>`
+          `<PropertyGroup>\n    <Version>${version}</Version>`,
         );
       }
-      
+
       await writeFile(csprojPath, content);
     }
   } catch (error) {
@@ -107,7 +101,7 @@ async function hasPackScript(project: ProjectConfig): Promise<boolean> {
  */
 export async function executePack(
   project: ProjectConfig,
-  context: BuildPackContext
+  context: BuildPackContext,
 ): Promise<ExecutionResult> {
   if (!(await hasPackScript(project))) {
     console.log(`⊘ ${project.name}: No pack script, skipping...`);
@@ -149,7 +143,7 @@ export async function executePack(
         console.error(`  ⚠️  gitflow not found in PATH`);
         console.error(`  PATH: ${env.PATH}`);
       }
-      
+
       result = await $({ cwd: project.cwd, env, verbose: true })`pnpm run github.actions.pack`;
       console.log(`  ✓ Pack completed`);
     } catch (error) {
@@ -165,7 +159,7 @@ export async function executePack(
     const artifactPath = await generateArtifactDescriptor(
       project.cwd,
       project.name,
-      project.version
+      project.version,
     );
 
     if (!existsSync(artifactPath)) {
@@ -200,7 +194,7 @@ export async function executePack(
  */
 export async function executeUpload(
   project: ProjectConfig,
-  context: BuildPackContext
+  context: BuildPackContext,
 ): Promise<ExecutionResult> {
   console.log(`⬆️  ${project.name}: Uploading artifacts...`);
 
@@ -236,8 +230,8 @@ export async function executeUpload(
         case 'npm':
           // Upload npm package file
           // Path may be absolute (from artifact generation) or relative (from config)
-          const npmPath = isAbsolute(artifact.path) 
-            ? artifact.path 
+          const npmPath = isAbsolute(artifact.path)
+            ? artifact.path
             : join(context.workspaceRoot, artifact.path);
           await uploadArtifact(
             context.githubToken,
@@ -245,7 +239,7 @@ export async function executeUpload(
             repo,
             release.id,
             release.upload_url,
-            npmPath
+            npmPath,
           );
           break;
 
@@ -260,7 +254,7 @@ export async function executeUpload(
             repo,
             release.id,
             release.upload_url,
-            nugetPath
+            nugetPath,
           );
           break;
 
@@ -275,7 +269,7 @@ export async function executeUpload(
             repo,
             release.id,
             release.upload_url,
-            attachmentPath
+            attachmentPath,
           );
           break;
 

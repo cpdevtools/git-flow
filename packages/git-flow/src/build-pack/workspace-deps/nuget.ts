@@ -16,7 +16,9 @@ export interface RewriteNugetDepsOptions {
 /**
  * Convert ProjectReference to PackageReference before packing
  */
-export async function rewriteNugetProjectReferences(options: RewriteNugetDepsOptions): Promise<void> {
+export async function rewriteNugetProjectReferences(
+  options: RewriteNugetDepsOptions,
+): Promise<void> {
   const { project, allProjects } = options;
 
   // Find all .csproj files
@@ -31,9 +33,7 @@ export async function rewriteNugetProjectReferences(options: RewriteNugetDepsOpt
   }
 
   // Create version lookup map
-  const versionMap = new Map(
-    allProjects.map(p => [p.name, p.version])
-  );
+  const versionMap = new Map(allProjects.map((p) => [p.name, p.version]));
 
   for (const csprojPath of csprojFiles) {
     const content = await readFile(csprojPath, 'utf-8');
@@ -46,11 +46,11 @@ export async function rewriteNugetProjectReferences(options: RewriteNugetDepsOpt
 
     for (const match of matches) {
       const includePath = match[1];
-      
+
       // Try to find matching project by path
       for (const otherProject of allProjects) {
         if (otherProject.name === project.name) continue;
-        
+
         // Simple heuristic: if path contains project folder name
         if (includePath.includes(otherProject.name)) {
           const packageRef = `<PackageReference Include="${otherProject.name}" Version="${otherProject.version}" />`;
@@ -75,7 +75,7 @@ export async function restoreCsprojFiles(projectCwd: string): Promise<void> {
   const csprojFiles = await fg('**/*.csproj', {
     cwd: projectCwd,
     absolute: true,
-    ignore: ['**/node_modules/**', '**/.git/**']
+    ignore: ['**/node_modules/**', '**/.git/**'],
   });
 
   for (const csprojPath of csprojFiles) {

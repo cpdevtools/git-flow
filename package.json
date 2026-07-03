@@ -15,6 +15,35 @@
     "test": "wireit",
     "typecheck": "wireit"
   },
+  "devDependencies": {
+    "@cpdevtools/ts-dev-utilities-cli": "file:../ts-dev-utilities/packages/cli",
+    "@types/node": "^20.17.11",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "eslint": "^9.18.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.4.2",
+    "syncpack": "^13.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
+    "wireit": "^0.14.13"
+  },
+  "keywords": [
+    "git",
+    "github-actions",
+    "release",
+    "versioning",
+    "workflow"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "repository": "cpdevtools/git-flow.git",
+  "bugs": "https://github.com/cpdevtools/git-flow/issues",
+  "homepage": "https://github.com/cpdevtools/git-flow#readme",
+  "engines": {
+    "node": ">=24"
+  },
   "wireit": {
     "prepare": {
       "dependencies": [
@@ -35,10 +64,15 @@
       ]
     },
     "test": {
-      "dependencies": ["./packages/git-flow:test"]
+      "dependencies": [
+        "./packages/git-flow:test"
+      ]
     },
     "typecheck": {
-      "dependencies": ["./packages/git-flow:typecheck", "./packages/cli:typecheck"]
+      "dependencies": [
+        "./packages/git-flow:typecheck",
+        "./packages/cli:typecheck"
+      ]
     },
     "fix": {
       "dependencies": [
@@ -113,34 +147,5 @@
       "command": "pnpm install",
       "cache": false
     }
-  },
-  "devDependencies": {
-    "@cpdevtools/ts-dev-utilities-cli": "file:../ts-dev-utilities/packages/cli",
-    "@types/node": "^20.17.11",
-    "@typescript-eslint/eslint-plugin": "^8.20.0",
-    "@typescript-eslint/parser": "^8.20.0",
-    "eslint": "^9.18.0",
-    "husky": "^9.1.7",
-    "prettier": "^3.4.2",
-    "syncpack": "^13.0.0",
-    "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "vitest": "^2.1.8",
-    "wireit": "^0.14.13"
-  },
-  "keywords": [
-    "git",
-    "github-actions",
-    "release",
-    "versioning",
-    "workflow"
-  ],
-  "author": "CPDevTools",
-  "license": "MIT",
-  "repository": "cpdevtools/git-flow.git",
-  "bugs": "https://github.com/cpdevtools/git-flow/issues",
-  "homepage": "https://github.com/cpdevtools/git-flow#readme",
-  "engines": {
-    "node": ">=24"
   }
 }

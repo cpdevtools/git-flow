@@ -19,13 +19,13 @@ async function detectProjectType(cwd: string): Promise<'npm' | 'nuget' | 'unknow
   if (existsSync(join(cwd, 'package.json'))) {
     return 'npm';
   }
-  
+
   // Check for .csproj files
   const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj" -print -quit`;
   if (stdout.trim()) {
     return 'nuget';
   }
-  
+
   return 'unknown';
 }
 
@@ -34,18 +34,18 @@ async function detectProjectType(cwd: string): Promise<'npm' | 'nuget' | 'unknow
  */
 async function packNpm(context: PackContext): Promise<void> {
   const { cwd, outputDir, artifactFilename, version } = context;
-  
+
   // Run npm pack
   await $({ cwd })`pnpm pack --pack-destination ${outputDir}`;
-  
+
   // Find the generated tarball (npm creates filename from package name)
   const tarballName = `${artifactFilename}-${version}.tgz`;
-  
+
   // Use just the output directory basename and tarball name
   // The upload step will resolve this relative to workspace root
   const { basename } = await import('node:path');
   const artifactRelativePath = `${basename(outputDir)}/${tarballName}`;
-  
+
   // Create artifact descriptor with absolute path to avoid resolution issues
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
@@ -58,10 +58,10 @@ async function packNpm(context: PackContext): Promise<void> {
       },
     ],
   };
-  
+
   const descriptorPath = join(outputDir, `${artifactFilename}.artifact.yml`);
   await writeFile(descriptorPath, stringify(descriptor));
-  
+
   console.log(`✓ Created NPM package: ${tarballName}`);
   console.log(`✓ Created artifact descriptor: ${descriptorPath}`);
 }
@@ -71,17 +71,17 @@ async function packNpm(context: PackContext): Promise<void> {
  */
 async function packNuget(context: PackContext): Promise<void> {
   const { cwd, outputDir, artifactFilename, version } = context;
-  
+
   // Run dotnet pack
   await $({ cwd })`dotnet pack -c Release -o ${outputDir} /p:Version=${version}`;
-  
+
   // NuGet package filename
   const nupkgName = `${artifactFilename}.${version}.nupkg`;
-  
+
   // Compute path relative to project cwd
   const { relative } = await import('node:path');
   const relativePath = relative(cwd, join(outputDir, nupkgName));
-  
+
   // Create artifact descriptor
   const descriptor: ArtifactDescriptor = {
     project: context.projectName,
@@ -94,10 +94,10 @@ async function packNuget(context: PackContext): Promise<void> {
       },
     ],
   };
-  
+
   const artifactPath = join(outputDir, `${artifactFilename}.artifact.yml`);
   await writeFile(artifactPath, stringify(descriptor));
-  
+
   console.log(`✓ Created NuGet package: ${nupkgName}`);
   console.log(`✓ Created artifact descriptor: ${artifactPath}`);
 }
@@ -107,10 +107,10 @@ async function packNuget(context: PackContext): Promise<void> {
  */
 async function defaultPack(context: PackContext): Promise<void> {
   const projectType = await detectProjectType(context.cwd);
-  
+
   // Ensure output directory exists
   await mkdir(context.outputDir, { recursive: true });
-  
+
   switch (projectType) {
     case 'npm':
       await packNpm(context);
@@ -124,7 +124,8 @@ async function defaultPack(context: PackContext): Promise<void> {
 }
 
 export default class Pack extends Command {
-  static override description = 'Pack project artifacts (NPM/NuGet) with optional configuration hooks';
+  static override description =
+    'Pack project artifacts (NPM/NuGet) with optional configuration hooks';
 
   static override examples = [
     '<%= config.bin %> <%= command.id %>',
@@ -141,7 +142,7 @@ export default class Pack extends Command {
       char: 'n',
       description: 'Project name (overrides PROJECT_NAME env var)',
     }),
-    'version': Flags.string({
+    version: Flags.string({
       char: 'v',
       description: 'Project version (overrides PROJECT_VERSION env var)',
     }),
@@ -149,19 +150,25 @@ export default class Pack extends Command {
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Pack);
-    
+
     // Read environment variables with flag overrides
     const projectName = flags['project-name'] || process.env.PROJECT_NAME;
     const version = flags.version || process.env.PROJECT_VERSION;
     const cwd = process.cwd();
-    const outputDir = flags['output-dir'] || process.env.ARTIFACT_OUTPUT_DIR || join(cwd, '.artifacts');
-    const artifactFilename = process.env.ARTIFACT_FILENAME || projectName?.replace(/@/g, '').replace(/\//g, '-') || 'artifact';
+    const outputDir =
+      flags['output-dir'] || process.env.ARTIFACT_OUTPUT_DIR || join(cwd, '.artifacts');
+    const artifactFilename =
+      process.env.ARTIFACT_FILENAME ||
+      projectName?.replace(/@/g, '').replace(/\//g, '-') ||
+      'artifact';
     const sha = process.env.GITHUB_SHA || 'local';
-    
+
     if (!projectName || !version) {
-      this.error('PROJECT_NAME and PROJECT_VERSION are required (via flags or environment variables)');
+      this.error(
+        'PROJECT_NAME and PROJECT_VERSION are required (via flags or environment variables)',
+      );
     }
-    
+
     const context: PackContext = {
       projectName,
       version,
@@ -170,10 +177,10 @@ export default class Pack extends Command {
       artifactFilename,
       sha,
     };
-    
+
     // Load config
     const config = await loadConfig(cwd);
-    
+
     try {
       // Execute pack with hooks
       if (config?.pack?.execute) {
@@ -184,9 +191,9 @@ export default class Pack extends Command {
         if (config?.pack?.beforePack) {
           await config.pack.beforePack(context);
         }
-        
+
         await defaultPack(context);
-        
+
         if (config?.pack?.afterPack) {
           await config.pack.afterPack(context);
         }

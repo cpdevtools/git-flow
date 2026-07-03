@@ -13,15 +13,17 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   // Create .npmrc in home directory (where npm looks for auth by default)
   const npmrcPath = join(homedir(), '.npmrc');
   const registryUrl = new URL(registry.url);
-  
+
   // Include trailing slash for registry path to match npm's expectations
-  const registryPath = registryUrl.pathname.endsWith('/') ? registryUrl.pathname : registryUrl.pathname + '/';
+  const registryPath = registryUrl.pathname.endsWith('/')
+    ? registryUrl.pathname
+    : registryUrl.pathname + '/';
   let npmrcContent = `//${registryUrl.host}${registryPath}:_authToken=${token}\n`;
-  
+
   if (registry.scope) {
     npmrcContent += `${registry.scope}:registry=${registry.url}\n`;
   }
-  
+
   console.log(`  📝 Writing .npmrc to ${npmrcPath}`);
   await writeFile(npmrcPath, npmrcContent);
 
@@ -67,19 +69,21 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
 
   try {
     const fullTempImage = `${imageName}:${tempTag}`;
-    
+
     // Pull temp image from Phase 2
     await $`docker pull ${fullTempImage}`;
-    
+
     // Verify digest matches
-    const actualDigest = (await $`docker inspect --format='{{.Id}}' ${fullTempImage}`).stdout.trim();
-    
+    const actualDigest = (
+      await $`docker inspect --format='{{.Id}}' ${fullTempImage}`
+    ).stdout.trim();
+
     if (actualDigest !== digest) {
       throw new Error(
         `Docker image digest mismatch!\n` +
-        `Expected: ${digest}\n` +
-        `Actual:   ${actualDigest}\n` +
-        `This may indicate the image was modified after being built in Phase 2.`
+          `Expected: ${digest}\n` +
+          `Actual:   ${actualDigest}\n` +
+          `This may indicate the image was modified after being built in Phase 2.`,
       );
     }
 

@@ -12,6 +12,7 @@ A generic parallel script runner that orders execution by the workspace dependen
 **Published**: `@cpdevtools/ts-dev-utilities@0.2.5`
 
 Key API (`ts-dev-utilities/runner`):
+
 - **`runScripts(options)`** — Discover all workspace projects, build a dependency graph, and run one or more named scripts in topological order with configurable concurrency
 - **`RunSummary`** — Typed result with `passed`, `failed`, `skipped`, `cancelled` task lists and per-task output/truncation metadata
 - Task outcomes: `passed`, `failed`, `skipped` (dependency failed), `cancelled` (fail-fast triggered), `no-script` (project doesn't define the script — treated as a pass)
@@ -44,12 +45,12 @@ Ensures CI always installs from published registry versions, never from `file:` 
 
 All four composite actions updated to the current toolchain:
 
-| Action | Changes |
-|---|---|
-| `actions/test` | Node 24, pnpm 11, registry auth step, `--lockfile-dir .pnpm-prod`, `HUSKY=0` |
-| `actions/build-pack` | Same |
-| `actions/create-release-pr` | Same |
-| `actions/publish-release` | Same |
+| Action                      | Changes                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `actions/test`              | Node 24, pnpm 11, registry auth step, `--lockfile-dir .pnpm-prod`, `HUSKY=0` |
+| `actions/build-pack`        | Same                                                                         |
+| `actions/create-release-pr` | Same                                                                         |
+| `actions/publish-release`   | Same                                                                         |
 
 ### 5. globby / Node 24 CJS Compatibility Fix
 
@@ -68,5 +69,6 @@ All four composite actions updated to the current toolchain:
 ## ✅ Verification
 
 CI on commit `4091a28` (July 2, 2026):
+
 - **Test** workflow: ✅ success
 - **Create Release PR** workflow: ✅ success

@@ -16,12 +16,12 @@ Git-based versioning and release workflow automation.
 
 **Inputs:**
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| `mode` | `test-optional` | `build`, `test`, or `test-optional` (both where available) |
-| `fail-fast` | `false` | Stop on first failure, cancel in-flight tasks |
-| `concurrency` | _(unlimited)_ | Max projects to run in parallel |
-| `workspace-root` | `${{ github.workspace }}` | Workspace root |
+| Input            | Default                   | Description                                                |
+| ---------------- | ------------------------- | ---------------------------------------------------------- |
+| `mode`           | `test-optional`           | `build`, `test`, or `test-optional` (both where available) |
+| `fail-fast`      | `false`                   | Stop on first failure, cancel in-flight tasks              |
+| `concurrency`    | _(unlimited)_             | Max projects to run in parallel                            |
+| `workspace-root` | `${{ github.workspace }}` | Workspace root                                             |
 
 **Outputs:** `projects-passed`, `projects-failed`, `projects-skipped`
 
@@ -52,7 +52,9 @@ pnpm format
 ## License
 
 MIT
-# Git-Flow Release Test
-# Trigger new PR
-# Retrigger
 
+# Git-Flow Release Test
+
+# Trigger new PR
+
+# Retrigger

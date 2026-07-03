@@ -75,7 +75,7 @@ cd git-flow/packages/git-flow && pnpm run build
 # ESM ⚡️ Build success
 # DTS ⚡️ Build success
 
-cd git-flow/actions/build-pack && pnpm run build  
+cd git-flow/actions/build-pack && pnpm run build
 # ESM ⚡️ Build success
 ```
 
@@ -91,30 +91,35 @@ cd git-flow/actions/build-pack && pnpm run build
 ## Key Features Implemented
 
 ### ✅ Smart Dependency Building
+
 - Discovers all workspace dependencies recursively
 - Builds dependencies in topological order
 - Only packs/uploads release projects
 - Dependency-only projects skip pack/upload phases
 
 ### ✅ Resumability
+
 - Checks existing draft releases via GitHub API
 - Identifies completed projects by artifact.yml presence
 - Skips already-completed projects
 - Returns statistics on skipped vs. processed
 
 ### ✅ Multi-Artifact Support
+
 - **NPM** - Uploads .tgz files
 - **Docker** - Metadata only (no file upload)
 - **NuGet** - Uploads .nupkg files
 - **Release Attachments** - Any file type with content-type
 
 ### ✅ Execution & Error Handling
+
 - Parallel batch execution within dependency levels
 - Stops on first failure
 - Detailed error messages with exit codes
 - Returns comprehensive statistics
 
 ### ✅ GitHub Integration
+
 - Creates draft releases per project
 - Tag format: `{project-name}/v{version}`
 - Uploads artifact.yml + artifact files
@@ -123,6 +128,7 @@ cd git-flow/actions/build-pack && pnpm run build
 ## API Usage
 
 ### TypeScript
+
 ```typescript
 import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
 
@@ -135,7 +141,7 @@ const result = await runBuildPack(
     sha: 'abc1234',
     runNumber: 1,
   },
-  prBodyWithMetadata
+  prBodyWithMetadata,
 );
 
 console.log(`Built: ${result.built.length}`);
@@ -146,6 +152,7 @@ console.log(`Failed: ${result.failed.length}`);
 ```
 
 ### GitHub Action
+
 ```yaml
 - uses: cpdevtools/git-flow/actions/build-pack@main
   with:
@@ -158,14 +165,18 @@ console.log(`Failed: ${result.failed.length}`);
 Each project must implement two package scripts:
 
 ### 1. github.actions.build
+
 Builds the project. Environment variables:
+
 - `PROJECT_NAME` - Project name
 - `PROJECT_VERSION` - Version to build
 - `ARTIFACT_OUTPUT_DIR` - Output directory
 - `GITHUB_SHA` - Git commit SHA
 
 ### 2. github.actions.pack
+
 Packages and creates artifact.yml:
+
 - Must generate `${ARTIFACT_OUTPUT_DIR}/${PROJECT_NAME}.artifact.yml`
 - YAML descriptor with project name and artifacts array
 
@@ -193,11 +204,13 @@ artifacts:
 ## What's Next
 
 ### Immediate
+
 1. ✅ Implementation complete
 2. Integration testing with real PR
 3. Create example projects in test-git-flow repo
 
 ### Phase 3 (Future)
+
 - Publish workflow
 - Registry-specific publishing logic
 - Version verification and cleanup
@@ -219,6 +232,7 @@ cd /devcontainer/repos/git-flow/actions/build-pack && pnpm run build
 ## Files Created/Modified
 
 ### New Files
+
 - git-flow/packages/git-flow/src/build-pack/github.ts
 - git-flow/packages/git-flow/src/build-pack/BUILD_PACK_GUIDE.md
 - git-flow/actions/build-pack/ (entire directory)
@@ -226,6 +240,7 @@ cd /devcontainer/repos/git-flow/actions/build-pack && pnpm run build
 - git-flow/IMPLEMENTATION_COMPLETE.md (this file)
 
 ### Modified Files
+
 - git-flow/packages/git-flow/src/build-pack/orchestrate.ts
 - git-flow/packages/git-flow/src/build-pack/execute.ts
 - git-flow/packages/git-flow/src/build-pack/types.ts

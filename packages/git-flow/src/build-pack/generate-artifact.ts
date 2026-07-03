@@ -1,6 +1,6 @@
 /**
  * Artifact descriptor generation
- * 
+ *
  * Generates artifact descriptors after packing, supporting multiple config formats.
  */
 
@@ -37,15 +37,18 @@ function replaceEnvVars(str: string, envVars: Record<string, string>): string {
 /**
  * Replace environment variables in artifact config
  */
-function substituteEnvVars(config: ArtifactConfig, envVars: Record<string, string>): ArtifactConfig {
+function substituteEnvVars(
+  config: ArtifactConfig,
+  envVars: Record<string, string>,
+): ArtifactConfig {
   return {
     ...config,
-    artifacts: config.artifacts.map(artifact => {
+    artifacts: config.artifacts.map((artifact) => {
       const base = {
         ...artifact,
         name: replaceEnvVars(artifact.name, envVars),
       };
-      
+
       // Handle path property for artifact types that have it
       if ('path' in artifact && artifact.path) {
         return {
@@ -53,9 +56,9 @@ function substituteEnvVars(config: ArtifactConfig, envVars: Record<string, strin
           path: replaceEnvVars(artifact.path, envVars),
         } as Artifact;
       }
-      
+
       return base as Artifact;
-    })
+    }),
   };
 }
 
@@ -66,7 +69,7 @@ function substituteEnvVars(config: ArtifactConfig, envVars: Record<string, strin
  */
 async function loadArtifactConfig(
   packageDir: string,
-  envVars: Record<string, string>
+  envVars: Record<string, string>,
 ): Promise<ArtifactConfig | null> {
   const configFiles = [
     'release-artifacts.yml',
@@ -74,7 +77,7 @@ async function loadArtifactConfig(
     'release-artifacts.json',
     'release-artifacts.ts',
     'release-artifacts.js',
-    'release-artifacts.cjs'
+    'release-artifacts.cjs',
   ];
 
   for (const configFile of configFiles) {
@@ -84,7 +87,7 @@ async function loadArtifactConfig(
     }
 
     console.log(`  📄 Found config: ${configFile}`);
-    
+
     if (configFile.endsWith('.yml') || configFile.endsWith('.yaml')) {
       const content = await readFile(configPath, 'utf-8');
       const config = parseYaml(content) as ArtifactConfig;
@@ -107,7 +110,7 @@ async function loadArtifactConfig(
 
 /**
  * Generate artifact descriptor after packing
- * 
+ *
  * @param packageDir - Directory containing package.json
  * @param packageName - Name from package.json
  * @param packageVersion - Version from package.json
@@ -116,28 +119,28 @@ async function loadArtifactConfig(
 export async function generateArtifactDescriptor(
   packageDir: string,
   packageName: string,
-  packageVersion: string
+  packageVersion: string,
 ): Promise<string> {
   const tarballName = `${packageName.replace('@', '').replace('/', '-')}-${packageVersion}.tgz`;
   const artifactFilename = packageName.replace(/@/g, '').replace(/\//g, '-');
-  
+
   console.log(`  📦 Generating artifact descriptor for ${packageName}@${packageVersion}`);
   console.log(`  📁 Artifact directory: ${ARTIFACT_OUTPUT_DIR}`);
-  
+
   // Ensure artifact directory exists
   await mkdir(ARTIFACT_OUTPUT_DIR, { recursive: true });
-  
+
   // Copy tarball to artifact directory
   const tarballSource = join(packageDir, tarballName);
   const tarballDest = join(ARTIFACT_OUTPUT_DIR, tarballName);
-  
+
   if (!existsSync(tarballSource)) {
     throw new Error(`Tarball not found: ${tarballSource}`);
   }
-  
+
   await copyFile(tarballSource, tarballDest);
   console.log(`  ✓ Copied tarball to artifacts directory`);
-  
+
   // Set environment variables for writeArtifact and config substitution
   const envVars = {
     PROJECT_NAME: artifactFilename,
@@ -147,33 +150,33 @@ export async function generateArtifactDescriptor(
     PACKAGE_NAME: packageName,
     PACKAGE_VERSION: packageVersion,
   };
-  
+
   process.env.PROJECT_NAME = artifactFilename;
   process.env.ARTIFACT_OUTPUT_DIR = ARTIFACT_OUTPUT_DIR;
-  
+
   // Load artifact config - required
   const config = await loadArtifactConfig(packageDir, envVars);
-  
+
   if (!config) {
     throw new Error(
       `No release-artifacts configuration found in ${packageDir}\n` +
-      `Please create one of: release-artifacts.yml, release-artifacts.json, release-artifacts.ts, release-artifacts.js, release-artifacts.cjs\n` +
-      `See release-artifacts.example.yml for format`
+        `Please create one of: release-artifacts.yml, release-artifacts.json, release-artifacts.ts, release-artifacts.js, release-artifacts.cjs\n` +
+        `See release-artifacts.example.yml for format`,
     );
   }
-  
+
   console.log(`  ✓ Using artifact configuration from package root`);
-  
+
   const descriptor: ProjectArtifactDescriptor = {
     project: packageName,
-    artifacts: config.artifacts
+    artifacts: config.artifacts,
   };
-  
+
   // Generate artifact descriptor
   await writeArtifact(descriptor);
-  
+
   const artifactPath = join(ARTIFACT_OUTPUT_DIR, `${artifactFilename}.artifact.yml`);
   console.log(`  ✓ Artifact descriptor generated: ${artifactPath}`);
-  
+
   return artifactPath;
 }

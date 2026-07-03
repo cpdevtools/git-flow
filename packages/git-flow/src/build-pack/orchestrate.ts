@@ -9,14 +9,19 @@ import type { Project } from '../lib/project';
 import { discoverProjects } from '../lib/project';
 import { applyVersion, executePack, executeUpload } from './execute.js';
 import { ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
-import { deleteDraftRelease, findDraftReleaseByTag, getReleaseTag, isArtifactUploaded } from './github.js';
+import {
+  deleteDraftRelease,
+  findDraftReleaseByTag,
+  getReleaseTag,
+  isArtifactUploaded,
+} from './github.js';
 import { extractPRMetadata } from './options.js';
 import type {
   BuildPackContext,
   BuildPackResult,
   ExecutionResult,
   PRMetadata,
-  ProjectConfig
+  ProjectConfig,
 } from './types.js';
 
 /**
@@ -26,7 +31,7 @@ import type {
  */
 export async function runBuildPack(
   context: BuildPackContext,
-  prBody: string
+  prBody: string,
 ): Promise<BuildPackResult> {
   console.log('🚀 Starting Phase 2: Build & Pack\n');
 
@@ -36,26 +41,20 @@ export async function runBuildPack(
   console.log(`📋 Processing ${allProjects.length} projects from PR #${context.prNumber}`);
   console.log(`   Run: ${context.runNumber}`);
   console.log(`   SHA: ${context.sha.substring(0, 7)}`);
-  
+
   // Display projects grouped by placeholder
   for (const [placeholder, projects] of Object.entries(metadata.projectsByPlaceholder)) {
-    console.log(`   ${placeholder}: ${projects.map(p => p.name).join(', ')}`);
+    console.log(`   ${placeholder}: ${projects.map((p) => p.name).join(', ')}`);
   }
-  
+
   // Handle Force Rebuild if enabled
   if (metadata.forceRebuild) {
     console.log('\n🔄 Force Rebuild enabled - deleting existing draft releases...');
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
-    
+
     for (const project of allProjects) {
-      await deleteDraftRelease(
-        context.githubToken,
-        owner,
-        repo,
-        project.name,
-        project.version
-      );
+      await deleteDraftRelease(context.githubToken, owner, repo, project.name, project.version);
     }
     console.log('   ✓ Draft releases deleted');
   }
@@ -65,20 +64,16 @@ export async function runBuildPack(
   console.log('🔍 Discovering workspace projects...');
   const discoveredProjects = await discoverProjects(context.workspaceRoot);
   console.log(`   Found ${discoveredProjects.length} projects:`);
-  discoveredProjects.forEach(p => console.log(`     - ${p.name}`));
+  discoveredProjects.forEach((p) => console.log(`     - ${p.name}`));
   console.log('');
 
   // Build project configurations from metadata (projects to pack/publish)
-  const projectsToRelease = buildProjectConfigs(
-    metadata,
-    discoveredProjects,
-    context
-  );
+  const projectsToRelease = buildProjectConfigs(metadata, discoveredProjects, context);
 
   // Check which projects already have artifacts uploaded (resumability)
   console.log('🔍 Checking for existing artifacts...');
   const projectsToSkip = await findCompletedProjects(projectsToRelease, context);
-  
+
   if (projectsToSkip.length > 0) {
     console.log(`   ✓ Found ${projectsToSkip.length} project(s) with artifacts already uploaded:`);
     for (const project of projectsToSkip) {
@@ -91,7 +86,7 @@ export async function runBuildPack(
 
   // Filter out completed projects
   const projectsToProcess = projectsToRelease.filter(
-    p => !projectsToSkip.find(skip => skip.name === p.name)
+    (p) => !projectsToSkip.find((skip) => skip.name === p.name),
   );
 
   if (projectsToProcess.length === 0) {
@@ -100,26 +95,26 @@ export async function runBuildPack(
       built: [],
       packed: [],
       uploaded: [],
-      skipped: projectsToSkip.map(p => p.name),
+      skipped: projectsToSkip.map((p) => p.name),
       failed: [],
     };
   }
 
-  console.log(`📦 Projects remaining to release: ${projectsToProcess.map(p => p.name).join(', ')}\n`);
+  console.log(
+    `📦 Projects remaining to release: ${projectsToProcess.map((p) => p.name).join(', ')}\n`,
+  );
 
   // Find all dependencies that need to be built (but not necessarily packed)
-  const allProjectsToProcess = findAllDependencies(
-    projectsToProcess,
-    discoveredProjects,
-    context
-  );
+  const allProjectsToProcess = findAllDependencies(projectsToProcess, discoveredProjects, context);
 
   const dependenciesOnly = allProjectsToProcess.filter(
-    p => !projectsToProcess.find(r => r.name === p.name)
+    (p) => !projectsToProcess.find((r) => r.name === p.name),
   );
-  
+
   if (dependenciesOnly.length > 0) {
-    console.log(`🔧 Additional dependencies to build: ${dependenciesOnly.map(p => p.name).join(', ')}`);
+    console.log(
+      `🔧 Additional dependencies to build: ${dependenciesOnly.map((p) => p.name).join(', ')}`,
+    );
   } else {
     console.log(`🔧 No additional dependencies needed`);
   }
@@ -136,7 +131,7 @@ export async function runBuildPack(
 
   // Build lookup structures for hooks
   const projectConfigMap = new Map<string, ProjectConfig>(
-    allProjectsToProcess.map((p) => [p.name, p])
+    allProjectsToProcess.map((p) => [p.name, p]),
   );
   const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
 
@@ -213,7 +208,9 @@ export async function runBuildPack(
   if (failedResults.length === 0) {
     console.log(`✅ Phase 2 Complete: ${totalSuccess} projects succeeded`);
   } else {
-    console.log(`⚠️  Phase 2 Completed with errors: ${totalSuccess} succeeded, ${failedResults.length} failed`);
+    console.log(
+      `⚠️  Phase 2 Completed with errors: ${totalSuccess} succeeded, ${failedResults.length} failed`,
+    );
   }
   console.log(`${'='.repeat(80)}\n`);
 
@@ -221,7 +218,7 @@ export async function runBuildPack(
     built: builtProjects,
     packed: packedProjects,
     uploaded: uploadedProjects,
-    skipped: projectsToSkip.map(p => p.name),
+    skipped: projectsToSkip.map((p) => p.name),
     failed: failedResults,
   };
 }
@@ -232,7 +229,7 @@ export async function runBuildPack(
 function buildProjectConfigs(
   metadata: PRMetadata,
   discoveredProjects: Project[],
-  context: BuildPackContext
+  context: BuildPackContext,
 ): ProjectConfig[] {
   const configs: ProjectConfig[] = [];
   const allProjects = Object.values(metadata.projectsByPlaceholder).flat();
@@ -244,10 +241,10 @@ function buildProjectConfigs(
     console.log(`   Found match: ${discovered ? 'YES' : 'NO'}`);
 
     if (!discovered) {
-      console.log(`   Available projects: ${discoveredProjects.map(p => `"${p.name}"`).join(', ')}`);
-      throw new Error(
-        `Project ${prProject.name} from PR metadata not found in workspace`
+      console.log(
+        `   Available projects: ${discoveredProjects.map((p) => `"${p.name}"`).join(', ')}`,
       );
+      throw new Error(`Project ${prProject.name} from PR metadata not found in workspace`);
     }
 
     configs.push({
@@ -269,7 +266,7 @@ function buildProjectConfigs(
  */
 async function findCompletedProjects(
   projectsToRelease: ProjectConfig[],
-  context: BuildPackContext
+  context: BuildPackContext,
 ): Promise<ProjectConfig[]> {
   const completed: ProjectConfig[] = [];
   const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
@@ -284,10 +281,10 @@ async function findCompletedProjects(
 
   for (const project of projectsToRelease) {
     const tag = getReleaseTag(project.name, project.version);
-    
+
     try {
       const release = await findDraftReleaseByTag(context.githubToken, owner, repo, tag);
-      
+
       if (release) {
         const artifactFileName = `${project.name}.artifact.yml`;
         const hasArtifact = await isArtifactUploaded(
@@ -295,9 +292,9 @@ async function findCompletedProjects(
           owner,
           repo,
           release.id,
-          artifactFileName
+          artifactFileName,
         );
-        
+
         if (hasArtifact) {
           console.log(`    ✅ ${project.name} already completed (found ${artifactFileName})`);
           completed.push(project);
@@ -309,7 +306,9 @@ async function findCompletedProjects(
       }
     } catch (error) {
       // Log but don't fail - proceed as if not completed
-      console.log(`    ⚠️  Error checking ${project.name}: ${error instanceof Error ? error.message : String(error)}`);
+      console.log(
+        `    ⚠️  Error checking ${project.name}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -327,7 +326,7 @@ async function findCompletedProjects(
 function findAllDependencies(
   projectsToRelease: ProjectConfig[],
   discoveredProjects: Project[],
-  context: BuildPackContext
+  context: BuildPackContext,
 ): ProjectConfig[] {
   const allProjects = new Map<string, ProjectConfig>();
   const toProcess = [...projectsToRelease];
@@ -352,7 +351,7 @@ function findAllDependencies(
       }
 
       // Find in discovered projects
-      const depProject = discoveredProjects.find(p => p.name === depName);
+      const depProject = discoveredProjects.find((p) => p.name === depName);
       if (depProject) {
         // Create a config for this dependency (not for release, just for build)
         const depConfig: ProjectConfig = {
@@ -378,7 +377,7 @@ function findAllDependencies(
  */
 function displayExecutionPlan(
   allProjects: ProjectConfig[],
-  projectsToRelease: ProjectConfig[]
+  projectsToRelease: ProjectConfig[],
 ): void {
   console.log('📋 Execution Plan:');
   console.log('─'.repeat(80));

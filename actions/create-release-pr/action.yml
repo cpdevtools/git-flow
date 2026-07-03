@@ -65,7 +65,7 @@ runs:
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm i --no-frozen-lockfile
+      run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-create-release-pr...
       env:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}

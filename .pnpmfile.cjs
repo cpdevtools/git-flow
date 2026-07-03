@@ -19,7 +19,6 @@ const warnedPackages = new Set();
 const checkedPackages = new Map(); // Cache existence checks
 
 function readPackage(pkg, context) {
-  // Apply overrides to ALL packages (not just root) when DEV_LOCAL=true
   if (process.env.DEV_LOCAL === 'true') {
     // Map of npm package names to their local paths (relative to workspace root)
     const localPackagesConfig = {
@@ -61,20 +60,26 @@ function readPackage(pkg, context) {
         });
       }
     });
+  } else {
+    // Strip file: protocol dependencies — they are local-only and must not appear in CI lockfiles
+    ['dependencies', 'devDependencies', 'peerDependencies'].forEach((depType) => {
+      if (pkg[depType]) {
+        for (const [name, version] of Object.entries(pkg[depType])) {
+          if (typeof version === 'string' && version.startsWith('file:')) {
+            delete pkg[depType][name];
+          }
+        }
+      }
+    });
   }
 
   return pkg;
 }
 
-// Only export hooks when DEV_LOCAL=true to avoid lockfile checksum mismatch in CI
-if (process.env.DEV_LOCAL === 'true') {
-  module.exports = {
-    hooks: {
-      readPackage,
-    },
-  };
-} else {
-  module.exports = {
-    hooks: {},
-  };
-}
+// Always export hooks so pnpm consistently hashes the pnpmfile and the
+// file: stripping logic applies whether DEV_LOCAL is set or not.
+module.exports = {
+  hooks: {
+    readPackage,
+  },
+};

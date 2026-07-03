@@ -16,16 +16,16 @@ import type { ApplyVersionContext } from '../types.js';
  */
 async function applyVersionToPackageJson(cwd: string, version: string): Promise<void> {
   const pkgPath = join(cwd, 'package.json');
-  
+
   if (!existsSync(pkgPath)) {
     return;
   }
-  
+
   const content = await readFile(pkgPath, 'utf-8');
   const pkg = JSON.parse(content);
-  
+
   pkg.version = version;
-  
+
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
   console.log(`✓ Updated package.json to version ${version}`);
 }
@@ -37,11 +37,11 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
   // Find all .csproj files
   const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj"`;
   const csprojFiles = stdout.trim().split('\n').filter(Boolean);
-  
+
   for (const csprojFile of csprojFiles) {
     const csprojPath = join(cwd, csprojFile);
     let content = await readFile(csprojPath, 'utf-8');
-    
+
     // Update <Version> tag
     if (content.includes('<Version>')) {
       content = content.replace(/<Version>.*?<\/Version>/, `<Version>${version}</Version>`);
@@ -49,10 +49,10 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
       // Add Version tag if not present
       content = content.replace(
         /<PropertyGroup>/,
-        `<PropertyGroup>\n    <Version>${version}</Version>`
+        `<PropertyGroup>\n    <Version>${version}</Version>`,
       );
     }
-    
+
     await writeFile(csprojPath, content);
     console.log(`✓ Updated ${csprojFile} to version ${version}`);
   }
@@ -63,16 +63,17 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
  */
 async function defaultApplyVersion(context: ApplyVersionContext): Promise<void> {
   const { cwd, version } = context;
-  
+
   // Apply to package.json (NPM projects)
   await applyVersionToPackageJson(cwd, version);
-  
+
   // Apply to .csproj (NuGet projects)
   await applyVersionToCsproj(cwd, version);
 }
 
 export default class ApplyVersion extends Command {
-  static override description = 'Apply version to project files (package.json, .csproj) with optional configuration hooks';
+  static override description =
+    'Apply version to project files (package.json, .csproj) with optional configuration hooks';
 
   static override examples = [
     '<%= config.bin %> <%= command.id %> 1.2.3',
@@ -100,25 +101,25 @@ export default class ApplyVersion extends Command {
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(ApplyVersion);
-    
+
     // Read version from flags, args, or environment (in that order)
     const version = flags.version || args.version || process.env.PROJECT_VERSION;
     const projectName = flags['project-name'] || process.env.PROJECT_NAME || 'unknown';
     const cwd = process.cwd();
-    
+
     if (!version) {
       this.error('Version is required (via argument, --version flag, or PROJECT_VERSION env var)');
     }
-    
+
     const context: ApplyVersionContext = {
       projectName,
       version,
       cwd,
     };
-    
+
     // Load config
     const config = await loadConfig(cwd);
-    
+
     try {
       // Execute with hooks
       if (config?.applyVersion?.execute) {
@@ -129,9 +130,9 @@ export default class ApplyVersion extends Command {
         if (config?.applyVersion?.beforeApplyVersion) {
           await config.applyVersion.beforeApplyVersion(context);
         }
-        
+
         await defaultApplyVersion(context);
-        
+
         if (config?.applyVersion?.afterApplyVersion) {
           await config.applyVersion.afterApplyVersion(context);
         }

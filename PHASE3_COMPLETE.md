@@ -105,12 +105,14 @@ GitHub Actions interface:
 ## 🎯 Key Features
 
 ### ✅ Flexible Registry Authentication
+
 - **Environment variable approach**: No hard-coded action inputs
 - **Unlimited registries**: Configure any number in `.github/registries.yml`
 - **Token resolution**: Tokens read from `process.env[registry.auth]`
 - **Security**: No secrets in logs or code
 
 ### ✅ Workspace Dependency Rewriting
+
 - **Automatic**: Runs before every pack operation
 - **NPM**: `workspace:*` → actual version from allProjects
 - **NuGet**: `<ProjectReference>` → `<PackageReference version="X.Y.Z">`
@@ -118,6 +120,7 @@ GitHub Actions interface:
 - **Integration**: Built into Phase 2 `executePack()`
 
 ### ✅ Docker Digest Verification
+
 - **Security feature**: Prevents publishing tampered images
 - **Flow**:
   1. Pull temp image (from Phase 2)
@@ -128,12 +131,14 @@ GitHub Actions interface:
 - **Error on mismatch**: Stops immediately if digests don't match
 
 ### ✅ Fail-Fast Error Handling
+
 - **Stop on first error**: Don't publish partial releases
 - **Clear error messages**: Exactly which project/artifact failed
 - **No automatic rollback**: Manual intervention required
 - **Idempotent retry**: Safe to re-run after fixing issues
 
 ### ✅ Publication Verification
+
 - **NPM**: `npm view package@version`
 - **NuGet**: HTTP API check
 - **Docker**: `docker manifest inspect`
@@ -141,14 +146,14 @@ GitHub Actions interface:
 
 ## 📋 Build Status
 
-| Component | Status | Output Size |
-|-----------|--------|-------------|
-| `git-flow` package | ✅ Built | 44.78 KB (index) |
-| `publishing` module | ✅ Built | 6.58 KB |
-| `publish-release` module | ✅ Built | 13.77 KB |
-| `workspace-deps` module | ✅ Built | (in build-pack) |
-| `publish-release` action | ✅ Built | 2.08 MB |
-| `build-pack` action | ✅ Built | 3.08 KB |
+| Component                | Status   | Output Size      |
+| ------------------------ | -------- | ---------------- |
+| `git-flow` package       | ✅ Built | 44.78 KB (index) |
+| `publishing` module      | ✅ Built | 6.58 KB          |
+| `publish-release` module | ✅ Built | 13.77 KB         |
+| `workspace-deps` module  | ✅ Built | (in build-pack)  |
+| `publish-release` action | ✅ Built | 2.08 MB          |
+| `build-pack` action      | ✅ Built | 3.08 KB          |
 
 **Note**: TypeScript declarations (DTS) temporarily disabled due to workspace link resolution issues. Functionality is unaffected.
 
@@ -168,7 +173,7 @@ registries:
     type: npm
     url: https://registry.npmjs.org
     auth: NPM_TOKEN
-    scope: "@myorg"
+    scope: '@myorg'
 
   dockerhub:
     type: docker
@@ -195,12 +200,14 @@ registries:
 ## 🧪 Testing Strategy
 
 ### Manual Testing
+
 1. Build packages: `pnpm build`
 2. Create test `.github/registries.yml`
 3. Run orchestration with test data
 4. Verify publication to test registries
 
 ### Integration Testing (TODO)
+
 - [ ] NPM publication to test registry
 - [ ] NuGet publication to test feed
 - [ ] Docker publication to test registry
@@ -209,6 +216,7 @@ registries:
 - [ ] Error handling paths
 
 ### Unit Testing (TODO)
+
 - [ ] Registry configuration parsing
 - [ ] Token resolution
 - [ ] Artifact descriptor reading

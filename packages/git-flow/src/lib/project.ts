@@ -28,7 +28,7 @@ export interface DependencyGraph {
 export async function discoverProjects(workspaceRoot: string): Promise<Project[]> {
   const packageJsonPaths = await fg(['**/package.json'], {
     cwd: workspaceRoot,
-    ignore: ['**/node_modules/**']
+    ignore: ['**/node_modules/**'],
   });
 
   const projects: Project[] = [];
@@ -36,17 +36,17 @@ export async function discoverProjects(workspaceRoot: string): Promise<Project[]
   for (const packagePath of packageJsonPaths) {
     const fullPath = join(workspaceRoot, packagePath);
     const directory = dirname(fullPath);
-    
+
     try {
       const content = await readFile(fullPath, 'utf-8');
       const packageJson = JSON.parse(content);
-      
+
       if (packageJson.name) {
         projects.push({
           name: packageJson.name,
           directory,
           packageJson,
-          dependencies: []
+          dependencies: [],
         });
       }
     } catch (error) {
@@ -62,9 +62,9 @@ export async function discoverProjects(workspaceRoot: string): Promise<Project[]
  */
 export function buildDependencyGraph(projects: Project[]): DependencyGraph {
   const dependencies = new Map<string, string[]>();
-  
+
   // Simple implementation - no dependencies for now
-  projects.forEach(project => {
+  projects.forEach((project) => {
     dependencies.set(project.name, []);
   });
 
@@ -73,6 +73,6 @@ export function buildDependencyGraph(projects: Project[]): DependencyGraph {
   return {
     dependencies,
     batches,
-    getTopologicalBatches: () => batches
+    getTopologicalBatches: () => batches,
   };
 }

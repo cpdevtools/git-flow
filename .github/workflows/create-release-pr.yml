@@ -15,7 +15,7 @@ jobs:
       packages: read
     steps:
       - uses: actions/checkout@v7
-      
+
       - name: Create Release PR
         uses: cpdevtools/git-flow/actions/create-release-pr@main
         with:

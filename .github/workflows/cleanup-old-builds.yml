@@ -24,7 +24,7 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
-      
+
       - name: Cleanup GitHub Releases & Tags
         env:
           GH_TOKEN: ${{ secrets.token || github.token }}
@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "🧹 Cleaning up build versions older than $DAYS_OLD days..."
           cutoff_date=$(date -d "$DAYS_OLD days ago" +%s)
-          
+
           gh release list --limit 200 --json tagName,publishedAt | \
           jq -r ".[] | select(.tagName | contains(\".build.\")) | 
                  select(.publishedAt | fromdateiso8601 < $cutoff_date) | 
@@ -47,7 +47,7 @@ jobs:
               git push origin ":refs/tags/$tag" 2>/dev/null || true
             fi
           done
-      
+
       - name: Cleanup NPM Packages (GitHub Packages)
         env:
           GH_TOKEN: ${{ secrets.token || github.token }}
@@ -56,7 +56,7 @@ jobs:
         run: |
           echo "🧹 Cleaning up npm packages from GitHub Packages..."
           cutoff_date=$(date -d "$DAYS_OLD days ago" --iso-8601=seconds)
-          
+
           # Get unique package names from this repo's releases
           echo "  📋 Discovering packages published in this repository's releases..."
           package_names=$(gh api /repos/${{ github.repository }}/releases --paginate | \
@@ -65,12 +65,12 @@ jobs:
             grep "name:" | \
             sed 's/.*name: *"\?\([^"]*\)"\?.*/\1/' | \
             sort -u)
-          
+
           if [ -z "$package_names" ]; then
             echo "  ℹ️  No packages found in release metadata"
             exit 0
           fi
-          
+
           echo "$package_names" | while read package_name; do
             [ -z "$package_name" ] && continue
             echo "  📦 Checking package: $package_name"
@@ -95,7 +95,7 @@ jobs:
               fi
             done
           done
-      
+
       - name: Summary
         run: |
           echo "✅ Cleanup complete!"

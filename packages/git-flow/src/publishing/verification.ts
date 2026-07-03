@@ -12,18 +12,20 @@ export async function isNpmPublished(
   packageName: string,
   version: string,
   registry: NpmRegistry,
-  token?: string
+  token?: string,
 ): Promise<VerificationResult> {
   const npmrcPath = join(homedir(), '.npmrc');
   let npmrcCreated = false;
-  
+
   try {
     console.log(`  📋 Checking if ${packageName}@${version} exists in ${registry.url}...`);
-    
+
     // If token provided, set up .npmrc for auth (GitHub Packages requires auth even for reads)
     if (token) {
       const registryUrl = new URL(registry.url);
-      const registryPath = registryUrl.pathname.endsWith('/') ? registryUrl.pathname : registryUrl.pathname + '/';
+      const registryPath = registryUrl.pathname.endsWith('/')
+        ? registryUrl.pathname
+        : registryUrl.pathname + '/';
       let npmrcContent = `//${registryUrl.host}${registryPath}:_authToken=${token}\n`;
       if (registry.scope) {
         npmrcContent += `${registry.scope}:registry=${registry.url}\n`;
@@ -31,20 +33,33 @@ export async function isNpmPublished(
       await writeFile(npmrcPath, npmrcContent);
       npmrcCreated = true;
     }
-    
+
     // Build args array for proper argument handling
-    const args = ['view', `${packageName}@${version}`, 'version', '--registry', registry.url, '--json'];
-    
+    const args = [
+      'view',
+      `${packageName}@${version}`,
+      'version',
+      '--registry',
+      registry.url,
+      '--json',
+    ];
+
     const result = await $`npm ${args}`.nothrow();
-    
-    console.log(`  📋 npm view exit code: ${result.exitCode}, stdout: ${result.stdout.trim().substring(0, 100)}`);
-    
+
+    console.log(
+      `  📋 npm view exit code: ${result.exitCode}, stdout: ${result.stdout.trim().substring(0, 100)}`,
+    );
+
     if (result.exitCode !== 0) {
       // Check if it's a package not found error
       const stderr = result.stderr || '';
       const stdout = result.stdout || '';
-      if (stderr.includes('404') || stderr.includes('E404') || 
-          stdout.includes('E404') || stderr.includes('not found')) {
+      if (
+        stderr.includes('404') ||
+        stderr.includes('E404') ||
+        stdout.includes('E404') ||
+        stderr.includes('not found')
+      ) {
         return {
           published: false,
           error: 'Package not found in registry',
@@ -56,7 +71,7 @@ export async function isNpmPublished(
         error: result.stderr || 'Unknown error checking registry',
       };
     }
-    
+
     // Parse JSON output (npm view returns quoted string or null)
     const output = result.stdout.trim();
     const publishedVersion = output.replace(/^"|"$/g, '');
@@ -86,7 +101,7 @@ export async function isNpmPublished(
 export async function isNugetPublished(
   packageId: string,
   version: string,
-  registry: NugetRegistry
+  registry: NugetRegistry,
 ): Promise<VerificationResult> {
   try {
     // Use NuGet HTTP API to check if version exists
@@ -102,7 +117,7 @@ export async function isNugetPublished(
     // This is a simplified check - full implementation would follow NuGet protocol
     // For now, we'll use dotnet CLI
     const result = await $`dotnet list package --source ${registry.url} | grep ${packageId}`;
-    
+
     return {
       published: result.stdout.includes(version),
       version,
@@ -121,7 +136,7 @@ export async function isNugetPublished(
 export async function isDockerPublished(
   imageName: string,
   tag: string,
-  registry: DockerRegistry
+  registry: DockerRegistry,
 ): Promise<VerificationResult> {
   try {
     const fullImageName = registry.namespace
@@ -150,7 +165,7 @@ export async function verifyPublication(
   artifactName: string,
   version: string,
   registry: NpmRegistry | NugetRegistry | DockerRegistry,
-  token?: string
+  token?: string,
 ): Promise<VerificationResult> {
   switch (registry.type) {
     case 'npm':

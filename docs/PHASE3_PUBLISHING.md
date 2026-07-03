@@ -13,8 +13,8 @@ registries:
   npm:
     type: npm
     url: https://registry.npmjs.org
-    auth: NPM_TOKEN  # Env var name
-    scope: "@myorg"
+    auth: NPM_TOKEN # Env var name
+    scope: '@myorg'
 
   dockerhub:
     type: docker
@@ -60,28 +60,33 @@ Composite GitHub Action at `actions/publish-release/`:
 ## Features
 
 ### ✅ Flexible Registry Authentication
+
 - Unlimited registries supported
 - Tokens passed via workflow `env:` block
 - No hard-coded inputs in action.yml
 
 ### ✅ Workspace Dependency Rewriting
+
 - Automatically rewrites workspace dependencies before packing
 - NPM: `workspace:*` → actual version
 - NuGet: `ProjectReference` → `PackageReference`
 - Restores original files after packing
 
 ### ✅ Docker Digest Verification
+
 - Pulls temp image from Phase 2
 - Verifies digest matches
 - Prevents publishing tampered images
 - Retags with final version and `latest`
 
 ### ✅ Fail-Fast Error Handling
+
 - Stops on first error
 - Clear error messages
 - No automatic rollback (manual intervention required)
 
 ### ✅ Idempotent Publication
+
 - Checks if version already published
 - Skips already-published artifacts
 - Safe to retry
@@ -112,16 +117,19 @@ Phase 3: Publish Release
 ## Registry Types
 
 ### NPM
+
 - Supports scoped packages (`@org/package`)
 - Creates temporary `.npmrc` with auth
 - Publishes tarball to registry
 
 ### NuGet
+
 - Uses `dotnet nuget push`
 - Supports custom registry URLs
 - API key authentication
 
 ### Docker
+
 - Multi-step: pull → verify → retag → push
 - Digest verification (security)
 - Pushes both version tag and `latest`
