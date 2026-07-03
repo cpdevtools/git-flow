@@ -42,13 +42,11 @@ async function run(): Promise<void> {
       },
       afterTask: (_project, result) => {
         const icon = result.state === 'passed' ? '✅' : '❌';
-        const label = `${icon} ${result.project} (${(result.durationMs / 1000).toFixed(1)}s)`;
+        core.info(`${icon} ${result.project} (${(result.durationMs / 1000).toFixed(1)}s)`);
         if (result.output?.trim()) {
-          core.startGroup(label);
-          process.stdout.write(result.output);
-          core.endGroup();
-        } else {
-          core.info(label);
+          for (const line of result.output.trimEnd().split('\n')) {
+            core.info(`  ${line}`);
+          }
         }
       },
     });
