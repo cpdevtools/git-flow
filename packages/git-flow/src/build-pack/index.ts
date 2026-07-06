@@ -52,6 +52,7 @@ export { extractPRMetadata } from './options.js';
 // Artifact generation
 export {
   generateArtifactDescriptor,
+  loadArtifactConfig,
   ARTIFACT_OUTPUT_DIR,
   type ArtifactConfig,
 } from './generate-artifact.js';

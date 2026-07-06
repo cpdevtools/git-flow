@@ -6,6 +6,7 @@ export default defineConfig({
     'version/index': 'src/version/index.ts',
     'branch/index': 'src/branch/index.ts',
     'build-pack/index': 'src/build-pack/index.ts',
+    'artifacts/index': 'src/artifacts/index.ts',
     'publishing/index': 'src/publishing/index.ts',
     'publish-release/index': 'src/publish-release/index.ts',
   },
