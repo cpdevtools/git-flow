@@ -187,6 +187,39 @@ export async function executePack(
 }
 
 /**
+ * Execute pack-deploy for a project if it has a pack-deploy script.
+ * Runs after pack and after the draft release is found/created so that
+ * GITHUB_RELEASE_ID is available for deploy.yml generation.
+ */
+async function executePackDeploy(
+  project: ProjectConfig,
+  context: BuildPackContext,
+  releaseId: number,
+): Promise<void> {
+  const packageJson = await readPackageJson(project.cwd);
+  if (!packageJson.scripts?.['github.actions.pack-deploy']) {
+    return;
+  }
+
+  console.log(`🚀 ${project.name}: Running pack-deploy...`);
+
+  const env = {
+    ...process.env,
+    PROJECT_VERSION: project.version,
+    PROJECT_NAME: project.name,
+    ARTIFACT_OUTPUT_DIR,
+    DEPLOY_OUTPUT_DIR: join(project.cwd, '.deploy-output'),
+    GITHUB_RELEASE_ID: String(releaseId),
+    GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY ?? '',
+    GITHUB_SHA: context.sha,
+  } as Record<string, string>;
+
+  await $({ cwd: project.cwd, env })`pnpm run github.actions.pack-deploy`;
+
+  console.log(`✓ ${project.name}: pack-deploy completed`);
+}
+
+/**
  * Execute upload for a project's artifacts
  * @param project - Project configuration
  * @param context - Workflow context
@@ -219,6 +252,9 @@ export async function executeUpload(
 
     // Find or create draft release with artifact metadata in body
     const release = await findOrCreateDraftRelease(project, context, artifactYml);
+
+    // Run pack-deploy (if the project supports it) now that we have the release ID
+    await executePackDeploy(project, context, release.id);
 
     // Get owner/repo from environment
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
@@ -281,6 +317,21 @@ export async function executeUpload(
         default:
           console.error(`  ⚠️  Unknown artifact type: ${(artifact as any).type}`);
       }
+    }
+
+    // Upload deploy.zip if pack-deploy produced one
+    const artifactFilename2 = project.name.replace(/@/g, '').replace(/\//g, '-');
+    const deployZipPath = join(ARTIFACT_OUTPUT_DIR, `${artifactFilename2}-deploy.zip`);
+    if (existsSync(deployZipPath)) {
+      console.log(`  📦 Uploading deploy.zip...`);
+      await uploadArtifact(
+        context.githubToken,
+        owner,
+        repo,
+        release.id,
+        release.upload_url,
+        deployZipPath,
+      );
     }
 
     console.log(`✓ ${project.name}: Upload completed`);

@@ -7,6 +7,8 @@ export default defineConfig({
     'config-loader': 'src/config-loader.ts',
     'commands/pack': 'src/commands/pack.ts',
     'commands/apply-version': 'src/commands/apply-version.ts',
+    'commands/pack-deploy': 'src/commands/pack-deploy.ts',
+    'pack-deploy': 'src/pack-deploy.ts',
   },
   format: ['cjs'],
   target: 'node24',
