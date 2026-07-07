@@ -89,13 +89,13 @@ export default class Pack extends Command {
       version,
     };
 
-    for (const artifact of config.artifacts) {
+    for (const artifact of config.artifacts ?? []) {
       await getArtifactType(artifact.type).pack(artifact, ctx);
     }
 
     const descriptor: ProjectArtifactDescriptor = {
       project: projectName,
-      artifacts: config.artifacts,
+      artifacts: config.artifacts ?? [],
     };
 
     await writeArtifact(descriptor);

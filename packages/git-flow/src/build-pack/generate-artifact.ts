@@ -12,13 +12,33 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { getArtifactType, safeName, type PackContext } from '../artifacts/index.js';
+import { getArtifactType, registerArtifactType, safeName, type PackContext } from '../artifacts/index.js';
+
+/**
+ * A plugin entry in release-artifacts.yml.
+ * The package is dynamically imported (it must be installed in the workspace);
+ * its top-level code calls registerArtifactType to add or override type handlers.
+ */
+export interface PluginConfig {
+  /** npm package name to import, e.g. '@myorg/gitflow-helm' */
+  package: string;
+  /** Artifact declarations that use this plugin's types */
+  artifacts?: Artifact[];
+}
 
 /**
  * Artifact configuration that can be provided in release-artifacts.* files
  */
 export interface ArtifactConfig {
-  artifacts: Artifact[];
+  /**
+   * Plugin packages to load before dispatching artifacts.
+   * Plugins are imported in list order; later registrations override earlier ones.
+   * Built-in types (npm, nuget, docker, release-attachment, deploy) are always
+   * registered first and can be overridden by any plugin.
+   */
+  plugins?: PluginConfig[];
+  /** Artifact declarations using built-in or previously-loaded plugin types */
+  artifacts?: Artifact[];
 }
 
 /**
@@ -39,27 +59,25 @@ function replaceEnvVars(str: string, envVars: Record<string, string>): string {
 /**
  * Replace environment variables in artifact config
  */
+function substituteArtifact(artifact: Artifact, envVars: Record<string, string>): Artifact {
+  const base = { ...artifact, name: replaceEnvVars(artifact.name, envVars) };
+  if ('path' in artifact && artifact.path) {
+    return { ...base, path: replaceEnvVars(artifact.path as string, envVars) } as Artifact;
+  }
+  return base as Artifact;
+}
+
 function substituteEnvVars(
   config: ArtifactConfig,
   envVars: Record<string, string>,
 ): ArtifactConfig {
   return {
     ...config,
-    artifacts: config.artifacts.map((artifact) => {
-      const base = {
-        ...artifact,
-        name: replaceEnvVars(artifact.name, envVars),
-      };
-
-      if ('path' in artifact && artifact.path) {
-        return {
-          ...base,
-          path: replaceEnvVars(artifact.path, envVars),
-        } as Artifact;
-      }
-
-      return base as Artifact;
-    }),
+    plugins: config.plugins?.map((p) => ({
+      ...p,
+      artifacts: p.artifacts?.map((a) => substituteArtifact(a, envVars)),
+    })),
+    artifacts: config.artifacts?.map((a) => substituteArtifact(a, envVars)),
   };
 }
 
@@ -87,19 +105,44 @@ export async function loadArtifactConfig(
 
     console.log(`  📄 Found config: ${configFile}`);
 
+    let raw: ArtifactConfig;
     if (configFile.endsWith('.yml') || configFile.endsWith('.yaml')) {
       const content = await readFile(configPath, 'utf-8');
-      const config = parseYaml(content) as ArtifactConfig;
-      return substituteEnvVars(config, envVars);
+      raw = parseYaml(content) as ArtifactConfig;
     } else if (configFile.endsWith('.json')) {
       const content = await readFile(configPath, 'utf-8');
-      const config = JSON.parse(content) as ArtifactConfig;
-      return substituteEnvVars(config, envVars);
+      raw = JSON.parse(content) as ArtifactConfig;
     } else {
       const fileUrl = `file://${configPath}`;
       const mod = await import(fileUrl);
-      return (mod.default || mod) as ArtifactConfig;
+      raw = (mod.default || mod) as ArtifactConfig;
     }
+
+    // Apply env-var substitution before loading plugins so ${VAR} in
+    // package names is also resolved (e.g. ${PLUGIN_SCOPE}/my-plugin)
+    const config = substituteEnvVars(raw, envVars);
+
+    // Load plugins in order — each plugin calls registerArtifactType on import.
+    // Later registrations override earlier ones (last wins).
+    for (const plugin of config.plugins ?? []) {
+      try {
+        await import(plugin.package);
+        console.log(`  🔌 Loaded plugin: ${plugin.package}`);
+      } catch (err) {
+        throw new Error(
+          `Failed to load artifact plugin '${plugin.package}': ${err instanceof Error ? err.message : String(err)}\n` +
+          `Ensure the package is installed in the workspace devDependencies.`,
+        );
+      }
+    }
+
+    // Flatten: plugin artifacts first (in list order), then root artifacts
+    const allArtifacts: Artifact[] = [
+      ...(config.plugins ?? []).flatMap((p) => p.artifacts ?? []),
+      ...(config.artifacts ?? []),
+    ];
+
+    return { artifacts: allArtifacts };
   }
 
   return null;
@@ -152,13 +195,13 @@ export async function generateArtifactDescriptor(
     version: packageVersion,
   };
 
-  for (const artifact of config.artifacts) {
+  for (const artifact of config.artifacts ?? []) {
     await getArtifactType(artifact.type).pack(artifact, ctx);
   }
 
   const descriptor: ProjectArtifactDescriptor = {
     project: packageName,
-    artifacts: config.artifacts,
+    artifacts: config.artifacts ?? [],
   };
 
   await writeArtifact(descriptor);
