@@ -5,10 +5,11 @@
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 import { parseDocument } from 'yaml';
 import { $ } from 'zx';
-import { findOrCreateDraftRelease, uploadArtifact } from './github.js';
+import { getArtifactType, type UploadContext } from '../artifacts/index.js';
+import { findOrCreateDraftRelease } from './github.js';
 import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
@@ -256,82 +257,25 @@ export async function executeUpload(
     // Run pack-deploy (if the project supports it) now that we have the release ID
     await executePackDeploy(project, context, release.id);
 
+    // Re-read descriptor after pack-deploy — deploy artifact path is now populated
+    const updatedYml = await readFile(artifactPath, 'utf-8');
+    const updatedDescriptor = parseDocument(updatedYml).toJSON() as ProjectArtifactDescriptor;
+
     // Get owner/repo from environment
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
 
-    // Upload artifacts based on type (but NOT the artifact.yml file itself)
-    for (const artifact of descriptor.artifacts) {
-      switch (artifact.type) {
-        case 'npm':
-          // Upload npm package file
-          // Path may be absolute (from artifact generation) or relative (from config)
-          const npmPath = isAbsolute(artifact.path)
-            ? artifact.path
-            : join(context.workspaceRoot, artifact.path);
-          await uploadArtifact(
-            context.githubToken,
-            owner,
-            repo,
-            release.id,
-            release.upload_url,
-            npmPath,
-          );
-          break;
+    const uploadCtx: UploadContext = {
+      githubToken: context.githubToken,
+      owner,
+      repo,
+      releaseId: release.id,
+      uploadUrl: release.upload_url,
+      workspaceRoot: context.workspaceRoot,
+    };
 
-        case 'nuget':
-          // Upload nuget package file
-          const nugetPath = isAbsolute(artifact.path)
-            ? artifact.path
-            : join(context.workspaceRoot, artifact.path);
-          await uploadArtifact(
-            context.githubToken,
-            owner,
-            repo,
-            release.id,
-            release.upload_url,
-            nugetPath,
-          );
-          break;
-
-        case 'release-attachment':
-          // Upload release attachment file
-          const attachmentPath = isAbsolute(artifact.path)
-            ? artifact.path
-            : join(context.workspaceRoot, artifact.path);
-          await uploadArtifact(
-            context.githubToken,
-            owner,
-            repo,
-            release.id,
-            release.upload_url,
-            attachmentPath,
-          );
-          break;
-
-        case 'docker':
-          // Docker artifacts don't need file uploads - just metadata in release body
-          console.log(`  ℹ️  Docker artifact: ${artifact.name} (metadata in release body)`);
-          break;
-
-        default:
-          console.error(`  ⚠️  Unknown artifact type: ${(artifact as any).type}`);
-      }
-    }
-
-    // Upload deploy.zip if pack-deploy produced one
-    const artifactFilename2 = project.name.replace(/@/g, '').replace(/\//g, '-');
-    const deployZipPath = join(ARTIFACT_OUTPUT_DIR, `${artifactFilename2}-deploy.zip`);
-    if (existsSync(deployZipPath)) {
-      console.log(`  📦 Uploading deploy.zip...`);
-      await uploadArtifact(
-        context.githubToken,
-        owner,
-        repo,
-        release.id,
-        release.upload_url,
-        deployZipPath,
-      );
+    for (const artifact of updatedDescriptor.artifacts) {
+      await getArtifactType(artifact.type).upload(artifact, uploadCtx);
     }
 
     console.log(`✓ ${project.name}: Upload completed`);
