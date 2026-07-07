@@ -2,6 +2,7 @@
   "name": "@cpdevtools/git-flow-action-create-release-pr",
   "version": "0.0.0-DEFAULT",
   "private": true,
+  "type": "module",
   "description": "GitHub Action to create release PRs",
   "dependencies": {
     "@actions/core": "^1.11.1",
