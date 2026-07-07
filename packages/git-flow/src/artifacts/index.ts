@@ -132,7 +132,7 @@ export function safeName(name: string): string {
 const npm: ArtifactType<NpmArtifact> = {
   async pack(artifact, ctx) {
     await mkdir(ctx.artifactOutputDir, { recursive: true });
-    await $`pnpm pack --pack-destination ${ctx.artifactOutputDir}`.cwd(ctx.projectCwd);
+    await $({ cwd: ctx.projectCwd })`pnpm pack --pack-destination ${ctx.artifactOutputDir}`;
     const tarballName = `${safeName(artifact.name)}-${ctx.version}.tgz`;
     artifact.path = join(ctx.artifactOutputDir, tarballName);
     console.log(`  ✓ npm: ${tarballName}`);
