@@ -6,7 +6,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/git-flow": "workspace:*",
+    "@cpdevtools/git-flow": "^0.4.0-dev.2",
     "tsx": "^4.19.2"
   },
   "author": "CPDevTools",
