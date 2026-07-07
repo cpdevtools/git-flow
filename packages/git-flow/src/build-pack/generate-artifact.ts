@@ -12,7 +12,12 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { getArtifactType, registerArtifactType, safeName, type PackContext } from '../artifacts/index.js';
+import {
+  getArtifactType,
+  registerArtifactType,
+  safeName,
+  type PackContext,
+} from '../artifacts/index.js';
 
 /**
  * A plugin entry in release-artifacts.yml.
@@ -131,7 +136,7 @@ export async function loadArtifactConfig(
       } catch (err) {
         throw new Error(
           `Failed to load artifact plugin '${plugin.package}': ${err instanceof Error ? err.message : String(err)}\n` +
-          `Ensure the package is installed in the workspace devDependencies.`,
+            `Ensure the package is installed in the workspace devDependencies.`,
         );
       }
     }
