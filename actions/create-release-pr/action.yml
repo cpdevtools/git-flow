@@ -71,7 +71,7 @@ runs:
 
     - name: Run Create Release PR
       shell: bash
-      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      run: ${{ github.action_path }}/node_modules/.bin/tsx --conditions source ${{ github.action_path }}/src/action.ts
       env:
         INPUT_BRANCH: ${{ inputs.branch }}
         INPUT_TOKEN: ${{ inputs.token }}
