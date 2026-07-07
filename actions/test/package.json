@@ -3,32 +3,11 @@
   "version": "0.0.0-DEFAULT",
   "private": true,
   "description": "GitHub Action for Phase 4 Test orchestration",
-  "scripts": {
-    "build": "wireit",
-    "clean": "rm -rf dist",
-    "dev": "tsup --watch"
-  },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@cpdevtools/ts-dev-utilities": "^0.3.2-dev.1",
+    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.0",
     "tsx": "^4.19.2"
   },
-  "devDependencies": {},
   "author": "CPDevTools",
-  "license": "MIT",
-  "wireit": {
-    "build": {
-      "command": "tsup",
-      "dependencies": [
-        "../../packages/git-flow:build"
-      ],
-      "files": [
-        "src/**/*.ts",
-        "tsup.config.ts"
-      ],
-      "output": [
-        "dist/**"
-      ]
-    }
-  }
+  "license": "MIT"
 }

@@ -24,10 +24,10 @@ export async function loadConfig(cwd: string): Promise<CPDevToolsConfig | undefi
       try {
         const configUrl = pathToFileURL(configPath).href;
         const module = await import(configUrl);
-        
+
         // Support both default export and named exports
         const config: CPDevToolsConfig = module.default || module;
-        
+
         return config;
       } catch (error) {
         console.warn(`Warning: Failed to load config from ${configPath}:`, error);

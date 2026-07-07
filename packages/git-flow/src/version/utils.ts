@@ -13,10 +13,10 @@ export function isPreRelease(version: string): boolean {
 /**
  * Sanitize branch name for use in version string
  * Replaces slashes and special characters with dots
- * 
+ *
  * @param branch - Branch name to sanitize
  * @returns Sanitized branch name
- * 
+ *
  * @example
  * sanitizeBranchName('feature/new-feature') // "feature.new-feature"
  * sanitizeBranchName('team/feature/auth') // "team.feature.auth"
@@ -28,10 +28,10 @@ export function sanitizeBranchName(branch: string): string {
 /**
  * Determine branch type: mainline or development
  * Mainline branches do NOT contain a forward slash
- * 
+ *
  * @param branch - Branch name
  * @returns Branch type
- * 
+ *
  * @example
  * getBranchType('main') // 'mainline'
  * getBranchType('feature/auth') // 'development'
@@ -43,10 +43,10 @@ export function getBranchType(branch: string): 'mainline' | 'development' {
 /**
  * Determine if a branch is a mainline branch
  * Mainline branches do NOT contain a forward slash
- * 
+ *
  * @param branch - Branch name
  * @returns True if branch is mainline
- * 
+ *
  * @example
  * isMainlineBranch('main') // true
  * isMainlineBranch('v1.8') // true

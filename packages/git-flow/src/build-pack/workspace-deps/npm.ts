@@ -16,22 +16,27 @@ export interface RewriteNpmDepsOptions {
 /**
  * Rewrite workspace:* dependencies to actual versions before packing
  */
-export async function rewriteNpmWorkspaceDependencies(options: RewriteNpmDepsOptions): Promise<void> {
+export async function rewriteNpmWorkspaceDependencies(
+  options: RewriteNpmDepsOptions,
+): Promise<void> {
   const { project, allProjects } = options;
   const pkgPath = join(project.cwd, 'package.json');
-  
+
   const content = await readFile(pkgPath, 'utf-8');
   const pkg = JSON.parse(content);
 
   // Create version lookup map
-  const versionMap = new Map(
-    allProjects.map(p => [p.name, p.version])
-  );
+  const versionMap = new Map(allProjects.map((p) => [p.name, p.version]));
 
   let modified = false;
 
   // Rewrite all dependency types
-  for (const depType of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+  for (const depType of [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ]) {
     const deps = pkg[depType];
     if (!deps) continue;
 

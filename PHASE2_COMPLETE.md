@@ -43,6 +43,7 @@
 ### GitHub Action
 
 **[actions/build-pack/](git-flow/actions/build-pack/)**
+
 - `action.yml` - Action definition with inputs/outputs
 - `src/index.ts` - Action entry point with @actions/core integration
 - `README.md` - Action usage documentation
@@ -64,6 +65,7 @@
 ### Dependencies
 
 Added to git-flow package:
+
 - `execa@^9.5.2` - Command execution
 - `@actions/github@^6.0.0` - GitHub API (Octokit)
 - `@actions/core@^1.11.1` - GitHub Actions utilities
@@ -72,28 +74,33 @@ Added to git-flow package:
 ## Key Features
 
 ✅ **Smart Dependency Building**
+
 - Builds all workspace dependencies
 - Only packs/uploads release projects
 - Topological sort ensures correct build order
 
 ✅ **Resumability**
+
 - Checks existing draft releases
 - Skips projects with uploaded artifact.yml
 - Allows re-running failed builds
 
 ✅ **Multi-Artifact Support**
+
 - NPM packages (.tgz files)
 - Docker images (metadata only)
 - NuGet packages (.nupkg files)
 - Release attachments (any file type)
 
 ✅ **Error Handling**
+
 - Detailed error messages
 - Exit codes captured
 - Failed projects tracked separately
 - Continues with remaining projects
 
 ✅ **GitHub Integration**
+
 - Creates draft releases per project
 - Uploads artifacts as release assets
 - Tag format: `{project-name}/v{version}`
@@ -101,6 +108,7 @@ Added to git-flow package:
 ## Build Status
 
 All code compiles successfully:
+
 ```bash
 cd git-flow/packages/git-flow && pnpm run build
 # ✅ ESM Build success

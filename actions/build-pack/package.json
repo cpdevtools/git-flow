@@ -3,33 +3,12 @@
   "version": "0.0.0-DEFAULT",
   "private": true,
   "description": "GitHub Action for Phase 2 Build & Pack workflow",
-  "scripts": {
-    "build": "wireit",
-    "clean": "rm -rf dist",
-    "dev": "tsup --watch"
-  },
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/git-flow": "workspace:*",
     "tsx": "^4.19.2"
   },
-  "devDependencies": {},
   "author": "CPDevTools",
-  "license": "MIT",
-  "wireit": {
-    "build": {
-      "command": "tsup",
-      "dependencies": [
-        "../../packages/git-flow:build"
-      ],
-      "files": [
-        "src/**/*.ts",
-        "tsup.config.ts"
-      ],
-      "output": [
-        "dist/**"
-      ]
-    }
-  }
+  "license": "MIT"
 }

@@ -1,9 +1,9 @@
 /**
  * Phase 2: Build & Pack
- * 
+ *
  * Orchestrates building and packaging projects from a GitHub PR description.
  * Creates draft releases with artifacts for projects marked for release.
- * 
+ *
  * @module build-pack
  */
 
@@ -24,7 +24,12 @@ export type {
 export { applyVersion, executePack, executeUpload } from './execute.js';
 
 // Project discovery (shared utility)
-export { discoverProjects, buildDependencyGraph, type Project, type DependencyGraph } from '../lib/project.js';
+export {
+  discoverProjects,
+  buildDependencyGraph,
+  type Project,
+  type DependencyGraph,
+} from '../lib/project.js';
 
 // GitHub API operations (for advanced usage/testing)
 export {
@@ -45,7 +50,12 @@ export {
 export { extractPRMetadata } from './options.js';
 
 // Artifact generation
-export { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR, type ArtifactConfig } from './generate-artifact.js';
+export {
+  generateArtifactDescriptor,
+  loadArtifactConfig,
+  ARTIFACT_OUTPUT_DIR,
+  type ArtifactConfig,
+} from './generate-artifact.js';
 
 // Workspace dependency rewriting (for Phase 2)
 export {

@@ -8,19 +8,19 @@ import type { RegistryConfig, Registry } from './types.js';
  */
 export async function loadRegistryConfig(workspaceRoot: string): Promise<RegistryConfig> {
   const configPath = join(workspaceRoot, '.publish', 'registries.yml');
-  
+
   try {
     const content = await readFile(configPath, 'utf-8');
     const config = parseYaml(content) as RegistryConfig;
-    
+
     validateRegistryConfig(config);
-    
+
     return config;
   } catch (error) {
     throw new Error(
       `Failed to load registry configuration from ${configPath}: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
     );
   }
 }
@@ -63,7 +63,9 @@ export function validateRegistryConfig(config: RegistryConfig): void {
         break;
 
       default:
-        throw new Error(`Registry "${name}" has invalid type: ${(registry as unknown as { type: string }).type}`);
+        throw new Error(
+          `Registry "${name}" has invalid type: ${(registry as unknown as { type: string }).type}`,
+        );
     }
   }
 }
@@ -73,11 +75,11 @@ export function validateRegistryConfig(config: RegistryConfig): void {
  */
 export function getRegistry(config: RegistryConfig, name: string): Registry {
   const registry = config.registries[name];
-  
+
   if (!registry) {
     throw new Error(
       `Registry "${name}" not found in configuration. ` +
-      `Available registries: ${Object.keys(config.registries).join(', ')}`
+        `Available registries: ${Object.keys(config.registries).join(', ')}`,
     );
   }
 
@@ -89,11 +91,11 @@ export function getRegistry(config: RegistryConfig, name: string): Registry {
  */
 export function getToken(registry: Registry): string {
   const token = process.env[registry.auth];
-  
+
   if (!token) {
     throw new Error(
       `Authentication token not found for registry. ` +
-      `Expected environment variable: ${registry.auth}`
+        `Expected environment variable: ${registry.auth}`,
     );
   }
 

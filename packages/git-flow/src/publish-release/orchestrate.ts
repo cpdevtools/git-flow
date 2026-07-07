@@ -2,36 +2,31 @@
  * Phase 3: Publish & Release orchestration
  */
 
-import type { ProjectArtifactDescriptor, Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
+import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { parseDocument } from 'yaml';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { getOctokit as getActionsOctokit } from '@actions/github';
+import { getArtifactType, type PublishContext } from '../artifacts/index.js';
 import {
   loadRegistryConfig,
   getRegistry,
   getToken,
-  publishToNpm,
-  publishToNuget,
-  publishToDocker,
   verifyPublication,
   type RegistryConfig,
   type Registry,
-  type NpmRegistry,
-  type NugetRegistry,
-  type DockerRegistry,
   type PublishReleaseOptions,
   type PublishReleaseResult,
   type ProjectPublishResult,
 } from '../publishing/index.js';
-import { 
-  finalizeRelease, 
-  createGitTag, 
+import {
+  finalizeRelease,
+  createGitTag,
   getReleaseTag,
   getDraftReleaseMetadata,
   updateDraftReleaseBody,
   findDraftReleaseByTag,
-  postPRReleaseComment
+  postPRReleaseComment,
 } from '../build-pack/github.js';
 
 /**
@@ -42,10 +37,10 @@ async function downloadReleaseAssets(
   owner: string,
   repo: string,
   tag: string,
-  outputDir: string
+  outputDir: string,
 ): Promise<void> {
   const octokit = getActionsOctokit(githubToken);
-  
+
   // Find the release
   const { data: releases } = await octokit.rest.repos.listReleases({
     owner,
@@ -60,9 +55,10 @@ async function downloadReleaseAssets(
   const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
 
   // First try exact tag match, then fall back to name match for untagged releases
-  const release = releases.find(r => r.tag_name === tag) || 
-                  (expectedName ? releases.find(r => r.draft && r.name === expectedName) : null);
-  
+  const release =
+    releases.find((r) => r.tag_name === tag) ||
+    (expectedName ? releases.find((r) => r.draft && r.name === expectedName) : null);
+
   if (!release) {
     throw new Error(`Release not found for tag: ${tag}`);
   }
@@ -73,7 +69,7 @@ async function downloadReleaseAssets(
   // Download each asset
   for (const asset of release.assets) {
     console.log(`  ⬇️  Downloading ${asset.name}...`);
-    
+
     const response = await octokit.rest.repos.getReleaseAsset({
       owner,
       repo,
@@ -97,12 +93,12 @@ async function updateReleaseBodyPublishedFlags(
   owner: string,
   repo: string,
   tag: string,
-  artifactYml: string
+  artifactYml: string,
 ): Promise<void> {
   // Parse YAML and update published flags
   const doc = parseDocument(artifactYml);
   const descriptor = doc.toJSON() as ProjectArtifactDescriptor;
-  
+
   // Set published:true for all artifacts
   if (descriptor.artifacts) {
     for (let i = 0; i < descriptor.artifacts.length; i++) {
@@ -112,17 +108,17 @@ async function updateReleaseBodyPublishedFlags(
       }
     }
   }
-  
+
   // Get the draft release
   const release = await findDraftReleaseByTag(githubToken, owner, repo, tag);
   if (!release) {
     throw new Error(`Draft release not found for tag: ${tag}`);
   }
-  
+
   // Parse existing body to preserve PR link and tags sections
   const existingBody = release.body || '';
   const artifactMetadataMatch = existingBody.match(/## Artifact Metadata\n```yaml\n[\s\S]*?\n```/);
-  
+
   // Extract PR link and tags sections from existing body
   let prAndTagsSections = '';
   if (artifactMetadataMatch) {
@@ -132,14 +128,12 @@ async function updateReleaseBodyPublishedFlags(
     // No artifact metadata section found, preserve entire existing body
     prAndTagsSections = existingBody.trim();
   }
-  
+
   // Update release body preserving PR link, tags, and updating artifact metadata
   const updatedYaml = doc.toString();
   const artifactSection = `## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``;
-  const body = prAndTagsSections 
-    ? `${prAndTagsSections}\n\n${artifactSection}`
-    : artifactSection;
-  
+  const body = prAndTagsSections ? `${prAndTagsSections}\n\n${artifactSection}` : artifactSection;
+
   await updateDraftReleaseBody(githubToken, owner, repo, release.id, body);
 }
 
@@ -147,7 +141,7 @@ async function updateReleaseBodyPublishedFlags(
  * Main orchestration function for publishing and releasing
  */
 export async function runPublishRelease(
-  options: PublishReleaseOptions
+  options: PublishReleaseOptions,
 ): Promise<PublishReleaseResult> {
   const result: PublishReleaseResult = {
     published: [],
@@ -170,13 +164,13 @@ export async function runPublishRelease(
           options.githubToken,
           options.owner,
           options.repo,
-          tag
+          tag,
         );
 
         if (!artifactYml) {
           throw new Error(
             `No artifact metadata found in draft release ${tag}. ` +
-            `Make sure the build-pack phase completed successfully.`
+              `Make sure the build-pack phase completed successfully.`,
           );
         }
 
@@ -191,7 +185,7 @@ export async function runPublishRelease(
           options.owner,
           options.repo,
           tag,
-          artifactsDir
+          artifactsDir,
         );
 
         // Publish each artifact to its registries
@@ -199,7 +193,7 @@ export async function runPublishRelease(
           descriptor,
           registryConfig,
           options.workspaceRoot,
-          project.version
+          project.version,
         );
 
         if (!publishResult.success) {
@@ -213,7 +207,7 @@ export async function runPublishRelease(
           options.owner,
           options.repo,
           tag,
-          artifactYml
+          artifactYml,
         );
 
         // Create git tag BEFORE finalizing release (required for GitHub to use the tag)
@@ -225,7 +219,7 @@ export async function runPublishRelease(
           project.name,
           project.version,
           options.sha,
-          project.placeholder
+          project.placeholder,
         );
 
         // Finalize GitHub Release (draft → published)
@@ -236,7 +230,7 @@ export async function runPublishRelease(
           options.repo,
           project.name,
           project.version,
-          project.prerelease
+          project.prerelease,
         );
 
         result.published.push(project.name);
@@ -259,7 +253,7 @@ export async function runPublishRelease(
         throw new Error(
           `Publishing failed for ${project.name}: ${
             error instanceof Error ? error.message : String(error)
-          }`
+          }`,
         );
       }
     }
@@ -276,15 +270,17 @@ export async function runPublishRelease(
             options.githubToken,
             options.owner,
             options.repo,
-            tag
+            tag,
           );
           return {
             name: project.name,
             version: project.version,
-            url: release?.html_url || `https://github.com/${options.owner}/${options.repo}/releases/tag/${tag}`,
+            url:
+              release?.html_url ||
+              `https://github.com/${options.owner}/${options.repo}/releases/tag/${tag}`,
             tag,
           };
-        })
+        }),
       );
 
       await postPRReleaseComment(
@@ -292,7 +288,7 @@ export async function runPublishRelease(
         options.owner,
         options.repo,
         options.prNumber,
-        releaseLinks
+        releaseLinks,
       );
     }
 
@@ -313,7 +309,9 @@ function isGitHubRegistry(registry: Registry): boolean {
     case 'nuget':
       return registry.url.includes('nuget.pkg.github.com');
     case 'docker':
-      return registry.registry.includes('ghcr.io') || registry.registry.includes('docker.pkg.github.com');
+      return (
+        registry.registry.includes('ghcr.io') || registry.registry.includes('docker.pkg.github.com')
+      );
     default:
       return false;
   }
@@ -333,7 +331,7 @@ async function publishProjectArtifacts(
   descriptor: ProjectArtifactDescriptor,
   registryConfig: RegistryConfig,
   workspaceRoot: string,
-  projectVersion: string
+  projectVersion: string,
 ): Promise<ProjectPublishResult> {
   const result: ProjectPublishResult = {
     project: descriptor.project,
@@ -348,43 +346,54 @@ async function publishProjectArtifacts(
   }
 
   try {
+    const publishCtx: PublishContext = { workspaceRoot, projectVersion };
+
     for (const artifact of descriptor.artifacts) {
-      const registries = getArtifactRegistries(artifact);
+      const registries = getArtifactType(artifact.type).getRegistries(artifact);
 
       for (const registryId of registries) {
         const registry = getRegistry(registryConfig, registryId);
-        
+
         // Skip non-GitHub registries for build versions
         if (isBuild && !isGitHubRegistry(registry)) {
-          console.log(`  ⏭️  Skipping ${artifact.name} → ${registryId} (build versions only publish to GitHub registries)`);
+          console.log(
+            `  ⏭️  Skipping ${artifact.name} → ${registryId} (build versions only publish to GitHub registries)`,
+          );
           continue;
         }
-        
+
         const token = getToken(registry);
 
         // Skip if already published
-        const artifactName = getArtifactName(artifact);
-        const artifactVersion = getArtifactVersion(artifact, projectVersion);
+        const artifactVersion = getArtifactType(artifact.type).getVersion(artifact, projectVersion);
 
-        const verification = await verifyPublication(artifactName, artifactVersion, registry, token);
+        const verification = await verifyPublication(
+          artifact.name,
+          artifactVersion,
+          registry,
+          token,
+        );
 
         if (verification.published) {
-          console.log(
-            `  ⏭️  Skipping ${artifact.name} - already published to ${registryId}`
-          );
+          console.log(`  ⏭️  Skipping ${artifact.name} - already published to ${registryId}`);
           continue;
         }
 
         // Publish to registry
         console.log(`  🚀 Publishing ${artifact.name} to ${registryId}...`);
-        await publishArtifact(artifact, registry, descriptor, workspaceRoot);
+        await getArtifactType(artifact.type).publish(artifact, registry, publishCtx);
 
         // Verify publication
-        const postVerification = await verifyPublication(artifactName, artifactVersion, registry, token);
+        const postVerification = await verifyPublication(
+          artifact.name,
+          artifactVersion,
+          registry,
+          token,
+        );
 
         if (!postVerification.published) {
           throw new Error(
-            `Verification failed for ${artifact.name} in ${registryId}: ${postVerification.error}`
+            `Verification failed for ${artifact.name} in ${registryId}: ${postVerification.error}`,
           );
         }
 
@@ -400,108 +409,4 @@ async function publishProjectArtifacts(
     result.error = error instanceof Error ? error.message : String(error);
     return result;
   }
-}
-
-/**
- * Publish single artifact to a registry
- */
-async function publishArtifact(
-  artifact: Artifact,
-  registry: Registry,
-  descriptor: ProjectArtifactDescriptor,
-  workspaceRoot: string
-): Promise<void> {
-  const token = getToken(registry);
-
-  switch (artifact.type) {
-    case 'npm':
-      if (!artifact.path) {
-        throw new Error(`NPM artifact ${artifact.name} missing path`);
-      }
-      // Use just the filename from the artifact path and look in .artifacts/
-      await publishToNpm({
-        artifactPath: join(workspaceRoot, '.artifacts', basename(artifact.path)),
-        registry: registry as NpmRegistry,
-        token,
-      });
-      break;
-
-    case 'nuget':
-      if (!artifact.path) {
-        throw new Error(`NuGet artifact ${artifact.name} missing path`);
-      }
-      // Use just the filename from the artifact path and look in .artifacts/
-      await publishToNuget({
-        artifactPath: join(workspaceRoot, '.artifacts', basename(artifact.path)),
-        registry: registry as NugetRegistry,
-        apiKey: token,
-      });
-      break;
-
-    case 'docker':
-      {
-        const dockerRegistry = registry as DockerRegistry;
-        if (!artifact.tempTag || !artifact.finalTag || !artifact.digest) {
-          throw new Error(`Docker artifact ${artifact.name} missing required fields`);
-        }
-
-        const username = dockerRegistry.usernameEnv
-          ? process.env[dockerRegistry.usernameEnv]
-          : undefined;
-
-        await publishToDocker({
-          imageName: artifact.name,
-          tempTag: artifact.tempTag,
-          finalTag: artifact.finalTag,
-          digest: artifact.digest,
-          registry: dockerRegistry,
-          username,
-          token,
-        });
-      }
-      break;
-
-    case 'release-attachment':
-      // Release attachments are already in GitHub Release
-      // No external publishing needed
-      console.log(`  ℹ️  ${artifact.name} is a release attachment, no external publishing needed`);
-      break;
-
-    default:
-      throw new Error(`Unknown artifact type: ${(artifact as unknown as { type: string }).type}`);
-  }
-}
-
-/**
- * Get registries for an artifact (from artifact or default from project)
- */
-function getArtifactRegistries(artifact: Artifact): string[] {
-  if ('registries' in artifact && Array.isArray(artifact.registries)) {
-    return artifact.registries;
-  }
-
-  if ('registry' in artifact && typeof artifact.registry === 'string') {
-    return [artifact.registry];
-  }
-
-  return [];
-}
-
-/**
- * Get artifact name for verification
- */
-function getArtifactName(artifact: Artifact): string {
-  return artifact.name;
-}
-
-/**
- * Get artifact version for verification
- */
-function getArtifactVersion(artifact: Artifact, projectVersion: string): string {
-  // Docker uses tags, not versions
-  if (artifact.type === 'docker' && artifact.finalTag) {
-    return artifact.finalTag;
-  }
-
-  return projectVersion;
 }

@@ -5,35 +5,30 @@
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 import { parseDocument } from 'yaml';
 import { $ } from 'zx';
-import {
-    findOrCreateDraftRelease,
-    uploadArtifact
-} from './github.js';
+import { getArtifactType, type UploadContext } from '../artifacts/index.js';
+import { findOrCreateDraftRelease } from './github.js';
 import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
-import {
-    rewriteWorkspaceDependencies,
-    restoreProjectFiles
-} from './workspace-deps/index.js';
+import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
 
 /**
  * Apply version to package.json
  */
 async function applyVersionToPackageJson(cwd: string, version: string): Promise<void> {
   const pkgPath = join(cwd, 'package.json');
-  
+
   if (!existsSync(pkgPath)) {
     return;
   }
-  
+
   const content = await readFile(pkgPath, 'utf-8');
   const pkg = JSON.parse(content);
-  
+
   pkg.version = version;
-  
+
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 }
 
@@ -45,11 +40,11 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
   try {
     const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj"`;
     const csprojFiles = stdout.trim().split('\n').filter(Boolean);
-    
+
     for (const csprojFile of csprojFiles) {
       const csprojPath = join(cwd, csprojFile);
       let content = await readFile(csprojPath, 'utf-8');
-      
+
       // Update <Version> tag
       if (content.includes('<Version>')) {
         content = content.replace(/<Version>.*?<\/Version>/, `<Version>${version}</Version>`);
@@ -57,10 +52,10 @@ async function applyVersionToCsproj(cwd: string, version: string): Promise<void>
         // Add Version tag if not present
         content = content.replace(
           /<PropertyGroup>/,
-          `<PropertyGroup>\n    <Version>${version}</Version>`
+          `<PropertyGroup>\n    <Version>${version}</Version>`,
         );
       }
-      
+
       await writeFile(csprojPath, content);
     }
   } catch (error) {
@@ -107,7 +102,7 @@ async function hasPackScript(project: ProjectConfig): Promise<boolean> {
  */
 export async function executePack(
   project: ProjectConfig,
-  context: BuildPackContext
+  context: BuildPackContext,
 ): Promise<ExecutionResult> {
   if (!(await hasPackScript(project))) {
     console.log(`⊘ ${project.name}: No pack script, skipping...`);
@@ -149,7 +144,7 @@ export async function executePack(
         console.error(`  ⚠️  gitflow not found in PATH`);
         console.error(`  PATH: ${env.PATH}`);
       }
-      
+
       result = await $({ cwd: project.cwd, env, verbose: true })`pnpm run github.actions.pack`;
       console.log(`  ✓ Pack completed`);
     } catch (error) {
@@ -165,7 +160,7 @@ export async function executePack(
     const artifactPath = await generateArtifactDescriptor(
       project.cwd,
       project.name,
-      project.version
+      project.version,
     );
 
     if (!existsSync(artifactPath)) {
@@ -193,6 +188,39 @@ export async function executePack(
 }
 
 /**
+ * Execute pack-deploy for a project if it has a pack-deploy script.
+ * Runs after pack and after the draft release is found/created so that
+ * GITHUB_RELEASE_ID is available for deploy.yml generation.
+ */
+async function executePackDeploy(
+  project: ProjectConfig,
+  context: BuildPackContext,
+  releaseId: number,
+): Promise<void> {
+  const packageJson = await readPackageJson(project.cwd);
+  if (!packageJson.scripts?.['github.actions.pack-deploy']) {
+    return;
+  }
+
+  console.log(`🚀 ${project.name}: Running pack-deploy...`);
+
+  const env = {
+    ...process.env,
+    PROJECT_VERSION: project.version,
+    PROJECT_NAME: project.name,
+    ARTIFACT_OUTPUT_DIR,
+    DEPLOY_OUTPUT_DIR: join(project.cwd, '.deploy-output'),
+    GITHUB_RELEASE_ID: String(releaseId),
+    GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY ?? '',
+    GITHUB_SHA: context.sha,
+  } as Record<string, string>;
+
+  await $({ cwd: project.cwd, env })`pnpm run github.actions.pack-deploy`;
+
+  console.log(`✓ ${project.name}: pack-deploy completed`);
+}
+
+/**
  * Execute upload for a project's artifacts
  * @param project - Project configuration
  * @param context - Workflow context
@@ -200,7 +228,7 @@ export async function executePack(
  */
 export async function executeUpload(
   project: ProjectConfig,
-  context: BuildPackContext
+  context: BuildPackContext,
 ): Promise<ExecutionResult> {
   console.log(`⬆️  ${project.name}: Uploading artifacts...`);
 
@@ -226,67 +254,28 @@ export async function executeUpload(
     // Find or create draft release with artifact metadata in body
     const release = await findOrCreateDraftRelease(project, context, artifactYml);
 
+    // Run pack-deploy (if the project supports it) now that we have the release ID
+    await executePackDeploy(project, context, release.id);
+
+    // Re-read descriptor after pack-deploy — deploy artifact path is now populated
+    const updatedYml = await readFile(artifactPath, 'utf-8');
+    const updatedDescriptor = parseDocument(updatedYml).toJSON() as ProjectArtifactDescriptor;
+
     // Get owner/repo from environment
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
 
-    // Upload artifacts based on type (but NOT the artifact.yml file itself)
-    for (const artifact of descriptor.artifacts) {
-      switch (artifact.type) {
-        case 'npm':
-          // Upload npm package file
-          // Path may be absolute (from artifact generation) or relative (from config)
-          const npmPath = isAbsolute(artifact.path) 
-            ? artifact.path 
-            : join(context.workspaceRoot, artifact.path);
-          await uploadArtifact(
-            context.githubToken,
-            owner,
-            repo,
-            release.id,
-            release.upload_url,
-            npmPath
-          );
-          break;
+    const uploadCtx: UploadContext = {
+      githubToken: context.githubToken,
+      owner,
+      repo,
+      releaseId: release.id,
+      uploadUrl: release.upload_url,
+      workspaceRoot: context.workspaceRoot,
+    };
 
-        case 'nuget':
-          // Upload nuget package file
-          const nugetPath = isAbsolute(artifact.path)
-            ? artifact.path
-            : join(context.workspaceRoot, artifact.path);
-          await uploadArtifact(
-            context.githubToken,
-            owner,
-            repo,
-            release.id,
-            release.upload_url,
-            nugetPath
-          );
-          break;
-
-        case 'release-attachment':
-          // Upload release attachment file
-          const attachmentPath = isAbsolute(artifact.path)
-            ? artifact.path
-            : join(context.workspaceRoot, artifact.path);
-          await uploadArtifact(
-            context.githubToken,
-            owner,
-            repo,
-            release.id,
-            release.upload_url,
-            attachmentPath
-          );
-          break;
-
-        case 'docker':
-          // Docker artifacts don't need file uploads - just metadata in release body
-          console.log(`  ℹ️  Docker artifact: ${artifact.name} (metadata in release body)`);
-          break;
-
-        default:
-          console.error(`  ⚠️  Unknown artifact type: ${(artifact as any).type}`);
-      }
+    for (const artifact of updatedDescriptor.artifacts) {
+      await getArtifactType(artifact.type).upload(artifact, uploadCtx);
     }
 
     console.log(`✓ ${project.name}: Upload completed`);

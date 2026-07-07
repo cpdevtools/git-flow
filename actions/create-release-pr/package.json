@@ -1,64 +1,16 @@
 {
-  "name": "create-release-pr",
+  "name": "@cpdevtools/git-flow-action-create-release-pr",
   "version": "0.0.0-DEFAULT",
   "private": true,
-  "description": "GitHub composite action to create release PRs",
-  "main": "dist/index.js",
-  "scripts": {
-    "build": "wireit",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "eslint src --ext .ts",
-    "test": "wireit",
-    "test:watch": "vitest",
-    "typecheck": "wireit"
-  },
+  "description": "GitHub Action to create release PRs",
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/git-flow": "workspace:*",
-    "@cpdevtools/ts-dev-utilities": "^0.3.2-dev.1",
+    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.0",
     "tsx": "^4.19.2",
     "yaml": "^2.8.2"
   },
-  "devDependencies": {},
-  "keywords": [
-    "github-actions",
-    "pr",
-    "release",
-    "versioning"
-  ],
   "author": "CPDevTools",
-  "license": "MIT",
-  "wireit": {
-    "build": {
-      "command": "tsup",
-      "dependencies": [
-        "../../packages/git-flow:build"
-      ],
-      "files": [
-        "src/**/*.ts",
-        "tsup.config.ts"
-      ],
-      "output": [
-        "dist/**"
-      ]
-    },
-    "test": {
-      "command": "vitest run",
-      "dependencies": [
-        "build"
-      ],
-      "files": [
-        "src/**/*.ts",
-        "vitest.config.ts"
-      ]
-    },
-    "typecheck": {
-      "command": "tsc --noEmit",
-      "files": [
-        "src/**/*.ts",
-        "tsconfig.json"
-      ]
-    }
-  }
+  "license": "MIT"
 }

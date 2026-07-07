@@ -13,20 +13,23 @@ import type { BuildPackContext, ProjectConfig } from './types.js';
  */
 function addPublishedFlagsToMetadata(artifactYaml: string): string {
   const doc = parseDocument(artifactYaml);
-  
+
   // Add published:false to each artifact
   const artifacts = doc.get('artifacts') as any;
   if (artifacts && Array.isArray(artifacts.items)) {
     for (const artifactNode of artifacts.items) {
-      if (artifactNode && typeof artifactNode.set === 'function' && !artifactNode.has('published')) {
+      if (
+        artifactNode &&
+        typeof artifactNode.set === 'function' &&
+        !artifactNode.has('published')
+      ) {
         artifactNode.set('published', false);
       }
     }
   }
-  
+
   return doc.toString();
 }
-
 
 /**
  * Get release tag name for a project
@@ -42,8 +45,13 @@ export async function findDraftReleaseByTag(
   githubToken: string,
   owner: string,
   repo: string,
-  tag: string
-): Promise<{ id: number; upload_url: string; html_url: string; body: string | null | undefined } | null> {
+  tag: string,
+): Promise<{
+  id: number;
+  upload_url: string;
+  html_url: string;
+  body: string | null | undefined;
+} | null> {
   const octokit = getOctokit(githubToken);
 
   try {
@@ -60,7 +68,7 @@ export async function findDraftReleaseByTag(
 
     // First try to find by exact tag match
     let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
-    
+
     // Fallback: find by release name (handles GitHub's untagged- behavior)
     if (!draftRelease && expectedName) {
       draftRelease = releases.find((r) => r.name === expectedName && r.draft);
@@ -93,7 +101,7 @@ export async function createDraftRelease(
   name: string,
   body: string,
   prerelease: boolean,
-  sha: string
+  sha: string,
 ): Promise<{ id: number; upload_url: string }> {
   const octokit = getOctokit(githubToken);
 
@@ -122,7 +130,7 @@ export async function updateDraftReleaseBody(
   owner: string,
   repo: string,
   releaseId: number,
-  body: string
+  body: string,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
 
@@ -140,7 +148,7 @@ export async function updateDraftReleaseBody(
 export async function findOrCreateDraftRelease(
   project: ProjectConfig,
   context: BuildPackContext,
-  artifactMetadata?: string
+  artifactMetadata?: string,
 ): Promise<{ id: number; upload_url: string }> {
   // Extract owner/repo from GitHub context (would come from environment in real action)
   // For now, using placeholders
@@ -149,7 +157,7 @@ export async function findOrCreateDraftRelease(
 
   const tag = getReleaseTag(project.name, project.version);
   const name = `${project.name} ${project.version}`;
-  
+
   // Calculate all tags that will be created
   const versionGroup = project.placeholder.split('-')[1] || 'MAIN';
   const tags = [
@@ -160,39 +168,30 @@ export async function findOrCreateDraftRelease(
   if (versionGroup === 'MAIN') {
     tags.push(`v${project.version}`); // Simple version tag (e.g., v0.2.1)
   }
-  
+
   // Add published:false to artifact metadata if provided
-  const processedMetadata = artifactMetadata ? addPublishedFlagsToMetadata(artifactMetadata) : undefined;
-  
+  const processedMetadata = artifactMetadata
+    ? addPublishedFlagsToMetadata(artifactMetadata)
+    : undefined;
+
   // Build release body with PR link, tags, and artifact metadata
   const prLink = `📋 **Created from PR:** #${context.prNumber}`;
-  const tagsList = tags.map(t => `- \`${t}\``).join('\n');
+  const tagsList = tags.map((t) => `- \`${t}\``).join('\n');
   const tagsSection = `\n\n🏷️ **Tags:**\n${tagsList}`;
-  const artifactSection = processedMetadata 
+  const artifactSection = processedMetadata
     ? `\n\n## Artifact Metadata\n\`\`\`yaml\n${processedMetadata}\n\`\`\``
     : '';
   const body = `${prLink}${tagsSection}${artifactSection}`;
 
   // Try to find existing draft release
-  const existing = await findDraftReleaseByTag(
-    context.githubToken,
-    owner,
-    repo,
-    tag
-  );
+  const existing = await findDraftReleaseByTag(context.githubToken, owner, repo, tag);
 
   if (existing) {
     console.log(`  ✓ Found existing draft release: ${tag}`);
-    
+
     // Always update release body with PR link, tags, and artifact metadata
-    await updateDraftReleaseBody(
-      context.githubToken,
-      owner,
-      repo,
-      existing.id,
-      body
-    );
-    
+    await updateDraftReleaseBody(context.githubToken, owner, repo, existing.id, body);
+
     return existing;
   }
 
@@ -206,7 +205,7 @@ export async function findOrCreateDraftRelease(
     name,
     body,
     project.prerelease,
-    context.sha
+    context.sha,
   );
 }
 
@@ -218,7 +217,7 @@ export async function isArtifactUploaded(
   owner: string,
   repo: string,
   releaseId: number,
-  assetName: string
+  assetName: string,
 ): Promise<boolean> {
   const octokit = getOctokit(githubToken);
 
@@ -245,19 +244,13 @@ export async function uploadArtifact(
   repo: string,
   releaseId: number,
   uploadUrl: string,
-  filePath: string
+  filePath: string,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const fileName = basename(filePath);
 
   // Check if already uploaded
-  const alreadyExists = await isArtifactUploaded(
-    githubToken,
-    owner,
-    repo,
-    releaseId,
-    fileName
-  );
+  const alreadyExists = await isArtifactUploaded(githubToken, owner, repo, releaseId, fileName);
 
   if (alreadyExists) {
     console.log(`  ⊘ ${fileName} already uploaded, skipping`);
@@ -301,7 +294,7 @@ export async function deleteDraftRelease(
   owner: string,
   repo: string,
   projectName: string,
-  version: string
+  version: string,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
@@ -340,7 +333,7 @@ export async function detectDraftReleases(
   githubToken: string,
   owner: string,
   repo: string,
-  projects: Array<{ name: string; version: string }>
+  projects: Array<{ name: string; version: string }>,
 ): Promise<boolean> {
   const octokit = getOctokit(githubToken);
 
@@ -376,7 +369,7 @@ export async function finalizeRelease(
   repo: string,
   projectName: string,
   version: string,
-  prerelease: boolean
+  prerelease: boolean,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
@@ -401,7 +394,7 @@ export async function finalizeRelease(
 
     // First try to find by exact tag match
     let release = releases.find((r) => r.tag_name === tag && r.draft);
-    
+
     // Fallback: find by release name (handles GitHub's untagged- behavior)
     if (!release) {
       release = releases.find((r) => r.name === expectedName && r.draft);
@@ -417,7 +410,7 @@ export async function finalizeRelease(
       owner,
       repo,
       release_id: release.id,
-      tag_name: tag,  // Update from untagged-XXX to final tag
+      tag_name: tag, // Update from untagged-XXX to final tag
       draft: false,
       prerelease,
     });
@@ -441,7 +434,7 @@ export async function createGitTag(
   projectName: string,
   version: string,
   sha: string,
-  placeholder: string
+  placeholder: string,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
@@ -488,7 +481,7 @@ export async function getDraftReleaseMetadata(
   githubToken: string,
   owner: string,
   repo: string,
-  tag: string
+  tag: string,
 ): Promise<string | null> {
   const octokit = getOctokit(githubToken);
 
@@ -507,11 +500,11 @@ export async function getDraftReleaseMetadata(
     const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
 
     // First try to find by exact tag match
-    let release = releases.find(r => r.tag_name === tag && r.draft);
+    let release = releases.find((r) => r.tag_name === tag && r.draft);
 
     // Fallback: find by release name (handles GitHub's untagged- behavior)
     if (!release && expectedName) {
-      release = releases.find(r => r.name === expectedName && r.draft);
+      release = releases.find((r) => r.name === expectedName && r.draft);
     }
 
     if (!release || !release.body) {
@@ -535,7 +528,7 @@ export async function postPRReleaseComment(
   owner: string,
   repo: string,
   prNumber: number,
-  releases: Array<{ name: string; version: string; url: string; tag: string }>
+  releases: Array<{ name: string; version: string; url: string; tag: string }>,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
 
@@ -563,4 +556,3 @@ All releases have been successfully published and are now available.`;
     // Don't throw - this is not critical
   }
 }
-

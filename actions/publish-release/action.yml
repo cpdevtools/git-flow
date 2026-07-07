@@ -31,8 +31,6 @@ runs:
     
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
-      with:
-        version: 11
     
     - name: Configure registry auth
       shell: bash
@@ -43,7 +41,7 @@ runs:
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm install --prod --no-frozen-lockfile
+      run: pnpm i --no-frozen-lockfile --filter @cpdevtools/publish-release-action...
       env:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}

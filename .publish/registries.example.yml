@@ -6,15 +6,15 @@ registries:
   npm:
     type: npm
     url: https://registry.npmjs.org
-    auth: NPM_TOKEN  # Environment variable name containing auth token
-    scope: "@cpdevtools"  # Optional: NPM scope for scoped packages
+    auth: NPM_TOKEN # Environment variable name containing auth token
+    scope: '@cpdevtools' # Optional: NPM scope for scoped packages
 
   # GitHub Packages (NPM)
   github-npm:
     type: npm
     url: https://npm.pkg.github.com
     auth: GITHUB_TOKEN
-    scope: "@cpdevtools"
+    scope: '@cpdevtools'
 
   # NuGet.org
   nuget:
@@ -32,9 +32,9 @@ registries:
   dockerhub:
     type: docker
     registry: docker.io
-    namespace: cpdevtools  # Optional: Docker Hub username/org
+    namespace: cpdevtools # Optional: Docker Hub username/org
     auth: DOCKERHUB_TOKEN
-    usernameEnv: DOCKERHUB_USERNAME  # Optional: separate username env var
+    usernameEnv: DOCKERHUB_USERNAME # Optional: separate username env var
 
   # GitHub Container Registry (ghcr.io)
   ghcr:

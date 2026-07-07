@@ -30,22 +30,28 @@ function buildTagName(version: string, projectName?: string): string {
  */
 async function versionExists(version: string, projectName?: string): Promise<boolean> {
   try {
-    console.log(`[versionExists] Checking version: ${version} for project: ${projectName || 'unknown'}`);
-    
+    console.log(
+      `[versionExists] Checking version: ${version} for project: ${projectName || 'unknown'}`,
+    );
+
     // Build tag name for git check
     const tag = buildTagName(version, projectName);
-    
+
     // First try local git tag
     const localResult = await $`git tag -l ${tag}`.nothrow();
-    console.log(`[versionExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`);
+    console.log(
+      `[versionExists] Local git tag result: "${localResult.stdout.trim()}" (expected: "${tag}")`,
+    );
     if (localResult.stdout.trim() === tag) {
       console.log(`[versionExists] Found local git tag: ${tag}`);
       return true;
     }
-    
+
     // Check remote tags (for CI where local might not have all tags)
     const remoteResult = await $`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
-    console.log(`[versionExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`);
+    console.log(
+      `[versionExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`,
+    );
     if (remoteResult.stdout.trim().length > 0) {
       console.log(`[versionExists] Found remote git tag: ${tag}`);
       return true;
@@ -56,40 +62,46 @@ async function versionExists(version: string, projectName?: string): Promise<boo
     const owner = process.env.GITHUB_REPOSITORY_OWNER;
     const repoWithOwner = process.env.GITHUB_REPOSITORY;
     const repo = repoWithOwner?.split('/')[1];
-    
+
     if (token && owner && repo) {
       console.log(`[versionExists] Checking GitHub release body for ${tag}`);
       $.env = { ...process.env, GITHUB_TOKEN: token };
-      const ghResult = await $`gh api repos/${owner}/${repo}/releases --jq '.[] | select(.tag_name == "${tag}" or .name == "${projectName} ${version}") | select(.draft == true) | .body'`.nothrow();
-      
+      const ghResult =
+        await $`gh api repos/${owner}/${repo}/releases --jq '.[] | select(.tag_name == "${tag}" or .name == "${projectName} ${version}") | select(.draft == true) | .body'`.nothrow();
+
       if (ghResult.exitCode === 0 && ghResult.stdout.trim()) {
         const body = ghResult.stdout.trim();
         // Extract YAML from markdown code block
         const yamlMatch = body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
-        
+
         if (yamlMatch) {
           const yaml = yamlMatch[1];
           console.log(`[versionExists] Found release body YAML, checking published flags`);
-          
+
           // Check if any artifact has published:true or is missing published field
           // Missing field = old release, assume published
           // All published:false = can resume publishing
           const hasPublishedTrue = /published:\s*true/i.test(yaml);
           const hasArtifacts = /artifacts:/i.test(yaml);
-          const allPublishedFalse = hasArtifacts && !hasPublishedTrue && /published:\s*false/i.test(yaml);
-          
+          const allPublishedFalse =
+            hasArtifacts && !hasPublishedTrue && /published:\s*false/i.test(yaml);
+
           if (hasPublishedTrue) {
             console.log(`[versionExists] Found artifact with published:true in release body`);
             return true;
           }
-          
+
           if (hasArtifacts && !allPublishedFalse) {
             // Has artifacts but no published field = old release, assume taken
-            console.log(`[versionExists] Found artifacts without published field, assuming version taken`);
+            console.log(
+              `[versionExists] Found artifacts without published field, assuming version taken`,
+            );
             return true;
           }
-          
-          console.log(`[versionExists] All artifacts have published:false, version available for resume`);
+
+          console.log(
+            `[versionExists] All artifacts have published:false, version available for resume`,
+          );
         }
       }
     }
@@ -105,10 +117,10 @@ async function versionExists(version: string, projectName?: string): Promise<boo
 /**
  * Resolve version based on placeholder, branch, and run number
  * Implements the complete version resolution algorithm
- * 
+ *
  * @param input - Version resolution input parameters
  * @returns Resolved version information
- * 
+ *
  * @example
  * ```typescript
  * const result = await resolveVersion({
@@ -181,9 +193,7 @@ async function resolveMainlineBranch(params: {
 
     if (resolvedIsPreRelease) {
       // Pre-release: append .build.N
-      version = runNumber
-        ? `${resolvedVersion}.build.${runNumber}`
-        : `${resolvedVersion}.build.0`;
+      version = runNumber ? `${resolvedVersion}.build.${runNumber}` : `${resolvedVersion}.build.0`;
     } else {
       // Stable: append -branch.build.N
       version = runNumber

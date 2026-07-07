@@ -19,7 +19,6 @@ const warnedPackages = new Set();
 const checkedPackages = new Map(); // Cache existence checks
 
 function readPackage(pkg, context) {
-  // Apply overrides to ALL packages (not just root) when DEV_LOCAL=true
   if (process.env.DEV_LOCAL === 'true') {
     // Map of npm package names to their local paths (relative to workspace root)
     const localPackagesConfig = {
@@ -30,6 +29,17 @@ function readPackage(pkg, context) {
     if (!hasLoggedInit) {
       console.log('DEV_LOCAL=true detected - checking for local packages...');
       hasLoggedInit = true;
+    }
+
+    // Inject CLI into the root workspace package for local development.
+    // The CLI is not in package.json (to avoid CI failures with file: paths),
+    // so we add it here only when DEV_LOCAL=true.
+    if (pkg.name === '@cpdevtools/git-flow-monorepo') {
+      const cliPath = path.resolve(__dirname, '../ts-dev-utilities/packages/cli');
+      if (fs.existsSync(path.join(cliPath, 'package.json'))) {
+        pkg.devDependencies = pkg.devDependencies || {};
+        pkg.devDependencies['@cpdevtools/ts-dev-utilities-cli'] = `file:${cliPath}`;
+      }
     }
 
     // Check which packages actually exist (only check once and cache the results)
@@ -66,15 +76,8 @@ function readPackage(pkg, context) {
   return pkg;
 }
 
-// Only export hooks when DEV_LOCAL=true to avoid lockfile checksum mismatch in CI
-if (process.env.DEV_LOCAL === 'true') {
-  module.exports = {
-    hooks: {
-      readPackage,
-    },
-  };
-} else {
-  module.exports = {
-    hooks: {},
-  };
-}
+module.exports = {
+  hooks: {
+    readPackage,
+  },
+};

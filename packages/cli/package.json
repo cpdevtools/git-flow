@@ -5,53 +5,13 @@
   "bin": {
     "gitflow": "./dist/bin.js"
   },
-  "oclif": {
-    "bin": "gitflow",
-    "dirname": "gitflow",
-    "commands": "./dist/commands",
-    "topicSeparator": " ",
-    "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-autocomplete"
-    ]
-  },
-  "files": [
-    "dist",
-    "oclif.manifest.json"
-  ],
   "scripts": {
     "build": "wireit",
-    "typecheck": "wireit",
-    "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
     "github.actions.build": "pnpm build",
-    "github.actions.pack": "pnpm pack"
-  },
-  "wireit": {
-    "build": {
-      "command": "tsup",
-      "dependencies": ["../git-flow:build"],
-      "files": ["src/**/*.ts", "tsup.config.ts", "tsconfig.json"],
-      "output": ["dist/**"]
-    },
-    "typecheck": {
-      "command": "tsc --noEmit",
-      "dependencies": ["../git-flow:build"],
-      "files": ["src/**/*.ts", "tsconfig.json"]
-    }
-  },
-  "keywords": [
-    "git",
-    "cli",
-    "gitflow",
-    "release"
-  ],
-  "author": "CPDevTools",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/cpdevtools/git-flow.git",
-    "directory": "packages/cli"
+    "github.actions.pack": "pnpm pack",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "wireit"
   },
   "dependencies": {
     "@cpdevtools/git-flow": "workspace:*",
@@ -70,7 +30,60 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
+  "keywords": [
+    "cli",
+    "git",
+    "gitflow",
+    "release"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cpdevtools/git-flow.git",
+    "directory": "packages/cli"
+  },
   "engines": {
     "node": ">=24"
+  },
+  "files": [
+    "dist",
+    "oclif.manifest.json"
+  ],
+  "oclif": {
+    "bin": "gitflow",
+    "dirname": "gitflow",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-autocomplete"
+    ]
+  },
+  "wireit": {
+    "build": {
+      "command": "tsup",
+      "dependencies": [
+        "../git-flow:build"
+      ],
+      "files": [
+        "src/**/*.ts",
+        "tsup.config.ts",
+        "tsconfig.json"
+      ],
+      "output": [
+        "dist/**"
+      ]
+    },
+    "typecheck": {
+      "command": "tsc --noEmit",
+      "dependencies": [
+        "../git-flow:build"
+      ],
+      "files": [
+        "src/**/*.ts",
+        "tsconfig.json"
+      ]
+    }
   }
 }
