@@ -4,10 +4,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@cpdevtools/ts-dev-utilities': ^0.3.2-dev.1
-
-pnpmfileChecksum: sha256-JUsvOx43Tl5igXa+5NifxtB1hsb1SnO3Lr27iOeZo8Y=
+pnpmfileChecksum: sha256-2zXkg18/Eq+JJwsn67jpoB5WXO7/znJiZ7xvnb/B+hA=
 
 importers:
 
@@ -77,8 +74,8 @@ importers:
         specifier: file:/devcontainer/repos/git-flow/packages/git-flow
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.2-dev.1
-        version: 0.3.2-dev.1
+        specifier: file:/devcontainer/repos/ts-dev-utilities
+        version: '@cpdevtools/ts-dev-utilities-workspace@file:../ts-dev-utilities'
       tsx:
         specifier: ^4.19.2
         version: 4.22.5
@@ -107,8 +104,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.2-dev.1
-        version: 0.3.2-dev.1
+        specifier: file:/devcontainer/repos/ts-dev-utilities
+        version: '@cpdevtools/ts-dev-utilities-workspace@file:../ts-dev-utilities'
       tsx:
         specifier: ^4.19.2
         version: 4.22.5
@@ -165,8 +162,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.3.2-dev.1
-        version: 0.3.2-dev.1
+        specifier: file:/devcontainer/repos/ts-dev-utilities
+        version: '@cpdevtools/ts-dev-utilities-workspace@file:../ts-dev-utilities'
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -241,8 +238,8 @@ packages:
     engines: {node: '>=24'}
     hasBin: true
 
-  '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
-    resolution: {integrity: sha512-0Dsw1QIqGsv9RVwK0AcnM4EWkQWHqteJ2hhJt3k2F0iM4n6pR/vYjMgtpTfW3hAsFd3MTeESrqLZ1cZuMCX6TA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.3.2-dev.1/de7cc593c5edb7a0f3d32b8478e3f139681c9132}
+  '@cpdevtools/ts-dev-utilities-workspace@file:../ts-dev-utilities':
+    resolution: {directory: ../ts-dev-utilities, type: directory}
     engines: {node: '>=24'}
 
   '@esbuild/aix-ppc64@0.21.5':
@@ -1198,9 +1195,6 @@ packages:
   chalk@5.6.2:
     resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
     engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
-
-  change-case@5.4.4:
-    resolution: {integrity: sha512-HRQyTk2/YPEkt9TnUPbOpr64Uw3KOicFWPVBb+xiHvd6eBx/qPr9xqfBFDT8P2vWsvvz4jbEkfDe71W3VyNu2w==}
 
   check-error@2.1.3:
     resolution: {integrity: sha512-PAJdDJusoxnwm1VwW07VWwUN1sl7smmC3OKggvndJFadxxDRyFJBX/ggnu/KE4kQAB7a3Dp8f/YXC1FlUprWmA==}
@@ -2195,14 +2189,9 @@ snapshots:
 
   '@cpdevtools/ts-dev-utilities-cli@file:../ts-dev-utilities/packages/cli':
     dependencies:
-      '@cpdevtools/ts-dev-utilities': 0.3.2-dev.1
+      '@cpdevtools/ts-dev-utilities': '@cpdevtools/ts-dev-utilities-workspace@file:../ts-dev-utilities'
 
-  '@cpdevtools/ts-dev-utilities@0.3.2-dev.1':
-    dependencies:
-      change-case: 5.4.4
-      globby: 14.1.0
-      jsonc-parser: 3.3.1
-      yaml: 2.9.0
+  '@cpdevtools/ts-dev-utilities-workspace@file:../ts-dev-utilities': {}
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
@@ -2925,8 +2914,6 @@ snapshots:
       supports-color: 7.2.0
 
   chalk@5.6.2: {}
-
-  change-case@5.4.4: {}
 
   check-error@2.1.3: {}
 
