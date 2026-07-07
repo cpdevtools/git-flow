@@ -1,4 +1,3 @@
-import { getOctokit } from '@actions/github';
 import { writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
@@ -25,101 +24,6 @@ export function resolveDockerImageBase(imageName: string, registry: DockerRegist
     return `${registry.registry}/${imageName}`;
   }
   return imageName;
-}
-
-/**
- * Best-effort removal of the transient temp tag from the remote registry.
- *
- * GHCR (via the GitHub Packages API) can only delete an entire package
- * *version* (manifest), not an individual tag. Because the temp tag and the
- * final release/`latest` tags all reference identical image content, they
- * collapse into a single package version — so the temp tag cannot be stripped
- * without deleting the released image.
- *
- * We therefore only reclaim a temp version when it is *orphaned*: tagged
- * exclusively with `temp-*` tags (e.g. left behind by a failed run that never
- * promoted the image). Versions that also carry release/`latest` tags are left
- * untouched. Only GHCR is supported; other registries are skipped.
- */
-async function cleanupRemoteTempTag(
-  imageName: string,
-  tempTag: string,
-  registry: DockerRegistry,
-  token: string,
-): Promise<void> {
-  if (!registry.registry.includes('ghcr.io')) {
-    return; // Only GHCR temp-tag cleanup is supported.
-  }
-
-  // Parse `ghcr.io/<owner>/<package...>` into owner + package name.
-  const path = imageName.startsWith(`${registry.registry}/`)
-    ? imageName.slice(registry.registry.length + 1)
-    : imageName;
-  const segments = path.split('/');
-  if (segments.length < 2) {
-    return; // Not enough information to resolve owner/package.
-  }
-  const owner = segments[0];
-  const packageName = segments.slice(1).join('/');
-
-  const octokit = getOctokit(token);
-
-  // Container packages can be scoped to an org or a user; try org, fall back to user.
-  let versions: Array<{ id: number; metadata?: { container?: { tags?: string[] } } }>;
-  let scope: 'org' | 'user';
-  try {
-    const { data } = await octokit.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
-      package_type: 'container',
-      package_name: packageName,
-      org: owner,
-      per_page: 100,
-    });
-    versions = data;
-    scope = 'org';
-  } catch (err) {
-    if ((err as { status?: number }).status !== 404) throw err;
-    const { data } = await octokit.rest.packages.getAllPackageVersionsForPackageOwnedByUser({
-      package_type: 'container',
-      package_name: packageName,
-      username: owner,
-      per_page: 100,
-    });
-    versions = data;
-    scope = 'user';
-  }
-
-  const version = versions.find((v) => v.metadata?.container?.tags?.includes(tempTag));
-  if (!version) {
-    return; // Temp tag no longer present.
-  }
-
-  const tags = version.metadata?.container?.tags ?? [];
-  const isOrphan = tags.length > 0 && tags.every((t) => t.startsWith('temp-'));
-  if (!isOrphan) {
-    const releaseTags = tags.filter((t) => !t.startsWith('temp-'));
-    console.log(
-      `  ℹ️  Temp tag ${tempTag} shares its manifest with release tag(s) ` +
-        `${releaseTags.join(', ')}; GHCR cannot delete a single shared tag — leaving in place`,
-    );
-    return;
-  }
-
-  if (scope === 'org') {
-    await octokit.rest.packages.deletePackageVersionForOrg({
-      package_type: 'container',
-      package_name: packageName,
-      org: owner,
-      package_version_id: version.id,
-    });
-  } else {
-    await octokit.rest.packages.deletePackageVersionForUser({
-      package_type: 'container',
-      package_name: packageName,
-      username: owner,
-      package_version_id: version.id,
-    });
-  }
-  console.log(`  🧹 Removed orphaned temp image version (${tempTag})`);
 }
 
 /**
@@ -174,9 +78,32 @@ export async function publishToNuget(options: NugetPublishOptions): Promise<void
 
 /**
  * Publish Docker image to registry
+ *
+ * The image is transported between the build-pack and publish jobs as a gzipped
+ * tarball artifact (produced by `docker save` during pack) rather than a
+ * transient registry tag. This keeps the registry free of throwaway `temp-*`
+ * tags: the image only ever appears under its final release/`latest` tags.
  */
 export async function publishToDocker(options: DockerPublishOptions): Promise<void> {
-  const { imageName, tempTag, finalTag, digest, registry, username, token } = options;
+  const { imageName, archivePath, finalTag, digest, registry, username, token } = options;
+
+  // Load the image from the tarball artifact produced during pack.
+  await $`docker load -i ${archivePath}`;
+
+  // Verify the loaded image matches the digest captured at pack time. The image
+  // config id (.Id) is stable across docker save/load, so we compare against it.
+  const actualDigest = (await $`docker inspect --format='{{.Id}}' ${digest}`.nothrow()).stdout
+    .trim()
+    .replace(/^'|'$/g, '');
+
+  if (actualDigest !== digest) {
+    throw new Error(
+      `Docker image digest mismatch!\n` +
+        `Expected: ${digest}\n` +
+        `Actual:   ${actualDigest || '(image not found after load)'}\n` +
+        `This may indicate the image archive was modified after being built.`,
+    );
+  }
 
   // Authenticate. GHCR (and most registries) require a username alongside
   // --password-stdin; fall back to the Actions actor when no username env is configured.
@@ -188,54 +115,22 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
   }
 
   try {
-    const fullTempImage = `${imageName}:${tempTag}`;
-
-    // Pull temp image from Phase 2
-    await $`docker pull ${fullTempImage}`;
-
-    // Verify digest matches. Pack captures the registry manifest digest
-    // (RepoDigests), so we must compare against the same value here — not .Id,
-    // which is the image config id and would never match.
-    const repoDigestRaw = (
-      await $`docker inspect --format='{{index .RepoDigests 0}}' ${fullTempImage}`
-    ).stdout.trim();
-    const actualDigest = repoDigestRaw.includes('@') ? repoDigestRaw.split('@')[1] : repoDigestRaw;
-
-    if (actualDigest !== digest) {
-      throw new Error(
-        `Docker image digest mismatch!\n` +
-          `Expected: ${digest}\n` +
-          `Actual:   ${actualDigest}\n` +
-          `This may indicate the image was modified after being built in Phase 2.`,
-      );
-    }
-
     // Build final image name with namespace if provided
     const finalImageBase = resolveDockerImageBase(imageName, registry);
 
     const finalVersionImage = `${finalImageBase}:${finalTag}`;
     const finalLatestImage = `${finalImageBase}:latest`;
 
-    // Retag with final version
-    await $`docker tag ${fullTempImage} ${finalVersionImage}`;
-    await $`docker tag ${fullTempImage} ${finalLatestImage}`;
+    // Tag the loaded image (referenced by its id) with the final tags and push.
+    await $`docker tag ${digest} ${finalVersionImage}`;
+    await $`docker tag ${digest} ${finalLatestImage}`;
 
-    // Push final tags
     await $`docker push ${finalVersionImage}`;
     await $`docker push ${finalLatestImage}`;
 
-    // Delete temp tag from local
-    await $`docker rmi ${fullTempImage}`.catch(() => {
+    // Best-effort local cleanup of the tags we created.
+    await $`docker rmi ${finalVersionImage} ${finalLatestImage}`.catch(() => {
       // Ignore errors - cleanup is best-effort
-    });
-
-    // Best-effort remote cleanup of the transient temp tag (GHCR only). A temp
-    // tag that shares its manifest with the release/latest tags cannot be
-    // deleted individually and is intentionally left in place.
-    await cleanupRemoteTempTag(imageName, tempTag, registry, token).catch((err) => {
-      console.log(
-        `  ⚠️  Temp-tag cleanup skipped: ${err instanceof Error ? err.message : String(err)}`,
-      );
     });
   } finally {
     await $`docker logout ${registry.registry}`.catch(() => {

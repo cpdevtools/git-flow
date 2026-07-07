@@ -79,7 +79,8 @@ export interface NugetPublishOptions {
  */
 export interface DockerPublishOptions {
   imageName: string;
-  tempTag: string;
+  /** Path to the gzipped image tarball (docker save output) to load and promote. */
+  archivePath: string;
   finalTag: string;
   digest: string;
   registry: DockerRegistry;
