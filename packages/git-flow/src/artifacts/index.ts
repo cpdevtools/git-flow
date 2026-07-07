@@ -343,6 +343,22 @@ const artifactTypeRegistry: Record<string, ArtifactType<any>> = {
   deploy,
 };
 
+/**
+ * Register (or override) an artifact type handler.
+ *
+ * Built-in types are registered at module load.  Call this from a plugin
+ * package's top-level code to add new types or replace existing ones.
+ * When multiple plugins register the same type, the last call wins.
+ *
+ * @example
+ * // In a plugin package's index.ts:
+ * import { registerArtifactType } from '@cpdevtools/git-flow/artifacts';
+ * registerArtifactType('helm-chart', helmChartHandler);
+ */
+export function registerArtifactType(type: string, handler: ArtifactType): void {
+  artifactTypeRegistry[type] = handler;
+}
+
 export function getArtifactType(type: string): ArtifactType {
   const handler = artifactTypeRegistry[type];
   if (!handler) {

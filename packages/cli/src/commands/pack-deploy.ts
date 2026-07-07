@@ -100,7 +100,7 @@ export default class PackDeploy extends Command {
       this.error(`No release-artifacts configuration found in ${cwd}`);
     }
 
-    const deployArtifacts = config.artifacts.filter(
+    const deployArtifacts = (config.artifacts ?? []).filter(
       (a): a is DeployArtifact => a.type === 'deploy',
     );
     if (deployArtifacts.length === 0) {

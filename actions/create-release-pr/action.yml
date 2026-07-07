@@ -22,7 +22,7 @@ inputs:
     required: false
     default: '.github/versions.yml'
   
-  run_number:
+  run-number:
     description: 'CI run number for build suffix'
     required: true
 
@@ -76,4 +76,4 @@ runs:
         INPUT_BRANCH: ${{ inputs.branch }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_VERSIONS_FILE: ${{ inputs.versions-file }}
-        INPUT_RUN_NUMBER: ${{ inputs.run_number }}
+        INPUT_RUN_NUMBER: ${{ inputs.run-number }}

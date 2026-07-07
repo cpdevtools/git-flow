@@ -1,6 +1,7 @@
 {
   "name": "@cpdevtools/git-flow",
   "version": "0.0.0-MAIN",
+  "packageManager": "pnpm@11.5.0",
   "description": "Core library for Git-based versioning and release workflows",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -16,7 +17,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.0",
+    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.2",
     "fast-glob": "^3.3.2",
     "semver": "^7.6.3",
     "yaml": "^2.8.2",
