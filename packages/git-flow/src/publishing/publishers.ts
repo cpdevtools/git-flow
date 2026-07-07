@@ -98,10 +98,13 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
     // Pull temp image from Phase 2
     await $`docker pull ${fullTempImage}`;
 
-    // Verify digest matches
-    const actualDigest = (
-      await $`docker inspect --format='{{.Id}}' ${fullTempImage}`
+    // Verify digest matches. Pack captures the registry manifest digest
+    // (RepoDigests), so we must compare against the same value here — not .Id,
+    // which is the image config id and would never match.
+    const repoDigestRaw = (
+      await $`docker inspect --format='{{index .RepoDigests 0}}' ${fullTempImage}`
     ).stdout.trim();
+    const actualDigest = repoDigestRaw.includes('@') ? repoDigestRaw.split('@')[1] : repoDigestRaw;
 
     if (actualDigest !== digest) {
       throw new Error(
