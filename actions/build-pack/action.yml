@@ -78,6 +78,13 @@ runs:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Build git-flow
+      shell: bash
+      working-directory: ${{ github.action_path }}/../..
+      run: pnpm --filter @cpdevtools/git-flow build
+      env:
+        HUSKY: '0'
     
     - name: Run Build & Pack
       shell: bash
