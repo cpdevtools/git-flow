@@ -2,8 +2,8 @@
   "name": "@cpdevtools/git-flow",
   "version": "0.0.0-MAIN",
   "description": "Core library for Git-based versioning and release workflows",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "build": "wireit",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -53,36 +53,30 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "default": "./src/index.ts"
     },
     "./version": {
-      "types": "./dist/version/index.d.ts",
-      "default": "./dist/version/index.js"
+      "default": "./src/version/index.ts"
     },
     "./branch": {
-      "types": "./dist/branch/index.d.ts",
-      "default": "./dist/branch/index.js"
+      "default": "./src/branch/index.ts"
     },
     "./build-pack": {
-      "types": "./dist/build-pack/index.d.ts",
-      "default": "./dist/build-pack/index.js"
+      "default": "./src/build-pack/index.ts"
     },
     "./publishing": {
-      "types": "./dist/publishing/index.d.ts",
-      "default": "./dist/publishing/index.js"
+      "default": "./src/publishing/index.ts"
     },
     "./publish-release": {
-      "types": "./dist/publish-release/index.d.ts",
-      "default": "./dist/publish-release/index.js"
+      "default": "./src/publish-release/index.ts"
     },
     "./artifacts": {
-      "types": "./dist/artifacts/index.d.ts",
-      "default": "./dist/artifacts/index.js"
+      "default": "./src/artifacts/index.ts"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "packageManager": "pnpm@11.5.0",
   "wireit": {
