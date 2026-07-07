@@ -2,7 +2,6 @@
   "name": "@cpdevtools/git-flow-action-build-pack",
   "version": "0.0.0-DEFAULT",
   "private": true,
-  "packageManager": "pnpm@11.5.0",
   "description": "GitHub Action for Phase 2 Build & Pack workflow",
   "dependencies": {
     "@actions/core": "^1.11.1",
@@ -11,5 +10,6 @@
     "tsx": "^4.19.2"
   },
   "author": "CPDevTools",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0"
 }

@@ -2,13 +2,13 @@
   "name": "@cpdevtools/git-flow-action-test",
   "version": "0.0.0-DEFAULT",
   "private": true,
-  "packageManager": "pnpm@11.5.0",
   "description": "GitHub Action for Phase 4 Test orchestration",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.2",
+    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.3",
     "tsx": "^4.19.2"
   },
   "author": "CPDevTools",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0"
 }

@@ -68,7 +68,7 @@ runs:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
-    
+
     - name: Run Create Release PR
       shell: bash
       run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
