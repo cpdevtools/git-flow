@@ -2,7 +2,30 @@ import { writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import { $ } from 'zx';
-import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';
+import type {
+  NpmPublishOptions,
+  NugetPublishOptions,
+  DockerPublishOptions,
+  DockerRegistry,
+} from './types.js';
+
+/**
+ * Resolve the fully-qualified docker image base (registry host + namespace + image).
+ *
+ * Handles both bare image names (e.g. `my-service`) and already fully-qualified
+ * names (e.g. `ghcr.io/owner/my-service`) so the registry host/namespace are never
+ * prepended twice.
+ */
+export function resolveDockerImageBase(imageName: string, registry: DockerRegistry): string {
+  if (registry.namespace && !imageName.includes('/')) {
+    return `${registry.registry}/${registry.namespace}/${imageName}`;
+  }
+  if (!imageName.includes(registry.registry)) {
+    return `${registry.registry}/${imageName}`;
+  }
+  return imageName;
+}
+
 
 /**
  * Publish NPM package to registry
@@ -60,9 +83,11 @@ export async function publishToNuget(options: NugetPublishOptions): Promise<void
 export async function publishToDocker(options: DockerPublishOptions): Promise<void> {
   const { imageName, tempTag, finalTag, digest, registry, username, token } = options;
 
-  // Authenticate
-  if (username) {
-    await $`echo ${token} | docker login ${registry.registry} -u ${username} --password-stdin`;
+  // Authenticate. GHCR (and most registries) require a username alongside
+  // --password-stdin; fall back to the Actions actor when no username env is configured.
+  const loginUser = username ?? process.env.GITHUB_ACTOR;
+  if (loginUser) {
+    await $`echo ${token} | docker login ${registry.registry} -u ${loginUser} --password-stdin`;
   } else {
     await $`echo ${token} | docker login ${registry.registry} --password-stdin`;
   }
@@ -88,12 +113,7 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
     }
 
     // Build final image name with namespace if provided
-    let finalImageBase = imageName;
-    if (registry.namespace && !imageName.includes('/')) {
-      finalImageBase = `${registry.registry}/${registry.namespace}/${imageName}`;
-    } else if (!imageName.includes(registry.registry)) {
-      finalImageBase = `${registry.registry}/${imageName}`;
-    }
+    const finalImageBase = resolveDockerImageBase(imageName, registry);
 
     const finalVersionImage = `${finalImageBase}:${finalTag}`;
     const finalLatestImage = `${finalImageBase}:latest`;
