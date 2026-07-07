@@ -133,6 +133,10 @@ export async function executePack(
       allProjects: context.allProjects || [project],
     });
 
+    // The descriptor path produced by packing.  Must be generated while the
+    // project files are still bumped/rewritten (before restoreProjectFiles).
+    const artifactPath = join(ARTIFACT_OUTPUT_DIR, `${artifactFilename}.artifact.yml`);
+
     // Execute pack script
     let result;
     try {
@@ -147,6 +151,13 @@ export async function executePack(
 
       result = await $({ cwd: project.cwd, env, verbose: true })`pnpm run github.actions.pack`;
       console.log(`  ✓ Pack completed`);
+
+      // Generate the descriptor while files are still bumped/rewritten.
+      // If the pack script already produced it (e.g. `gitflow pack`), skip to
+      // avoid re-running pack handlers (which would re-pack / re-push docker).
+      if (!existsSync(artifactPath)) {
+        await generateArtifactDescriptor(project.cwd, project.name, project.version);
+      }
     } catch (error) {
       console.error(`  ✗ Pack failed:`, error);
       throw error;
@@ -155,13 +166,6 @@ export async function executePack(
       console.log(`  ↩️  Restoring original project files...`);
       await restoreProjectFiles(project.cwd);
     }
-
-    // Generate artifact descriptor
-    const artifactPath = await generateArtifactDescriptor(
-      project.cwd,
-      project.name,
-      project.version,
-    );
 
     if (!existsSync(artifactPath)) {
       throw new Error(`Artifact descriptor was not generated: ${artifactPath}`);

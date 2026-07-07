@@ -131,15 +131,10 @@ export function safeName(name: string): string {
 
 const npm: ArtifactType<NpmArtifact> = {
   async pack(artifact, ctx) {
-    const tarballName = `${safeName(artifact.name)}-${ctx.version}.tgz`;
-    const src = join(ctx.projectCwd, tarballName);
-    const dest = join(ctx.artifactOutputDir, tarballName);
-    if (!existsSync(src)) {
-      throw new Error(`npm tarball not found: ${src}`);
-    }
     await mkdir(ctx.artifactOutputDir, { recursive: true });
-    await copyFile(src, dest);
-    artifact.path = dest;
+    await $({ cwd: ctx.projectCwd })`pnpm pack --pack-destination ${ctx.artifactOutputDir}`;
+    const tarballName = `${safeName(artifact.name)}-${ctx.version}.tgz`;
+    artifact.path = join(ctx.artifactOutputDir, tarballName);
     console.log(`  ✓ npm: ${tarballName}`);
   },
   async packDeploy() {
@@ -201,10 +196,41 @@ const nuget: ArtifactType<NuGetArtifact> = {
   },
 };
 
-/** Docker — image is in the daemon; no file to copy or upload */
+/** Docker — login, tag, push, capture digest, populate artifact fields */
 const docker: ArtifactType<DockerArtifact> = {
-  async pack(artifact) {
-    console.log(`  ✓ docker: ${artifact.name} (metadata only)`);
+  async pack(artifact, ctx) {
+    const sha = process.env.GITHUB_SHA;
+    const token = process.env.GITHUB_TOKEN;
+    const actor = process.env.GITHUB_ACTOR;
+
+    if (!sha) throw new Error('GITHUB_SHA is required for docker pack');
+    if (!token) throw new Error('GITHUB_TOKEN is required for docker pack');
+    if (!actor) throw new Error('GITHUB_ACTOR is required for docker pack');
+
+    const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
+    const tempTag = `temp-${sha.slice(0, 7)}`;
+    const fullTempImage = `${artifact.name}:${tempTag}`;
+    const source = (artifact as { localTag?: string }).localTag ?? `${artifact.name}:latest`;
+
+    await $`echo ${token} | docker login ${registryHost} -u ${actor} --password-stdin`;
+    await $`docker tag ${source} ${fullTempImage}`;
+    await $`docker push ${fullTempImage}`;
+
+    const repoDigestRaw = (
+      await $`docker inspect --format='{{index .RepoDigests 0}}' ${fullTempImage}`
+    ).stdout
+      .trim()
+      .replace(/^'|'$/g, '');
+    const digest = repoDigestRaw.includes('@') ? repoDigestRaw.split('@')[1] : repoDigestRaw;
+
+    artifact.tempTag = tempTag;
+    artifact.finalTag = ctx.version;
+    artifact.digest = digest;
+    artifact.registry = registryHost;
+    artifact.pushedAt = new Date().toISOString();
+
+    console.log(`  ✓ docker: pushed ${fullTempImage}`);
+    console.log(`  ✓ digest: ${digest}`);
   },
   async packDeploy() {
     // no-op
