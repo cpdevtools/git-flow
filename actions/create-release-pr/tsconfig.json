@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@cpdevtools/git-flow": ["../../packages/git-flow/src/index.ts"],
+      "@cpdevtools/git-flow/*": ["../../packages/git-flow/src/*"]
+    }
+  }
+}

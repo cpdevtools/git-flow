@@ -73,7 +73,6 @@ runs:
       shell: bash
       run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
       env:
-        NODE_OPTIONS: "--conditions source"
         INPUT_BRANCH: ${{ inputs.branch }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_VERSIONS_FILE: ${{ inputs.versions-file }}

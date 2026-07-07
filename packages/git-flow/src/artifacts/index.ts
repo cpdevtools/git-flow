@@ -210,7 +210,7 @@ const docker: ArtifactType<DockerArtifact> = {
     const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
     const tempTag = `temp-${sha.slice(0, 7)}`;
     const fullTempImage = `${artifact.name}:${tempTag}`;
-    const source = artifact.localTag ?? `${artifact.name}:latest`;
+    const source = (artifact as { localTag?: string }).localTag ?? `${artifact.name}:latest`;
 
     await $`echo ${token} | docker login ${registryHost} -u ${actor} --password-stdin`;
     await $`docker tag ${source} ${fullTempImage}`;

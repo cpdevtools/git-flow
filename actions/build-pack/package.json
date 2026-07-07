@@ -2,7 +2,6 @@
   "name": "@cpdevtools/git-flow-action-build-pack",
   "version": "0.0.0-DEFAULT",
   "private": true,
-  "type": "module",
   "description": "GitHub Action for Phase 2 Build & Pack workflow",
   "dependencies": {
     "@actions/core": "^1.11.1",
