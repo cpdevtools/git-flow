@@ -146,9 +146,7 @@ const npm: ArtifactType<NpmArtifact> = {
     // no-op
   },
   async upload(artifact, ctx) {
-    const path = isAbsolute(artifact.path)
-      ? artifact.path
-      : join(ctx.workspaceRoot, artifact.path);
+    const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
     await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
   },
   async publish(artifact, registry, ctx) {
@@ -184,9 +182,7 @@ const nuget: ArtifactType<NuGetArtifact> = {
     // no-op
   },
   async upload(artifact, ctx) {
-    const path = isAbsolute(artifact.path)
-      ? artifact.path
-      : join(ctx.workspaceRoot, artifact.path);
+    const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
     await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
   },
   async publish(artifact, registry, ctx) {
@@ -215,9 +211,12 @@ const docker: ArtifactType<DockerArtifact> = {
   },
   async upload() {
     // Docker artifacts have no file upload; the image digest is in the release body
-  },  async publish(artifact, registry) {
+  },
+  async publish(artifact, registry) {
     if (!artifact.tempTag || !artifact.finalTag || !artifact.digest) {
-      throw new Error(`docker artifact ${artifact.name} missing required fields (tempTag, finalTag, digest)`);
+      throw new Error(
+        `docker artifact ${artifact.name} missing required fields (tempTag, finalTag, digest)`,
+      );
     }
     const dockerRegistry = registry as DockerRegistry;
     await publishToDocker({
@@ -235,7 +234,8 @@ const docker: ArtifactType<DockerArtifact> = {
   },
   getVersion(artifact, projectVersion) {
     return artifact.finalTag || projectVersion;
-  },};
+  },
+};
 
 const releaseAttachment: ArtifactType<ReleaseAttachment> = {
   async pack(artifact) {
@@ -248,14 +248,14 @@ const releaseAttachment: ArtifactType<ReleaseAttachment> = {
     // no-op
   },
   async upload(artifact, ctx) {
-    const path = isAbsolute(artifact.path)
-      ? artifact.path
-      : join(ctx.workspaceRoot, artifact.path);
+    const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
     await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
   },
   async publish(artifact) {
     // Release attachments are already attached to the GitHub release; no external registry
-    console.log(`  \u2139\ufe0f  ${artifact.name} is a release attachment \u2014 no external publishing needed`);
+    console.log(
+      `  \u2139\ufe0f  ${artifact.name} is a release attachment \u2014 no external publishing needed`,
+    );
   },
   getRegistries() {
     return [];
@@ -276,13 +276,13 @@ const deploy: ArtifactType<DeployArtifact> = {
     if (!existsSync(deployOutputDir)) {
       throw new Error(
         `Deploy output dir not found: ${deployOutputDir}\n` +
-        `The project's github.actions.pack-deploy script must write files to DEPLOY_OUTPUT_DIR.`,
+          `The project's github.actions.pack-deploy script must write files to DEPLOY_OUTPUT_DIR.`,
       );
     }
     if (!existsSync(deployYmlPath)) {
       throw new Error(
         `deploy.yml not found in ${deployOutputDir}.\n` +
-        `The project's github.actions.pack-deploy script must write deploy.yml.`,
+          `The project's github.actions.pack-deploy script must write deploy.yml.`,
       );
     }
 
@@ -316,9 +316,7 @@ const deploy: ArtifactType<DeployArtifact> = {
     if (!artifact.path) {
       throw new Error(`Deploy artifact '${artifact.name}' has no path — was packDeploy run?`);
     }
-    const path = isAbsolute(artifact.path)
-      ? artifact.path
-      : join(ctx.workspaceRoot, artifact.path);
+    const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
     await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
   },
   async publish() {

@@ -15,7 +15,13 @@
 
 import { Command, Flags } from '@oclif/core';
 import { join } from 'node:path';
-import { getArtifactType, safeName, writeArtifact, type PackContext, type ProjectArtifactDescriptor } from '@cpdevtools/git-flow/artifacts';
+import {
+  getArtifactType,
+  safeName,
+  writeArtifact,
+  type PackContext,
+  type ProjectArtifactDescriptor,
+} from '@cpdevtools/git-flow/artifacts';
 import { loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from '@cpdevtools/git-flow/build-pack';
 
 export default class Pack extends Command {
@@ -52,7 +58,9 @@ export default class Pack extends Command {
     const artifactFilename = safeName(projectName ?? 'artifact');
 
     if (!projectName || !version) {
-      this.error('PROJECT_NAME and PROJECT_VERSION are required (via flags or environment variables)');
+      this.error(
+        'PROJECT_NAME and PROJECT_VERSION are required (via flags or environment variables)',
+      );
     }
 
     const envVars: Record<string, string> = {
@@ -70,7 +78,7 @@ export default class Pack extends Command {
     if (!config) {
       this.error(
         `No release-artifacts configuration found in ${cwd}\n` +
-        `Please create release-artifacts.yml (or .json/.ts/.js/.cjs).`,
+          `Please create release-artifacts.yml (or .json/.ts/.js/.cjs).`,
       );
     }
 

@@ -22,7 +22,14 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { getArtifactType, safeName, writeArtifact, type PackDeployContext, type DeployArtifact, type ProjectArtifactDescriptor } from '@cpdevtools/git-flow/artifacts';
+import {
+  getArtifactType,
+  safeName,
+  writeArtifact,
+  type PackDeployContext,
+  type DeployArtifact,
+  type ProjectArtifactDescriptor,
+} from '@cpdevtools/git-flow/artifacts';
 import { loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from '@cpdevtools/git-flow/build-pack';
 
 export default class PackDeploy extends Command {
@@ -77,7 +84,8 @@ export default class PackDeploy extends Command {
       this.error('DEPLOY_OUTPUT_DIR is required');
     }
 
-    const releaseId = typeof releaseIdRaw === 'number' ? releaseIdRaw : parseInt(String(releaseIdRaw), 10);
+    const releaseId =
+      typeof releaseIdRaw === 'number' ? releaseIdRaw : parseInt(String(releaseIdRaw), 10);
     const artifactFilename = safeName(projectName);
 
     // Load release-artifacts config to find deploy artifact entries
@@ -92,7 +100,9 @@ export default class PackDeploy extends Command {
       this.error(`No release-artifacts configuration found in ${cwd}`);
     }
 
-    const deployArtifacts = config.artifacts.filter((a): a is DeployArtifact => a.type === 'deploy');
+    const deployArtifacts = config.artifacts.filter(
+      (a): a is DeployArtifact => a.type === 'deploy',
+    );
     if (deployArtifacts.length === 0) {
       this.error('No deploy artifacts declared in release-artifacts.yml');
     }
@@ -117,7 +127,9 @@ export default class PackDeploy extends Command {
     process.env.PROJECT_NAME = artifactFilename;
 
     if (existsSync(descriptorPath)) {
-      const existing = parseYaml(await readFile(descriptorPath, 'utf-8')) as ProjectArtifactDescriptor;
+      const existing = parseYaml(
+        await readFile(descriptorPath, 'utf-8'),
+      ) as ProjectArtifactDescriptor;
       for (const deployArtifact of deployArtifacts) {
         const match = existing.artifacts.find(
           (a) => a.type === 'deploy' && a.name === deployArtifact.name,

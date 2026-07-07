@@ -410,6 +410,3 @@ async function publishProjectArtifacts(
     return result;
   }
 }
-
-
-

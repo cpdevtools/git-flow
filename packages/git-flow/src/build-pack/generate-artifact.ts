@@ -5,14 +5,14 @@
  * Dispatches per-type work through the artifact type handler registry.
  */
 
-import type { Artifact, ProjectArtifactDescriptor } from "@cpdevtools/ts-dev-utilities/artifacts";
-import { writeArtifact } from "@cpdevtools/ts-dev-utilities/artifacts";
-import { existsSync } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { parse as parseYaml } from "yaml";
-import { getArtifactType, safeName, type PackContext } from "../artifacts/index.js";
+import type { Artifact, ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
+import { writeArtifact } from '@cpdevtools/ts-dev-utilities/artifacts';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import { getArtifactType, safeName, type PackContext } from '../artifacts/index.js';
 
 /**
  * Artifact configuration that can be provided in release-artifacts.* files
@@ -24,7 +24,7 @@ export interface ArtifactConfig {
 /**
  * Hard-coded temporary directory for artifact generation
  */
-export const ARTIFACT_OUTPUT_DIR = join(tmpdir(), "git-flow-artifacts");
+export const ARTIFACT_OUTPUT_DIR = join(tmpdir(), 'git-flow-artifacts');
 
 /**
  * Replace environment variable placeholders in a string.
@@ -51,7 +51,7 @@ function substituteEnvVars(
         name: replaceEnvVars(artifact.name, envVars),
       };
 
-      if ("path" in artifact && artifact.path) {
+      if ('path' in artifact && artifact.path) {
         return {
           ...base,
           path: replaceEnvVars(artifact.path, envVars),
@@ -71,12 +71,12 @@ export async function loadArtifactConfig(
   envVars: Record<string, string>,
 ): Promise<ArtifactConfig | null> {
   const configFiles = [
-    "release-artifacts.yml",
-    "release-artifacts.yaml",
-    "release-artifacts.json",
-    "release-artifacts.ts",
-    "release-artifacts.js",
-    "release-artifacts.cjs",
+    'release-artifacts.yml',
+    'release-artifacts.yaml',
+    'release-artifacts.json',
+    'release-artifacts.ts',
+    'release-artifacts.js',
+    'release-artifacts.cjs',
   ];
 
   for (const configFile of configFiles) {
@@ -87,12 +87,12 @@ export async function loadArtifactConfig(
 
     console.log(`  📄 Found config: ${configFile}`);
 
-    if (configFile.endsWith(".yml") || configFile.endsWith(".yaml")) {
-      const content = await readFile(configPath, "utf-8");
+    if (configFile.endsWith('.yml') || configFile.endsWith('.yaml')) {
+      const content = await readFile(configPath, 'utf-8');
       const config = parseYaml(content) as ArtifactConfig;
       return substituteEnvVars(config, envVars);
-    } else if (configFile.endsWith(".json")) {
-      const content = await readFile(configPath, "utf-8");
+    } else if (configFile.endsWith('.json')) {
+      const content = await readFile(configPath, 'utf-8');
       const config = JSON.parse(content) as ArtifactConfig;
       return substituteEnvVars(config, envVars);
     } else {
@@ -139,7 +139,7 @@ export async function generateArtifactDescriptor(
     throw new Error(
       `No release-artifacts configuration found in ${packageDir}
 ` +
-      `Please create one of: release-artifacts.yml, release-artifacts.json, release-artifacts.ts, release-artifacts.js, release-artifacts.cjs`,
+        `Please create one of: release-artifacts.yml, release-artifacts.json, release-artifacts.ts, release-artifacts.js, release-artifacts.cjs`,
     );
   }
 
