@@ -1,5 +1,5 @@
 import fg from 'fast-glob';
-import { readFile } from 'fs/promises';
+import { readFile, access } from 'fs/promises';
 import { join, dirname } from 'path';
 
 export interface Project {
@@ -36,6 +36,15 @@ export async function discoverProjects(workspaceRoot: string): Promise<Project[]
   for (const packagePath of packageJsonPaths) {
     const fullPath = join(workspaceRoot, packagePath);
     const directory = dirname(fullPath);
+
+    // Skip the workspace root — a directory that owns a pnpm-workspace.yaml
+    // is a monorepo root, not a publishable project member.
+    try {
+      await access(join(directory, 'pnpm-workspace.yaml'));
+      continue;
+    } catch {
+      // No workspace file — this is a regular package, proceed.
+    }
 
     try {
       const content = await readFile(fullPath, 'utf-8');
