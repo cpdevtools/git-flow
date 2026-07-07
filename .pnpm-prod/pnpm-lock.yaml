@@ -51,8 +51,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/git-flow':
-        specifier: ^0.4.0-dev.2
-        version: 0.4.0-dev.2
+        specifier: workspace:*
+        version: link:../../packages/git-flow
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -66,8 +66,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/git-flow':
-        specifier: ^0.4.0-dev.2
-        version: 0.4.0-dev.2
+        specifier: workspace:*
+        version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.4.0-dev.3
         version: 0.4.0-dev.3
@@ -87,8 +87,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/git-flow':
-        specifier: ^0.4.0-dev.2
-        version: 0.4.0-dev.2
+        specifier: workspace:*
+        version: link:../../packages/git-flow
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -227,10 +227,6 @@ packages:
   '@babel/helper-validator-identifier@7.29.7':
     resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
     engines: {node: '>=6.9.0'}
-
-  '@cpdevtools/git-flow@0.4.0-dev.2':
-    resolution: {integrity: sha512-O8qh08xshCr+99njt+uePHi+vWJ4qqotItpn2TNdGAsbemahs/AqnIxwPa7QyF9SsjNQly6OQ4br/3ELzvBPQA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/git-flow/0.4.0-dev.2/7dba551355f7c37c6b232cb8e23219c0c962ae07}
-    engines: {node: '>=24'}
 
   '@cpdevtools/ts-dev-utilities@0.4.0-dev.3':
     resolution: {integrity: sha512-TCnJwq003+/gA1OFW8SUWEffbQb+M8aU5d3eUaQXL90P2olKaQJckMKzjlPWEaJUwpnWFOjojz8zCdMb+AFEeg==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.4.0-dev.3/42ac21111e62aa640d5cdaefe7627189f12dbacd}
@@ -2183,16 +2179,6 @@ snapshots:
       picocolors: 1.1.1
 
   '@babel/helper-validator-identifier@7.29.7': {}
-
-  '@cpdevtools/git-flow@0.4.0-dev.2':
-    dependencies:
-      '@actions/core': 1.11.1
-      '@actions/github': 6.0.1
-      '@cpdevtools/ts-dev-utilities': 0.4.0-dev.3
-      fast-glob: 3.3.3
-      semver: 7.8.5
-      yaml: 2.9.0
-      zx: 8.8.5
 
   '@cpdevtools/ts-dev-utilities@0.4.0-dev.3':
     dependencies:
