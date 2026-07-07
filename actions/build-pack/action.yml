@@ -85,7 +85,7 @@ runs:
 
     - name: Run Build & Pack
       shell: bash
-      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      run: ${{ github.action_path }}/node_modules/.bin/tsx --tsconfig ${{ github.action_path }}/tsconfig.json ${{ github.action_path }}/src/action.ts
       env:
         INPUT_PR_NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}
