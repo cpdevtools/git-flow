@@ -85,8 +85,9 @@ runs:
 
     - name: Run Build & Pack
       shell: bash
-      run: ${{ github.action_path }}/node_modules/.bin/tsx --conditions source ${{ github.action_path }}/src/action.ts
+      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
       env:
+        NODE_OPTIONS: "--conditions source"
         INPUT_PR_NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
