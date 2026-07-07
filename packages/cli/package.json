@@ -1,6 +1,7 @@
 {
   "name": "@cpdevtools/git-flow-cli",
   "version": "0.0.0-MAIN",
+  "packageManager": "pnpm@11.5.0",
   "description": "CLI tools for Git-based versioning and release workflows",
   "bin": {
     "gitflow": "./dist/bin.js"
