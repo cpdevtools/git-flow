@@ -2,7 +2,29 @@ import { writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import { $ } from 'zx';
-import type { NpmPublishOptions, NugetPublishOptions, DockerPublishOptions } from './types.js';
+import type {
+  NpmPublishOptions,
+  NugetPublishOptions,
+  DockerPublishOptions,
+  DockerRegistry,
+} from './types.js';
+
+/**
+ * Resolve the fully-qualified docker image base (registry host + namespace + image).
+ *
+ * Handles both bare image names (e.g. `my-service`) and already fully-qualified
+ * names (e.g. `ghcr.io/owner/my-service`) so the registry host/namespace are never
+ * prepended twice.
+ */
+export function resolveDockerImageBase(imageName: string, registry: DockerRegistry): string {
+  if (registry.namespace && !imageName.includes('/')) {
+    return `${registry.registry}/${registry.namespace}/${imageName}`;
+  }
+  if (!imageName.includes(registry.registry)) {
+    return `${registry.registry}/${imageName}`;
+  }
+  return imageName;
+}
 
 /**
  * Publish NPM package to registry
@@ -56,64 +78,60 @@ export async function publishToNuget(options: NugetPublishOptions): Promise<void
 
 /**
  * Publish Docker image to registry
+ *
+ * The image is transported between the build-pack and publish jobs as a gzipped
+ * tarball artifact (produced by `docker save` during pack) rather than a
+ * transient registry tag. This keeps the registry free of throwaway `temp-*`
+ * tags: the image only ever appears under its final release/`latest` tags.
  */
 export async function publishToDocker(options: DockerPublishOptions): Promise<void> {
-  const { imageName, tempTag, finalTag, digest, registry, username, token } = options;
+  const { imageName, archivePath, finalTag, digest, registry, username, token } = options;
 
-  // Authenticate
-  if (username) {
-    await $`echo ${token} | docker login ${registry.registry} -u ${username} --password-stdin`;
+  // Load the image from the tarball artifact produced during pack.
+  await $`docker load -i ${archivePath}`;
+
+  // Verify the loaded image matches the digest captured at pack time. The image
+  // config id (.Id) is stable across docker save/load, so we compare against it.
+  const actualDigest = (await $`docker inspect --format='{{.Id}}' ${digest}`.nothrow()).stdout
+    .trim()
+    .replace(/^'|'$/g, '');
+
+  if (actualDigest !== digest) {
+    throw new Error(
+      `Docker image digest mismatch!\n` +
+        `Expected: ${digest}\n` +
+        `Actual:   ${actualDigest || '(image not found after load)'}\n` +
+        `This may indicate the image archive was modified after being built.`,
+    );
+  }
+
+  // Authenticate. GHCR (and most registries) require a username alongside
+  // --password-stdin; fall back to the Actions actor when no username env is configured.
+  const loginUser = username ?? process.env.GITHUB_ACTOR;
+  if (loginUser) {
+    await $`echo ${token} | docker login ${registry.registry} -u ${loginUser} --password-stdin`;
   } else {
     await $`echo ${token} | docker login ${registry.registry} --password-stdin`;
   }
 
   try {
-    const fullTempImage = `${imageName}:${tempTag}`;
-
-    // Pull temp image from Phase 2
-    await $`docker pull ${fullTempImage}`;
-
-    // Verify digest matches
-    const actualDigest = (
-      await $`docker inspect --format='{{.Id}}' ${fullTempImage}`
-    ).stdout.trim();
-
-    if (actualDigest !== digest) {
-      throw new Error(
-        `Docker image digest mismatch!\n` +
-          `Expected: ${digest}\n` +
-          `Actual:   ${actualDigest}\n` +
-          `This may indicate the image was modified after being built in Phase 2.`,
-      );
-    }
-
     // Build final image name with namespace if provided
-    let finalImageBase = imageName;
-    if (registry.namespace && !imageName.includes('/')) {
-      finalImageBase = `${registry.registry}/${registry.namespace}/${imageName}`;
-    } else if (!imageName.includes(registry.registry)) {
-      finalImageBase = `${registry.registry}/${imageName}`;
-    }
+    const finalImageBase = resolveDockerImageBase(imageName, registry);
 
     const finalVersionImage = `${finalImageBase}:${finalTag}`;
     const finalLatestImage = `${finalImageBase}:latest`;
 
-    // Retag with final version
-    await $`docker tag ${fullTempImage} ${finalVersionImage}`;
-    await $`docker tag ${fullTempImage} ${finalLatestImage}`;
+    // Tag the loaded image (referenced by its id) with the final tags and push.
+    await $`docker tag ${digest} ${finalVersionImage}`;
+    await $`docker tag ${digest} ${finalLatestImage}`;
 
-    // Push final tags
     await $`docker push ${finalVersionImage}`;
     await $`docker push ${finalLatestImage}`;
 
-    // Delete temp tag from local
-    await $`docker rmi ${fullTempImage}`.catch(() => {
+    // Best-effort local cleanup of the tags we created.
+    await $`docker rmi ${finalVersionImage} ${finalLatestImage}`.catch(() => {
       // Ignore errors - cleanup is best-effort
     });
-
-    // TODO: Delete temp tag from remote registry
-    // This is registry-specific and can be added later
-    // For now, temp tags will remain in the registry
   } finally {
     await $`docker logout ${registry.registry}`.catch(() => {
       // Best effort logout

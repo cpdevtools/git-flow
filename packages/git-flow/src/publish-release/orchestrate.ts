@@ -24,6 +24,7 @@ import {
   createGitTag,
   getReleaseTag,
   getDraftReleaseMetadata,
+  isReleasePublished,
   updateDraftReleaseBody,
   findDraftReleaseByTag,
   postPRReleaseComment,
@@ -168,6 +169,19 @@ export async function runPublishRelease(
         );
 
         if (!artifactYml) {
+          // No draft found. If a finalized release already exists for this tag,
+          // the project was published on a previous run — skip it (idempotent
+          // re-run) instead of failing the whole release.
+          const alreadyPublished = await isReleasePublished(
+            options.githubToken,
+            options.owner,
+            options.repo,
+            tag,
+          );
+          if (alreadyPublished) {
+            console.log(`  ⏭️  ${project.name} already released (${tag}) — skipping`);
+            continue;
+          }
           throw new Error(
             `No artifact metadata found in draft release ${tag}. ` +
               `Make sure the build-pack phase completed successfully.`,

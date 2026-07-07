@@ -196,58 +196,57 @@ const nuget: ArtifactType<NuGetArtifact> = {
   },
 };
 
-/** Docker — login, tag, push, capture digest, populate artifact fields */
+/** Docker — save the built image to a tarball artifact; publish loads & pushes it */
 const docker: ArtifactType<DockerArtifact> = {
   async pack(artifact, ctx) {
-    const sha = process.env.GITHUB_SHA;
-    const token = process.env.GITHUB_TOKEN;
-    const actor = process.env.GITHUB_ACTOR;
-
-    if (!sha) throw new Error('GITHUB_SHA is required for docker pack');
-    if (!token) throw new Error('GITHUB_TOKEN is required for docker pack');
-    if (!actor) throw new Error('GITHUB_ACTOR is required for docker pack');
-
-    const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
-    const tempTag = `temp-${sha.slice(0, 7)}`;
-    const fullTempImage = `${artifact.name}:${tempTag}`;
     const source = (artifact as { localTag?: string }).localTag ?? `${artifact.name}:latest`;
+    const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
+    const archiveName = `${safeName(artifact.name)}.image.tar.gz`;
+    const archivePath = join(ctx.artifactOutputDir, archiveName);
 
-    await $`echo ${token} | docker login ${registryHost} -u ${actor} --password-stdin`;
-    await $`docker tag ${source} ${fullTempImage}`;
-    await $`docker push ${fullTempImage}`;
+    await mkdir(ctx.artifactOutputDir, { recursive: true });
 
-    const repoDigestRaw = (
-      await $`docker inspect --format='{{index .RepoDigests 0}}' ${fullTempImage}`
-    ).stdout
+    // Capture the image config id (.Id) — stable across docker save/load — to
+    // verify the image content in the publish phase.
+    const digest = (await $`docker inspect --format='{{.Id}}' ${source}`).stdout
       .trim()
       .replace(/^'|'$/g, '');
-    const digest = repoDigestRaw.includes('@') ? repoDigestRaw.split('@')[1] : repoDigestRaw;
 
-    artifact.tempTag = tempTag;
+    // Serialize the image to a gzipped tarball artifact. No registry temp tag is
+    // pushed, so the registry only ever sees the final release/latest tags.
+    await $`docker save ${source} | gzip > ${archivePath}`;
+
     artifact.finalTag = ctx.version;
     artifact.digest = digest;
     artifact.registry = registryHost;
     artifact.pushedAt = new Date().toISOString();
+    (artifact as { imageArchive?: string }).imageArchive = archivePath;
 
-    console.log(`  ✓ docker: pushed ${fullTempImage}`);
+    console.log(`  ✓ docker: saved ${source} → ${archiveName}`);
     console.log(`  ✓ digest: ${digest}`);
   },
   async packDeploy() {
     // no-op
   },
-  async upload() {
-    // Docker artifacts have no file upload; the image digest is in the release body
+  async upload(artifact, ctx) {
+    const imageArchive = (artifact as { imageArchive?: string }).imageArchive;
+    if (!imageArchive) {
+      throw new Error(`docker artifact ${artifact.name} missing image archive (run pack first)`);
+    }
+    const path = isAbsolute(imageArchive) ? imageArchive : join(ctx.workspaceRoot, imageArchive);
+    await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
   },
-  async publish(artifact, registry) {
-    if (!artifact.tempTag || !artifact.finalTag || !artifact.digest) {
+  async publish(artifact, registry, ctx) {
+    const imageArchive = (artifact as { imageArchive?: string }).imageArchive;
+    if (!imageArchive || !artifact.finalTag || !artifact.digest) {
       throw new Error(
-        `docker artifact ${artifact.name} missing required fields (tempTag, finalTag, digest)`,
+        `docker artifact ${artifact.name} missing required fields (imageArchive, finalTag, digest)`,
       );
     }
     const dockerRegistry = registry as DockerRegistry;
     await publishToDocker({
       imageName: artifact.name,
-      tempTag: artifact.tempTag,
+      archivePath: join(ctx.workspaceRoot, '.artifacts', basename(imageArchive)),
       finalTag: artifact.finalTag,
       digest: artifact.digest,
       registry: dockerRegistry,

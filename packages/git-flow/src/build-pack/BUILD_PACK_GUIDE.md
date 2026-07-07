@@ -81,7 +81,7 @@ For each project:
 2. Uploads `{project-name}.artifact.yml`
 3. Uploads artifact files based on type:
    - NPM: `.tgz` file
-   - Docker: Metadata only (no file)
+   - Docker: `.image.tar.gz` (gzipped `docker save` tarball)
    - NuGet: `.nupkg` file
    - Attachment: Specified file
 
@@ -172,54 +172,48 @@ writeFileSync(
 
 ### Docker Image
 
-**Pack script:**
+Docker images use the built-in `gitflow pack` handler. Build the image first,
+then declare it in `release-artifacts.yml`:
+
 ```json
 {
   "scripts": {
-    "github.actions.pack": "node scripts/pack-docker.js"
+    "github.actions.build": "docker build -t my-image:${PROJECT_VERSION:-dev} -t my-image:latest .",
+    "github.actions.pack": "gitflow pack"
   }
 }
 ```
 
-**Helper script** (`scripts/pack-docker.js`):
-```javascript
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { execSync } from 'node:child_process';
-
-const projectName = process.env.PROJECT_NAME;
-const version = process.env.PROJECT_VERSION;
-const sha = process.env.GITHUB_SHA;
-const outputDir = process.env.ARTIFACT_OUTPUT_DIR;
-
-// Build and push with temporary tag
-const imageName = `ghcr.io/myorg/${projectName}`;
-const tempTag = `temp-${sha.substring(0, 7)}`;
-const finalTag = version;
-
-execSync(`docker build -t ${imageName}:${tempTag} .`, { stdio: 'inherit' });
-execSync(`docker push ${imageName}:${tempTag}`, { stdio: 'inherit' });
-
-// Get digest
-const digest = execSync(`docker inspect --format='{{index .RepoDigests 0}}' ${imageName}:${tempTag}`)
-  .toString()
-  .trim()
-  .split('@')[1];
-
-const descriptor = `project: ${projectName}
+```yaml
+# release-artifacts.yml
 artifacts:
   - type: docker
-    name: ${imageName}
-    tempTag: ${tempTag}
-    finalTag: ${finalTag}
-    digest: ${digest}
-    registry: ghcr.io
-    pushedAt: '${new Date().toISOString()}'
+    name: ghcr.io/myorg/my-image   # fully-qualified: ghcr.io/<owner>/<image>
+    localTag: my-image:latest       # local tag to save (defaults to <name>:latest)
     registries: [ghcr, dockerhub]
-`;
+```
 
-writeFileSync(join(outputDir, `${projectName}.artifact.yml`), descriptor);
-console.log(`✓ Created artifact descriptor for ${imageName}:${tempTag}`);
+During `pack`, `gitflow` serializes the built image with `docker save | gzip`
+into a tarball artifact (`<name>.image.tar.gz`) and records the image id as
+`digest`. That tarball is uploaded to the draft release and travels to the
+publish job, which runs `docker load`, verifies the `digest`, then tags and
+pushes the final release/`latest` tags. No transient `temp-*` tag is ever pushed
+to the registry, so nothing needs cleaning up afterwards.
+
+The generated descriptor looks like:
+
+```yaml
+project: my-image
+artifacts:
+  - type: docker
+    name: ghcr.io/myorg/my-image
+    localTag: my-image:latest
+    finalTag: 1.0.0
+    digest: sha256:...
+    registry: ghcr.io
+    imageArchive: /tmp/git-flow-artifacts/myorg-my-image.image.tar.gz
+    pushedAt: '2026-01-29T12:00:00Z'
+    registries: [ghcr, dockerhub]
 ```
 
 ### NuGet Package
@@ -279,6 +273,7 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  packages: write # required to push docker artifacts to GHCR
 
 jobs:
   build-pack:
@@ -321,6 +316,7 @@ jobs:
 The workflow requires:
 - `contents: write` - Create draft releases and upload assets
 - `pull-requests: read` - Read PR description
+- `packages: write` - Push docker artifacts to GHCR (required only when packing `docker` artifacts)
 
 ### Secrets
 

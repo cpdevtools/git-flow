@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      packages: write # required to push docker artifacts to GHCR
     
     steps:
       - uses: actions/checkout@v4
@@ -127,13 +128,20 @@ Supported artifact types:
 ```yaml
 - type: docker
   name: ghcr.io/owner/image
-  tempTag: temp-abc1234
+  localTag: my-image:latest
   finalTag: 1.0.0
   digest: sha256:...
   registry: ghcr.io
+  imageArchive: /tmp/git-flow-artifacts/owner-image.image.tar.gz
   pushedAt: '2026-01-29T12:00:00Z'
   registries: [ghcr, dockerhub]
 ```
+
+The built image is serialized with `docker save` into a gzipped tarball
+(`imageArchive`) that travels between the build-pack and publish jobs as a
+release asset. The publish job runs `docker load`, verifies the image id
+(`digest`), then tags and pushes the final release/`latest` tags. No transient
+`temp-*` tag is ever pushed to the registry.
 
 ### NuGet Package
 ```yaml

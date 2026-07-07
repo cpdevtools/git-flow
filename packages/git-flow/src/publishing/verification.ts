@@ -3,6 +3,7 @@ import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { NpmRegistry, NugetRegistry, DockerRegistry, VerificationResult } from './types.js';
+import { resolveDockerImageBase } from './publishers.js';
 
 /**
  * Check if a package version is published to NPM registry
@@ -139,9 +140,7 @@ export async function isDockerPublished(
   registry: DockerRegistry,
 ): Promise<VerificationResult> {
   try {
-    const fullImageName = registry.namespace
-      ? `${registry.registry}/${registry.namespace}/${imageName}:${tag}`
-      : `${registry.registry}/${imageName}:${tag}`;
+    const fullImageName = `${resolveDockerImageBase(imageName, registry)}:${tag}`;
 
     // Try to inspect the remote image manifest
     await $`docker manifest inspect ${fullImageName}`;
