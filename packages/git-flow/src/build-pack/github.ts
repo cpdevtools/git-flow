@@ -521,6 +521,41 @@ export async function getDraftReleaseMetadata(
 }
 
 /**
+ * Check whether a finalized (non-draft) release already exists for a tag.
+ *
+ * Used for idempotent re-runs of publish-release: a project whose release has
+ * already been finalized should be skipped rather than treated as a missing
+ * draft (which would otherwise fail the run).
+ */
+export async function isReleasePublished(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  tag: string,
+): Promise<boolean> {
+  const octokit = getOctokit(githubToken);
+
+  try {
+    const { data: releases } = await octokit.rest.repos.listReleases({
+      owner,
+      repo,
+      per_page: 100,
+    });
+
+    // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
+    const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
+    const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
+
+    return releases.some(
+      (r) => !r.draft && (r.tag_name === tag || (expectedName != null && r.name === expectedName)),
+    );
+  } catch (error) {
+    console.error(`Error checking published release ${tag}:`, error);
+    return false;
+  }
+}
+
+/**
  * Post a comment on a PR with links to published releases
  */
 export async function postPRReleaseComment(
