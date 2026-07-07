@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      packages: write # required to push docker artifacts to GHCR
     
     steps:
       - uses: actions/checkout@v4

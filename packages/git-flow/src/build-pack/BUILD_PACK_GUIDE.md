@@ -279,6 +279,7 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  packages: write # required to push docker artifacts to GHCR
 
 jobs:
   build-pack:
@@ -321,6 +322,7 @@ jobs:
 The workflow requires:
 - `contents: write` - Create draft releases and upload assets
 - `pull-requests: read` - Read PR description
+- `packages: write` - Push docker artifacts to GHCR (required only when packing `docker` artifacts)
 
 ### Secrets
 
