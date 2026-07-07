@@ -2,16 +2,16 @@
   "name": "@cpdevtools/git-flow-action-create-release-pr",
   "version": "0.0.0-DEFAULT",
   "private": true,
-  "packageManager": "pnpm@11.5.0",
   "description": "GitHub Action to create release PRs",
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
     "@cpdevtools/git-flow": "workspace:*",
-    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.2",
+    "@cpdevtools/ts-dev-utilities": "^0.4.0-dev.3",
     "tsx": "^4.19.2",
     "yaml": "^2.8.2"
   },
   "author": "CPDevTools",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0"
 }
