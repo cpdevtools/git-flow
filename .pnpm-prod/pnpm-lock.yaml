@@ -8,6 +8,9 @@ importers:
 
   ..:
     devDependencies:
+      '@cpdevtools/git-flow-cli':
+        specifier: workspace:*
+        version: link:packages/git-flow-cli
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43

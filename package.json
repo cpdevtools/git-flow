@@ -16,6 +16,7 @@
     "typecheck": "wireit"
   },
   "devDependencies": {
+    "@cpdevtools/git-flow-cli": "workspace:*",
     "@types/node": "^20.17.11",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
