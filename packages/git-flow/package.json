@@ -53,39 +53,39 @@
   },
   "exports": {
     ".": {
+      "source": "./src/index.ts",
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js",
-      "source": "./src/index.ts"
+      "default": "./dist/index.js"
     },
     "./version": {
+      "source": "./src/version/index.ts",
       "types": "./dist/version/index.d.ts",
-      "default": "./dist/version/index.js",
-      "source": "./src/version/index.ts"
+      "default": "./dist/version/index.js"
     },
     "./branch": {
+      "source": "./src/branch/index.ts",
       "types": "./dist/branch/index.d.ts",
-      "default": "./dist/branch/index.js",
-      "source": "./src/branch/index.ts"
+      "default": "./dist/branch/index.js"
     },
     "./build-pack": {
+      "source": "./src/build-pack/index.ts",
       "types": "./dist/build-pack/index.d.ts",
-      "default": "./dist/build-pack/index.js",
-      "source": "./src/build-pack/index.ts"
+      "default": "./dist/build-pack/index.js"
     },
     "./publishing": {
+      "source": "./src/publishing/index.ts",
       "types": "./dist/publishing/index.d.ts",
-      "default": "./dist/publishing/index.js",
-      "source": "./src/publishing/index.ts"
+      "default": "./dist/publishing/index.js"
     },
     "./publish-release": {
+      "source": "./src/publish-release/index.ts",
       "types": "./dist/publish-release/index.d.ts",
-      "default": "./dist/publish-release/index.js",
-      "source": "./src/publish-release/index.ts"
+      "default": "./dist/publish-release/index.js"
     },
     "./artifacts": {
+      "source": "./src/artifacts/index.ts",
       "types": "./dist/artifacts/index.d.ts",
-      "default": "./dist/artifacts/index.js",
-      "source": "./src/artifacts/index.ts"
+      "default": "./dist/artifacts/index.js"
     }
   },
   "files": [
