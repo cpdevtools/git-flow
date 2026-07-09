@@ -1,0 +1,13 @@
+{
+  "name": "@cpdevtools/git-flow-action-deploy",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "description": "GitHub Action: trigger a deploy via the deploy gateway and stream logs",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "tsx": "^4.19.2"
+  },
+  "author": "CPDevTools",
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0"
+}

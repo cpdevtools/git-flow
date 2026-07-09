@@ -1,0 +1,55 @@
+{
+  "name": "@cpdevtools/git-flow-deploy-cli",
+  "version": "0.0.0-MAIN",
+  "description": "Server-side CLI for the git-flow deploy gateway",
+  "bin": {
+    "deploy-gateway": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "github.actions.build": "pnpm build"
+  },
+  "dependencies": {
+    "@cpdevtools/git-flow-deploy": "workspace:*",
+    "@oclif/core": "^4.8.0",
+    "@oclif/plugin-help": "^6.2.37"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.11",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "eslint": "^9.18.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "cli",
+    "deploy",
+    "git-flow"
+  ],
+  "author": "CPDevTools",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cpdevtools/git-flow.git",
+    "directory": "packages/git-flow-deploy-cli"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "files": [
+    "dist",
+    "oclif.manifest.json"
+  ],
+  "oclif": {
+    "bin": "deploy-gateway",
+    "dirname": "deploy-gateway",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
+  },
+  "packageManager": "pnpm@11.5.0"
+}

@@ -1,0 +1,59 @@
+name: Deploy (reusable)
+
+# Reusable deploy workflow for the git-flow ecosystem (Phase 5 — Phase B).
+#
+# Called by a thin per-environment wrapper workflow (e.g. deploy-production.yml)
+# that sets the target `environment` and forwards the release coordinates. This
+# workflow POSTs to that environment's deploy REST service, which downloads the
+# release's deploy.zip, reads deploy.yml -> deployCommand, and runs the full
+# deploy lifecycle server-side. No SSH/SFTP, no separate prepare call.
+#
+# The GitHub Environment supplies, with uniform names:
+#   vars.DEPLOY_URL      — deploy REST endpoint
+#   secrets.DEPLOY_TOKEN — bearer token for that endpoint
+#
+# Declaring `environment:` on the job also records a GitHub Deployment against
+# the environment, giving "what's live now" history in the UI for free.
+
+on:
+  workflow_call:
+    inputs:
+      repo:
+        description: 'owner/repo that owns the GitHub Release'
+        required: true
+        type: string
+      release_id:
+        description: 'Numeric GitHub Release ID to deploy'
+        required: true
+        type: string
+      environment:
+        description: 'GitHub Environment supplying DEPLOY_URL + DEPLOY_TOKEN'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout git-flow (for action)
+        uses: actions/checkout@v4
+        with:
+          repository: cpdevtools/git-flow
+          ref: main
+          path: .git-flow-action
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Deploy via gateway
+        uses: ./.git-flow-action/actions/deploy
+        with:
+          repo: ${{ inputs.repo }}
+          release_id: ${{ inputs.release_id }}
+          deploy_url: ${{ vars.DEPLOY_URL }}
+          deploy_token: ${{ secrets.DEPLOY_TOKEN }}

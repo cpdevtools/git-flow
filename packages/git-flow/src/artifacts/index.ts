@@ -328,21 +328,31 @@ const deploy: ArtifactType<DeployArtifact> = {
       }),
     );
 
-    // Zip the deploy output dir
+    // Zip the deploy output dir. The on-disk name stays unique per-artifact so
+    // parallel projects don't collide in the shared staging dir; the release
+    // asset is always published as `deploy.zip` (one deploy bundle per release).
     const zipName = `${safeName(artifact.name)}-deploy.zip`;
     await mkdir(ctx.artifactOutputDir, { recursive: true });
     const zipPath = join(ctx.artifactOutputDir, zipName);
     await $({ cwd: deployOutputDir })`zip -r ${zipPath} .`;
 
     artifact.path = zipPath;
-    console.log(`  ✓ deploy: ${zipName}`);
+    console.log(`  ✓ deploy: deploy.zip`);
   },
   async upload(artifact, ctx) {
     if (!artifact.path) {
       throw new Error(`Deploy artifact '${artifact.name}' has no path — was packDeploy run?`);
     }
     const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
-    await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
+    await uploadArtifact(
+      ctx.githubToken,
+      ctx.owner,
+      ctx.repo,
+      ctx.releaseId,
+      ctx.uploadUrl,
+      path,
+      'deploy.zip',
+    );
   },
   async publish() {
     // Deploy zips are consumed from the GitHub release by the deploy service;

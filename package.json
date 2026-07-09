@@ -60,7 +60,7 @@
     "build": {
       "dependencies": [
         "./packages/git-flow:build",
-        "./packages/cli:build"
+        "./packages/git-flow-cli:build"
       ]
     },
     "test": {
@@ -71,7 +71,7 @@
     "typecheck": {
       "dependencies": [
         "./packages/git-flow:typecheck",
-        "./packages/cli:typecheck"
+        "./packages/git-flow-cli:typecheck"
       ]
     },
     "fix": {

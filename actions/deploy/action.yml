@@ -1,0 +1,47 @@
+name: 'Deploy via Deploy Gateway'
+description: 'Sign and POST a deploy trigger to the deploy gateway, then stream logs until EXIT:0/EXIT:1'
+author: 'CPDevTools'
+
+branding:
+  icon: 'upload-cloud'
+  color: 'blue'
+
+inputs:
+  repo:
+    description: 'GitHub repo (owner/repo) — defaults to current repo'
+    required: false
+    default: ${{ github.repository }}
+
+  release_id:
+    description: 'GitHub Release ID'
+    required: true
+
+  deploy_url:
+    description: 'Base URL of the deploy gateway (e.g. https://deploy.example.com)'
+    required: true
+
+  deploy_token:
+    description: 'HMAC shared secret (DEPLOY_TOKEN from the GitHub Environment)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm i --no-frozen-lockfile
+      env:
+        HUSKY: '0'
+
+    - name: Run Deploy Action
+      shell: bash
+      run: |
+        ${{ github.action_path }}/node_modules/.bin/tsx \
+          --tsconfig ${{ github.action_path }}/tsconfig.json \
+          ${{ github.action_path }}/src/action.ts
+      env:
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_RELEASE_ID: ${{ inputs.release_id }}
+        INPUT_DEPLOY_URL: ${{ inputs.deploy_url }}
+        INPUT_DEPLOY_TOKEN: ${{ inputs.deploy_token }}
