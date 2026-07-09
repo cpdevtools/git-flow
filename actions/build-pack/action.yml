@@ -73,7 +73,22 @@ runs:
     - name: Add workspace bin to PATH
       shell: bash
       run: echo "${{ inputs.workspace-root }}/node_modules/.bin" >> $GITHUB_PATH
-    
+
+    - name: Pre-build git-flow-cli
+      shell: bash
+      run: pnpm --filter @cpdevtools/git-flow-cli build
+      env:
+        HUSKY: '0'
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Relink workspace binaries
+      shell: bash
+      run: pnpm install --prefer-offline --lockfile-dir .pnpm-prod
+      env:
+        HUSKY: '0'
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
