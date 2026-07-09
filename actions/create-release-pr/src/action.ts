@@ -46,15 +46,15 @@ async function run() {
     const projects = await discoverProjects(process.cwd());
     core.info(`Found ${projects.length} projects`);
 
-    // Filter to only projects with github.actions.build script
+    // Filter to only projects with github.actions.pack script (opt-in to release flow)
     const buildableProjects = projects.filter(project => {
-      const hasBuildScript = !!project.packageJson.scripts?.['github.actions.build'];
-      if (!hasBuildScript) {
-        core.info(`Skipping ${project.packageJson.name}: no github.actions.build script`);
+      const hasPackScript = !!project.packageJson.scripts?.['github.actions.pack'];
+      if (!hasPackScript) {
+        core.info(`Skipping ${project.packageJson.name}: no github.actions.pack script`);
       }
-      return hasBuildScript;
+      return hasPackScript;
     });
-    core.info(`${buildableProjects.length} projects have github.actions.build script`);
+    core.info(`${buildableProjects.length} projects have github.actions.pack script`);
 
     // Resolve versions for each project
     const projectMetadata: Array<ProjectMetadata & { cwd: string }> = [];
