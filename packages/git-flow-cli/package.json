@@ -9,7 +9,7 @@
     "build": "wireit",
     "format": "prettier --write \"src/**/*.ts\"",
     "github.actions.build": "pnpm build",
-    "github.actions.pack": "pnpm pack",
+    "github.actions.pack": "gitflow pack",
     "lint": "eslint src --ext .ts",
     "typecheck": "wireit"
   },

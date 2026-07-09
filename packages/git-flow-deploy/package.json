@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "github.actions.build": "pnpm build"
+    "github.actions.build": "pnpm build",
+    "github.actions.pack": "gitflow pack"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
