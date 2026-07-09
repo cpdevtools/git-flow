@@ -83,11 +83,10 @@ runs:
 
     - name: Relink workspace binaries
       shell: bash
-      run: pnpm install --prefer-offline --lockfile-dir .pnpm-prod
-      env:
-        HUSKY: '0'
-        NODE_AUTH_TOKEN: ${{ inputs.token }}
-        GITHUB_TOKEN: ${{ inputs.token }}
+      run: |
+        chmod +x packages/git-flow-cli/dist/bin.js
+        ln -sf "$(pwd)/packages/git-flow-cli/dist/bin.js" node_modules/.bin/gitflow
+      working-directory: ${{ inputs.workspace-root }}
 
     - name: Install action dependencies
       shell: bash
