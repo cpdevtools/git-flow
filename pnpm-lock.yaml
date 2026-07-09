@@ -10,6 +10,9 @@ importers:
 
   .:
     devDependencies:
+      '@cpdevtools/git-flow-cli':
+        specifier: workspace:*
+        version: link:packages/git-flow-cli
       '@cpdevtools/ts-dev-utilities-cli':
         specifier: file:/devcontainer/repos/ts-dev-utilities/packages/cli
         version: file:../ts-dev-utilities/packages/cli
