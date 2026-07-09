@@ -3,5 +3,9 @@ packages:
   - 'actions/*'
 allowBuilds:
   esbuild: false
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - '@cpdevtools/ts-dev-utilities'
+  - '@sinclair/typebox'
+  - 'node-releases'
+  - 'terser'

@@ -245,9 +245,12 @@ export async function uploadArtifact(
   releaseId: number,
   uploadUrl: string,
   filePath: string,
+  assetName?: string,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
-  const fileName = basename(filePath);
+  // The on-disk name can be unique (to avoid collisions in the shared staging
+  // dir); assetName overrides the name the asset is published under on the release.
+  const fileName = assetName ?? basename(filePath);
 
   // Check if already uploaded
   const alreadyExists = await isArtifactUploaded(githubToken, owner, repo, releaseId, fileName);
@@ -265,9 +268,11 @@ export async function uploadArtifact(
     ? 'application/x-yaml'
     : fileName.endsWith('.tgz')
       ? 'application/gzip'
-      : fileName.endsWith('.nupkg')
-        ? 'application/octet-stream'
-        : 'application/octet-stream';
+      : fileName.endsWith('.zip')
+        ? 'application/zip'
+        : fileName.endsWith('.nupkg')
+          ? 'application/octet-stream'
+          : 'application/octet-stream';
 
   console.log(`  ⬆️  Uploading ${fileName}...`);
 
