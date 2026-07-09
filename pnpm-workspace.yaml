@@ -3,6 +3,6 @@ packages:
   - 'actions/*'
 allowBuilds:
   esbuild: false
-  unrs-resolver: set this to true or false
+  unrs-resolver: true
 minimumReleaseAgeExclude:
   - '@cpdevtools/ts-dev-utilities'
