@@ -118,8 +118,9 @@ projects:
       core.summary.addHeading('Failed Projects', 3);
       for (const failure of result.failed) {
         const rawError = failure.error || 'Unknown error';
-        // Strip ANSI escape codes
-        const cleanError = rawError.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        // Strip ANSI escape codes (CSI, OSC, and two-char ESC sequences)
+        // eslint-disable-next-line no-control-regex
+        const cleanError = rawError.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
         // Pull out lines that look like actual errors for the headline
         const errorLines = cleanError
           .split('\n')
