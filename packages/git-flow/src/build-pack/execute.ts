@@ -236,6 +236,7 @@ async function executePackDeploy(
           projectCwd: project.cwd,
           deployOutputDir,
           projectName: project.name,
+          version: project.version,
           method,
         };
 

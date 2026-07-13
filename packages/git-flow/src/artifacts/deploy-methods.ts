@@ -34,6 +34,8 @@ export interface DeployMethodContext {
   deployOutputDir: string;
   /** Package name (e.g. '@org/my-app') */
   projectName: string;
+  /** Package version (e.g. '1.2.3') */
+  version: string;
   /** Deploy method name (e.g. 'compose', 'swarm', 'node') */
   method: string;
 }
@@ -182,10 +184,11 @@ registerDeployMethod('npm', 'node', {
     await mkdir(deployOutputDir, { recursive: true });
     await copyFile(ecoFile, join(deployOutputDir, 'ecosystem.config.js'));
   },
-  async generateDeployYml({ deployOutputDir }) {
+  async generateDeployYml({ deployOutputDir, projectName, version }) {
+    const installCmd = `npm install -g ${projectName}@${version}`;
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: 'pm2 reload ecosystem.config.js' }),
+      stringify({ deployCommand: `${installCmd} && pm2 reload ecosystem.config.js` }),
     );
   },
 });
