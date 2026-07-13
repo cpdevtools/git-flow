@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# Build context: packages/git-flow-deploy-service/.docker-staging
-# Staging dir is prepared by the github.actions.build wireit task via pnpm deploy.
+# Build context: packages/git-flow-deploy-service/.docker-bundle
+# Bundle is prepared by the build:bundle wireit task (pnpm deploy --legacy --prod).
 
 FROM node:24-alpine
 WORKDIR /app
