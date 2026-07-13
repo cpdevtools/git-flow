@@ -10,6 +10,17 @@
  *   getVersion    — returns the version string to use (docker uses finalTag)
  */
 
+// Import deploy-methods first so built-in handlers are registered before any
+// artifact-type code runs.  Side-effect import only.
+import './deploy-methods.js';
+export {
+  registerDeployMethod,
+  getDeployMethod,
+  listDeployMethods,
+  type DeployMethodHandler,
+  type DeployMethodContext,
+} from './deploy-methods.js';
+
 import type {
   Artifact,
   DeployArtifact,
