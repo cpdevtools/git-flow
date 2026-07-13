@@ -21,7 +21,7 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: Build and Pack
-        uses: cpdevtools/git-flow/actions/build-pack@main
+        uses: ./actions/build-pack
         with:
           pr-number: ${{ github.event.pull_request.number || '0' }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Publish Release
-        uses: cpdevtools/git-flow/actions/publish-release@main
+        uses: ./actions/publish-release
         with:
           pr-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GITHUB_TOKEN }}
