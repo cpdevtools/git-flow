@@ -18,6 +18,7 @@ export async function fetchDeployBundle(
   repo: string,
   releaseId: number,
   destDir: string,
+  assetName = 'deploy.zip',
 ): Promise<DeployManifest> {
   // List release assets
   const assetsUrl = `https://api.github.com/repos/${repo}/releases/${releaseId}/assets`;
@@ -36,10 +37,10 @@ export async function fetchDeployBundle(
   }
 
   const assets = (await assetsRes.json()) as GitHubAsset[];
-  const deployAsset = assets.find((a) => a.name === 'deploy.zip');
+  const deployAsset = assets.find((a) => a.name === assetName);
 
   if (!deployAsset) {
-    throw new Error(`No deploy.zip asset found in release ${releaseId} of ${repo}`);
+    throw new Error(`No ${assetName} asset found in release ${releaseId} of ${repo}`);
   }
 
   // Download via the asset API URL (requires Accept: application/octet-stream)

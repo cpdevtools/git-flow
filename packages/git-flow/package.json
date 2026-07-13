@@ -9,6 +9,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "github.actions.build": "pnpm build",
     "github.actions.pack": "gitflow pack",
+    "github.actions.test": "pnpm test",
     "lint": "eslint src --ext .ts",
     "test": "wireit",
     "typecheck": "wireit"
@@ -107,9 +108,6 @@
     },
     "test": {
       "command": "vitest run",
-      "dependencies": [
-        "build"
-      ],
       "files": [
         "src/**/*.ts",
         "vitest.config.ts"

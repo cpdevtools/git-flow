@@ -3,13 +3,15 @@
   "version": "0.0.0-MAIN",
   "description": "Deploy gateway service for git-flow",
   "author": "CPDevTools",
-  "private": true,
   "license": "MIT",
+  "files": ["dist"],
   "scripts": {
-    "build": "nest build",
+    "build": "wireit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "github.actions.build": "pnpm build",
+    "github.actions.build": "wireit",
+    "github.actions.pack": "gitflow pack",
     "github.actions.test": "pnpm test",
+    "github.actions.test:integration": "pnpm test:e2e",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -19,7 +21,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cpdevtools/git-flow-deploy": "workspace:*",
@@ -75,5 +78,53 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "wireit": {
+    "build": {
+      "command": "nest build",
+      "files": [
+        "src/**/*.ts",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "nest-cli.json"
+      ],
+      "output": [
+        "dist/**"
+      ]
+    },
+    "build:bundle": {
+      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-bundle && pnpm deploy --legacy --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-bundle && pnpm install --lockfile-dir .pnpm-prod --filter @cpdevtools/git-flow-deploy-service --config.confirmModulesPurge=false",
+      "dependencies": [
+        "build",
+        "../git-flow-deploy:build"
+      ],
+      "files": [
+        "../../pnpm-workspace.yaml",
+        "../../pnpm-lock.yaml",
+        "../../packages/git-flow-deploy/package.json"
+      ],
+      "output": []
+    },
+    "build:docker": {
+      "command": "cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t cpdevtools-git-flow-deploy-service:${PROJECT_VERSION} -t cpdevtools-git-flow-deploy-service:latest packages/git-flow-deploy-service/.docker-bundle",
+      "dependencies": [
+        "build:bundle"
+      ],
+      "env": {
+        "PROJECT_VERSION": {
+          "external": true,
+          "default": "dev"
+        }
+      },
+      "files": [
+        "Dockerfile"
+      ],
+      "output": []
+    },
+    "github.actions.build": {
+      "dependencies": [
+        "build:docker"
+      ]
+    }
   }
 }

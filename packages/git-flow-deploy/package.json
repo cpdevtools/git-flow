@@ -13,9 +13,12 @@
   },
   "scripts": {
     "build": "tsup",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "github.actions.build": "pnpm build",
-    "github.actions.pack": "gitflow pack"
+    "github.actions.pack": "gitflow pack",
+    "github.actions.test": "pnpm test"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
@@ -25,7 +28,8 @@
     "@types/adm-zip": "^0.5.5",
     "@types/node": "^20.17.11",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   },
   "engines": {
     "node": ">=24"

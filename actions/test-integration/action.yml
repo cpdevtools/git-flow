@@ -1,0 +1,89 @@
+name: 'Integration Test Projects'
+description: 'Builds all workspace projects then runs integration tests for projects that declare github.actions.test:integration'
+author: 'CPDevTools'
+
+branding:
+  icon: 'layers'
+  color: 'blue'
+
+inputs:
+  fail-fast:
+    description: 'Stop on first integration test failure'
+    required: false
+    default: 'false'
+
+  concurrency:
+    description: 'Maximum number of projects to test in parallel (default: unlimited)'
+    required: false
+    default: ''
+
+  token:
+    description: 'GitHub token (used for installing packages)'
+    required: false
+    default: ${{ github.token }}
+
+  workspace-root:
+    description: 'Workspace root directory'
+    required: false
+    default: ${{ github.workspace }}
+
+outputs:
+  projects-passed:
+    description: 'Number of projects that passed integration tests'
+    value: ${{ steps.test-integration.outputs.projects-passed }}
+
+  projects-failed:
+    description: 'Number of projects that failed integration tests'
+    value: ${{ steps.test-integration.outputs.projects-failed }}
+
+  projects-skipped:
+    description: 'Number of projects skipped due to a dependency failure'
+    value: ${{ steps.test-integration.outputs.projects-skipped }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@cpdevtools'
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Configure registry auth
+      shell: bash
+      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Install workspace dependencies
+      shell: bash
+      run: pnpm install --lockfile-dir .pnpm-prod
+      env:
+        HUSKY: '0'
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-test-integration...
+      env:
+        HUSKY: '0'
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    - name: Run Integration Tests
+      id: test-integration
+      shell: bash
+      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      env:
+        INPUT_FAIL_FAST: ${{ inputs.fail-fast }}
+        INPUT_CONCURRENCY: ${{ inputs.concurrency }}
+        INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
+        GITHUB_TOKEN: ${{ inputs.token }}

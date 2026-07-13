@@ -1,0 +1,13 @@
+artifacts:
+  - type: npm
+    registries:
+      - github-npm
+    deploy:
+      - node
+
+  - type: docker
+    registries:
+      - ghcr
+    deploy:
+      - compose
+      - swarm

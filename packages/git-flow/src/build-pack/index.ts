@@ -43,6 +43,7 @@ export {
   getDraftReleaseMetadata,
   deleteDraftRelease,
   detectDraftReleases,
+  cleanupEmptyDraftReleases,
   postPRReleaseComment,
 } from './github.js';
 

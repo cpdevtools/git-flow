@@ -15,4 +15,5 @@ export interface DeployManifest {
 export interface DeployRequest {
   repo: string;
   release_id: number;
+  bundle?: string;
 }

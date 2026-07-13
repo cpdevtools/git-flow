@@ -5,6 +5,7 @@ export default defineConfig({
     bin: 'src/bin.ts',
     index: 'src/index.ts',
     'config-loader': 'src/config-loader.ts',
+    'commands/deploy': 'src/commands/deploy.ts',
     'commands/pack': 'src/commands/pack.ts',
     'commands/apply-version': 'src/commands/apply-version.ts',
     'commands/pack-deploy': 'src/commands/pack-deploy.ts',

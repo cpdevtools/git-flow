@@ -65,7 +65,10 @@ function replaceEnvVars(str: string, envVars: Record<string, string>): string {
  * Replace environment variables in artifact config
  */
 function substituteArtifact(artifact: Artifact, envVars: Record<string, string>): Artifact {
-  const base = { ...artifact, name: replaceEnvVars(artifact.name, envVars) };
+  const base = { ...artifact } as Artifact & { name?: string };
+  if (base.name) {
+    base.name = replaceEnvVars(base.name, envVars);
+  }
   if ('path' in artifact && artifact.path) {
     return { ...base, path: replaceEnvVars(artifact.path as string, envVars) } as Artifact;
   }

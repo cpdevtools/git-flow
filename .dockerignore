@@ -1,0 +1,17 @@
+.git/
+.github/
+.husky/
+.wireit/
+.publish/
+.pnpm-prod/
+node_modules/
+packages/*/node_modules/
+packages/*/dist/
+packages/*/coverage/
+packages/*/test/
+coverage/
+actions/
+docs/
+*.log
+.env
+.env.local
