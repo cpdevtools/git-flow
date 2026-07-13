@@ -91,7 +91,7 @@
       ]
     },
     "build:bundle": {
-      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-bundle && pnpm deploy --legacy --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-bundle",
+      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-bundle && pnpm deploy --legacy --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-bundle && pnpm install --lockfile-dir .pnpm-prod --filter @cpdevtools/git-flow-deploy-service --config.confirmModulesPurge=false",
       "dependencies": [
         "build",
         "../git-flow-deploy:build"
