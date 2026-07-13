@@ -117,6 +117,18 @@ importers:
         specifier: ^4.19.2
         version: 4.22.4
 
+  ../actions/test-integration:
+    dependencies:
+      '@actions/core':
+        specifier: ^1.11.1
+        version: 1.11.1
+      '@cpdevtools/ts-dev-utilities':
+        specifier: ^0.4.0-dev.3
+        version: 0.4.0-dev.3
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.4
+
   ../packages/git-flow:
     dependencies:
       '@actions/core':

@@ -1,0 +1,34 @@
+name: Integration Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      fail-fast:
+        description: 'Stop on first failure'
+        required: false
+        default: 'false'
+
+permissions:
+  checks: write
+  actions: read
+  packages: read
+
+jobs:
+  test-integration:
+    name: Integration Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Integration Tests
+        uses: ./actions/test-integration
+        with:
+          fail-fast: ${{ github.event.inputs.fail-fast || 'false' }}
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -11,6 +11,7 @@
     "github.actions.build": "wireit",
     "github.actions.pack": "gitflow pack",
     "github.actions.test": "pnpm test",
+    "github.actions.test:integration": "pnpm test:e2e",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
