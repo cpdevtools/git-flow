@@ -104,7 +104,21 @@ projects:
     if (result.failed.length > 0) {
       core.summary.addHeading('Failed Projects', 3);
       for (const failure of result.failed) {
-        core.summary.addRaw(`- ${failure.project}: ${failure.error || 'Unknown error'}`, true);
+        const rawError = failure.error || 'Unknown error';
+        // Strip ANSI escape codes
+        const cleanError = rawError.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        // Pull out lines that look like actual errors for the headline
+        const errorLines = cleanError
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => /error|Error|failed|exit code/i.test(l) && l.length > 0)
+          .slice(0, 5)
+          .join('\n');
+        core.summary.addRaw(
+          `<details><summary>❌ <strong>${failure.project}</strong>${errorLines ? ` — ${errorLines.split('\n')[0].slice(0, 120)}` : ''}</summary>\n\n` +
+          `\`\`\`\n${cleanError.trim().slice(0, 8000)}\n\`\`\`\n\n</details>\n`,
+          true,
+        );
       }
     }
 

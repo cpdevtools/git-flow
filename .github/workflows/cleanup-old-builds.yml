@@ -23,84 +23,8 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Cleanup GitHub Releases & Tags
-        env:
-          GH_TOKEN: ${{ secrets.token || github.token }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          DAYS_OLD: ${{ inputs.days_old }}
-        run: |
-          echo "🧹 Cleaning up build versions older than $DAYS_OLD days..."
-          cutoff_date=$(date -d "$DAYS_OLD days ago" +%s)
-
-          gh release list --limit 200 --json tagName,publishedAt | \
-          jq -r ".[] | select(.tagName | contains(\".build.\")) | 
-                 select(.publishedAt | fromdateiso8601 < $cutoff_date) | 
-                 .tagName" | \
-          while read tag; do
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "  [DRY RUN] Would delete release: $tag"
-            else
-              echo "  🗑️  Deleting release: $tag"
-              gh release delete "$tag" -y 2>/dev/null || true
-              git push origin ":refs/tags/$tag" 2>/dev/null || true
-            fi
-          done
-
-      - name: Cleanup NPM Packages (GitHub Packages)
-        env:
-          GH_TOKEN: ${{ secrets.token || github.token }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          DAYS_OLD: ${{ inputs.days_old }}
-        run: |
-          echo "🧹 Cleaning up npm packages from GitHub Packages..."
-          cutoff_date=$(date -d "$DAYS_OLD days ago" --iso-8601=seconds)
-
-          # Get unique package names from this repo's releases
-          echo "  📋 Discovering packages published in this repository's releases..."
-          package_names=$(gh api /repos/${{ github.repository }}/releases --paginate | \
-            jq -r '.[].body' | \
-            grep -A 20 "## Artifact Metadata" | \
-            grep "name:" | \
-            sed 's/.*name: *"\?\([^"]*\)"\?.*/\1/' | \
-            sort -u)
-
-          if [ -z "$package_names" ]; then
-            echo "  ℹ️  No packages found in release metadata"
-            exit 0
-          fi
-
-          echo "$package_names" | while read package_name; do
-            [ -z "$package_name" ] && continue
-            echo "  📦 Checking package: $package_name"
-            
-            # GitHub Packages strips the scope from package names
-            # @cpdevtools/git-flow becomes just git-flow
-            package_name_no_scope="${package_name##*/}"
-            
-            # Get versions for this package
-            gh api "/orgs/${{ github.repository_owner }}/packages/npm/${package_name_no_scope}/versions" --paginate 2>/dev/null | \
-            jq -r ".[] | select(.name | contains(\".build.\")) | 
-                   select(.created_at < \"$cutoff_date\") | 
-                   \"\(.id) \(.name)\"" | \
-            while read version_id version_name; do
-              if [ "$DRY_RUN" = "true" ]; then
-                echo "    [DRY RUN] Would delete: $package_name@$version_name (ID: $version_id)"
-              else
-                echo "    🗑️  Deleting: $package_name@$version_name"
-                gh api --method DELETE \
-                  "/orgs/${{ github.repository_owner }}/packages/npm/${package_name_no_scope}/versions/$version_id" \
-                  2>/dev/null || echo "    ⚠️  Failed to delete (may already be deleted)"
-              fi
-            done
-          done
-
-      - name: Summary
-        run: |
-          echo "✅ Cleanup complete!"
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            echo "This was a DRY RUN - no actual deletions were performed."
-          else
-            echo "Removed all .build.* versions older than ${{ inputs.days_old }} days."
-          fi
+      - uses: ./actions/cleanup-old-builds
+        with:
+          days-old: ${{ inputs.days_old }}
+          dry-run: ${{ inputs.dry_run }}
+          token: ${{ secrets.token || github.token }}
