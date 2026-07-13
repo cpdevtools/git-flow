@@ -561,6 +561,64 @@ export async function isReleasePublished(
 }
 
 /**
+ * Delete draft releases created in a specific run that have no uploaded assets.
+ *
+ * Called on build failure to clean up empty drafts left behind when a run fails
+ * before (or during) the upload phase. Drafts with at least one asset are kept
+ * so a subsequent re-run can reuse them.
+ */
+export async function cleanupEmptyDraftReleases(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  runNumber: number,
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+  const buildSuffix = `.build.${runNumber}`;
+
+  console.log(`🧹 Cleaning up empty draft releases for run ${runNumber}...`);
+
+  let deleted = 0;
+  let kept = 0;
+  let page = 1;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data: releases } = await octokit.rest.repos.listReleases({
+      owner,
+      repo,
+      per_page: 100,
+      page,
+    });
+
+    if (releases.length === 0) break;
+
+    for (const release of releases) {
+      if (!release.draft) continue;
+      if (!release.tag_name.includes(buildSuffix)) continue;
+
+      if (release.assets.length === 0) {
+        try {
+          await octokit.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+          console.log(`  🗑️  Deleted empty draft: ${release.tag_name}`);
+          deleted++;
+        } catch (err: any) {
+          console.warn(`  ⚠️  Failed to delete ${release.tag_name}: ${err.message}`);
+        }
+      } else {
+        console.log(`  ✓ Kept draft with ${release.assets.length} asset(s): ${release.tag_name}`);
+        kept++;
+      }
+    }
+
+    if (releases.length < 100) break;
+    page++;
+  }
+
+  console.log(`   Cleanup complete: ${deleted} deleted, ${kept} kept`);
+}
+
+/**
  * Post a comment on a PR with links to published releases
  */
 export async function postPRReleaseComment(
