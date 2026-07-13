@@ -4,3 +4,8 @@ registries:
     url: https://npm.pkg.github.com
     auth: GITHUB_TOKEN
     scope: '@cpdevtools'
+  ghcr:
+    type: docker
+    registry: ghcr.io
+    namespace: cpdevtools
+    auth: GITHUB_TOKEN
