@@ -1,0 +1,25 @@
+services:
+  git-flow-deploy-service:
+    image: ghcr.io/cpdevtools/git-flow-deploy-service:latest
+    ports:
+      - "3700:3700"
+    environment:
+      DEPLOY_WORK_DIR: /var/deploy/work
+      SHARED_STORAGE_BASE_DIR: /var/deploy/shared
+    secrets:
+      - DEPLOY_HMAC_SECRET
+      - GITHUB_TOKEN
+    volumes:
+      - work:/var/deploy/work
+      - shared:/var/deploy/shared
+    restart: unless-stopped
+
+volumes:
+  work:
+  shared:
+
+secrets:
+  DEPLOY_HMAC_SECRET:
+    external: true
+  GITHUB_TOKEN:
+    external: true
