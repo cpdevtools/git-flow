@@ -8,3 +8,4 @@ artifacts:
       - ghcr
     deploy:
       - compose
+      - swarm
