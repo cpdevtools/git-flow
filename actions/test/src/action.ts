@@ -65,18 +65,18 @@ async function run(): Promise<void> {
   }
 }
 
-async function stripAnsi(text: string): Promise<string> {
+async function stripAnsi(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
 }
 
 async function renderSummary(summary: RunSummary): Promise<void> {
-  // GitHub Annotations — one error annotation per failed task
+  // GitHub Annotations — strip ANSI since annotations don't support color
   for (const task of summary.failed) {
     const rawOutput = task.output
       ? `${task.truncated ? '[Output truncated]\n' : ''}${task.output.trimEnd()}`
       : '(no output)';
-    const output = await stripAnsi(rawOutput);
+    const output = stripAnsi(rawOutput);
     core.error(`${task.project} failed:\n${output}`, { title: `Failed: ${task.project}` });
   }
 
@@ -96,15 +96,13 @@ async function renderSummary(summary: RunSummary): Promise<void> {
     ])
     .write();
 
-  // Inline failed-task output in summary
+  // Inline failed-task output in summary — use 'ansi' language to render colors
   for (const task of summary.failed) {
     if (task.output) {
-      const cleanOutput = await stripAnsi(
-        task.truncated ? `[Output truncated]\n${task.output}` : task.output,
-      );
+      const output = task.truncated ? `[Output truncated]\n${task.output}` : task.output;
       await core.summary
         .addHeading(`❌ ${task.project}`, 3)
-        .addCodeBlock(cleanOutput, 'text')
+        .addCodeBlock(output, 'ansi')
         .write();
     }
   }
