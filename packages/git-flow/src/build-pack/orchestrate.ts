@@ -98,6 +98,7 @@ export async function runBuildPack(
       uploaded: [],
       skipped: projectsToSkip.map((p) => p.name),
       failed: [],
+      releases: [],
     };
   }
 
