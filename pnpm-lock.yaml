@@ -203,6 +203,9 @@ importers:
       '@oclif/plugin-help':
         specifier: ^6.2.37
         version: 6.2.53
+      prompts:
+        specifier: ^2.4.2
+        version: 2.4.2
       yaml:
         specifier: ^2.8.2
         version: 2.9.0
@@ -213,6 +216,9 @@ importers:
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43
+      '@types/prompts':
+        specifier: ^2.4.9
+        version: 2.4.9
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.20.0
         version: 8.63.0(@typescript-eslint/parser@8.63.0(eslint@9.39.4)(typescript@5.9.3))(eslint@9.39.4)(typescript@5.9.3)
@@ -231,6 +237,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@20.19.43)(terser@5.48.0)
 
   packages/git-flow-deploy:
     dependencies:
@@ -1805,6 +1814,9 @@ packages:
 
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
+
+  '@types/prompts@2.4.9':
+    resolution: {integrity: sha512-qTxFi6Buiu8+50/+3DGIWLHM6QuWsEKugJnnP6iv2Mc4ncxE4A/OJkjuVOA+5X0X1S/nq5VJRa8Lu+nwcvbrKA==}
 
   '@types/qs@6.15.1':
     resolution: {integrity: sha512-GZHUBZR9hckSUhrxmp1nG6NwdpM9fCunJwyThLW1X3AyHgd9IlHb6VANpQQqDr2o/qQp6McZ3y/IA2rVzKzSbw==}
@@ -6032,6 +6044,11 @@ snapshots:
   '@types/node@24.13.3':
     dependencies:
       undici-types: 7.18.2
+
+  '@types/prompts@2.4.9':
+    dependencies:
+      '@types/node': 24.13.3
+      kleur: 3.0.3
 
   '@types/qs@6.15.1': {}
 

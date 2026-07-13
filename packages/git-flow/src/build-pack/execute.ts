@@ -4,13 +4,20 @@
 
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseDocument } from 'yaml';
+import { parse, parseDocument, stringify } from 'yaml';
 import { $ } from 'zx';
-import { getArtifactType, type UploadContext } from '../artifacts/index.js';
-import { findOrCreateDraftRelease } from './github.js';
-import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
+import {
+  getArtifactType,
+  getDeployMethod,
+  listDeployMethods,
+  type Artifact,
+  type DeployMethodContext,
+  type UploadContext,
+} from '../artifacts/index.js';
+import { findOrCreateDraftRelease, uploadArtifact } from './github.js';
+import { generateArtifactDescriptor, loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
 
@@ -192,21 +199,154 @@ export async function executePack(
 }
 
 /**
- * Execute pack-deploy for a project if it has a pack-deploy script.
- * Runs after pack and after the draft release is found/created so that
- * GITHUB_RELEASE_ID is available for deploy.yml generation.
+ * Execute pack-deploy for a project.
+ *
+ * Resolution chain per (artifact, method) pair — first match wins:
+ *   1. .deploy/{method}/ folder   — copy files; fall through to handler.generateDeployYml
+ *                                   if deploy.yml is absent from the folder
+ *   2. github.actions.pack-deploy-{method} script — run it (ARTIFACT_TYPE env set)
+ *   3. Registered DeployMethodHandler — call copyFiles then generateDeployYml
+ *
+ * Legacy path (backward compat): no artifact carries a `deploy:` array but the
+ * project has a github.actions.pack-deploy script.
  */
 async function executePackDeploy(
   project: ProjectConfig,
   context: BuildPackContext,
-  releaseId: number,
+  descriptor: ProjectArtifactDescriptor,
+  uploadCtx: UploadContext,
 ): Promise<void> {
+  type WithDeploy = { deploy?: string[] };
+  const artifactsWithDeploy = descriptor.artifacts.filter(
+    (a: Artifact) => Array.isArray((a as unknown as WithDeploy).deploy) && ((a as unknown as WithDeploy).deploy as string[]).length > 0,
+  );
+
+  if (artifactsWithDeploy.length > 0) {
+    // ── New convention-based path ──────────────────────────────────────────
+    const packageJson = await readPackageJson(project.cwd);
+    for (const artifact of artifactsWithDeploy) {
+      const methods = (artifact as unknown as WithDeploy).deploy as string[];
+      for (const method of methods) {
+        console.log(`  \ud83d\ude80 ${project.name}: pack-deploy-${method}...`);
+
+        const deployOutputDir = join(project.cwd, '.deploy-output', method);
+        await mkdir(deployOutputDir, { recursive: true });
+
+        const deployCtx: DeployMethodContext = {
+          projectCwd: project.cwd,
+          deployOutputDir,
+          projectName: project.name,
+          version: project.version,
+          method,
+        };
+
+        const env = {
+          ...process.env,
+          PROJECT_VERSION: project.version,
+          PROJECT_NAME: project.name,
+          ARTIFACT_TYPE: artifact.type,
+          ARTIFACT_OUTPUT_DIR,
+          DEPLOY_OUTPUT_DIR: deployOutputDir,
+          GITHUB_RELEASE_ID: String(uploadCtx.releaseId),
+          GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY ?? '',
+          GITHUB_SHA: context.sha,
+        } as Record<string, string>;
+
+        // ── Step 1: .deploy/{method}/ folder ────────────────────────────────
+        const folderPath = join(project.cwd, '.deploy', method);
+        if (existsSync(folderPath)) {
+          console.log(`    \ud83d\udcc1 Using .deploy/${method}/ override folder`);
+          await cp(folderPath, deployOutputDir, { recursive: true });
+          // Fall through for deploy.yml if the folder didn't include one
+          if (!existsSync(join(deployOutputDir, 'deploy.yml'))) {
+            const handler = getDeployMethod(artifact.type, method);
+            if (!handler) {
+              throw new Error(
+                `No deploy method handler for ${artifact.type}.${method} \u2014 needed to generate deploy.yml.\n` +
+                  `The .deploy/${method}/ folder exists but contains no deploy.yml and no handler is registered.\n` +
+                  `Registered methods for '${artifact.type}': ${listDeployMethods(artifact.type).join(', ') || '(none)'}`,
+              );
+            }
+            await handler.generateDeployYml(deployCtx);
+          }
+        }
+        // ── Step 2: github.actions.pack-deploy-{method} script ──────────────
+        else if (packageJson.scripts?.[`github.actions.pack-deploy-${method}`]) {
+          await $({ cwd: project.cwd, env })`pnpm run github.actions.pack-deploy-${method}`;
+        }
+        // ── Step 3: Registry handler ─────────────────────────────────────────
+        else {
+          // Load artifact config to trigger plugin side-effects in this process
+          await loadArtifactConfig(project.cwd, {
+            PROJECT_NAME: project.name,
+            ARTIFACT_OUTPUT_DIR,
+            PACKAGE_NAME: project.name,
+            PACKAGE_VERSION: project.version,
+          });
+          const handler = getDeployMethod(artifact.type, method);
+          if (!handler) {
+            throw new Error(
+              `No deploy handler found for ${artifact.type}.${method}.\n` +
+                `Options: add a .deploy/${method}/ folder, a github.actions.pack-deploy-${method} script, ` +
+                `or register a handler via registerDeployMethod('${artifact.type}', '${method}', ...).\n` +
+                `Registered methods for '${artifact.type}': ${listDeployMethods(artifact.type).join(', ') || '(none)'}`,
+            );
+          }
+          await handler.copyFiles(deployCtx);
+          await handler.generateDeployYml(deployCtx);
+        }
+
+        // Validate and inject metadata into deploy.yml
+        const deployYmlPath = join(deployOutputDir, 'deploy.yml');
+        if (!existsSync(deployYmlPath)) {
+          throw new Error(
+            `deploy.yml not found in ${deployOutputDir} after running pack-deploy-${method}.\n` +
+              `The pack-deploy implementation must produce deploy.yml with at least deployCommand.`,
+          );
+        }
+        const deployMeta = parse(await readFile(deployYmlPath, 'utf-8')) as Record<string, unknown>;
+        if (!deployMeta.deployCommand) {
+          throw new Error(`deploy.yml produced by pack-deploy-${method} is missing required field: deployCommand`);
+        }
+        await writeFile(
+          deployYmlPath,
+          stringify({
+            ...deployMeta,
+            name: project.name,
+            version: project.version,
+            repo: `https://github.com/${process.env.GITHUB_REPOSITORY ?? ''}`,
+            releaseId: uploadCtx.releaseId,
+          }),
+        );
+
+        // Zip the deploy output dir and upload directly
+        const zipName = `deploy-${method}.zip`;
+        const zipPath = join(ARTIFACT_OUTPUT_DIR, zipName);
+        await mkdir(ARTIFACT_OUTPUT_DIR, { recursive: true });
+        await $({ cwd: deployOutputDir })`zip -r ${zipPath} .`;
+
+        await uploadArtifact(
+          uploadCtx.githubToken,
+          uploadCtx.owner,
+          uploadCtx.repo,
+          uploadCtx.releaseId,
+          uploadCtx.uploadUrl,
+          zipPath,
+          zipName,
+        );
+        console.log(`  \u2713 ${project.name}: ${zipName} uploaded`);
+      }
+    }
+    return;
+  }
+
+  // ── Legacy path: single github.actions.pack-deploy script ─────────────────
   const packageJson = await readPackageJson(project.cwd);
   if (!packageJson.scripts?.['github.actions.pack-deploy']) {
     return;
   }
 
-  console.log(`🚀 ${project.name}: Running pack-deploy...`);
+  console.log(`\ud83d\ude80 ${project.name}: Running pack-deploy (legacy)...`);
 
   const env = {
     ...process.env,
@@ -214,14 +354,13 @@ async function executePackDeploy(
     PROJECT_NAME: project.name,
     ARTIFACT_OUTPUT_DIR,
     DEPLOY_OUTPUT_DIR: join(project.cwd, '.deploy-output'),
-    GITHUB_RELEASE_ID: String(releaseId),
+    GITHUB_RELEASE_ID: String(uploadCtx.releaseId),
     GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY ?? '',
     GITHUB_SHA: context.sha,
   } as Record<string, string>;
 
   await $({ cwd: project.cwd, env })`pnpm run github.actions.pack-deploy`;
-
-  console.log(`✓ ${project.name}: pack-deploy completed`);
+  console.log(`\u2713 ${project.name}: pack-deploy completed`);
 }
 
 /**
@@ -258,13 +397,6 @@ export async function executeUpload(
     // Find or create draft release with artifact metadata in body
     const release = await findOrCreateDraftRelease(project, context, artifactYml);
 
-    // Run pack-deploy (if the project supports it) now that we have the release ID
-    await executePackDeploy(project, context, release.id);
-
-    // Re-read descriptor after pack-deploy — deploy artifact path is now populated
-    const updatedYml = await readFile(artifactPath, 'utf-8');
-    const updatedDescriptor = parseDocument(updatedYml).toJSON() as ProjectArtifactDescriptor;
-
     // Get owner/repo from environment
     const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
@@ -278,7 +410,23 @@ export async function executeUpload(
       workspaceRoot: context.workspaceRoot,
     };
 
-    for (const artifact of updatedDescriptor.artifacts) {
+    // Run pack-deploy (convention-based or legacy) now that we have the release ID
+    await executePackDeploy(project, context, descriptor, uploadCtx);
+
+    // Determine if the new convention path was used (deploy: arrays on artifacts)
+    type WithDeploy = { deploy?: string[] };
+    const hasConventionDeploy = descriptor.artifacts.some(
+      (a: Artifact) => Array.isArray((a as unknown as WithDeploy).deploy) && ((a as unknown as WithDeploy).deploy as string[]).length > 0,
+    );
+
+    // Re-read descriptor for legacy path — pack-deploy may have updated deploy artifact paths
+    const uploadDescriptor = hasConventionDeploy
+      ? descriptor
+      : (parseDocument(await readFile(artifactPath, 'utf-8')).toJSON() as ProjectArtifactDescriptor);
+
+    for (const artifact of uploadDescriptor.artifacts) {
+      // Convention deploy bundles are already uploaded inside executePackDeploy; skip type:deploy entries
+      if (artifact.type === 'deploy' && hasConventionDeploy) continue;
       await getArtifactType(artifact.type).upload(artifact, uploadCtx);
     }
 

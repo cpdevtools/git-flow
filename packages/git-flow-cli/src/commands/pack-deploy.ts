@@ -1,151 +1,112 @@
 /**
- * gitflow pack-deploy command
+ * gitflow pack-deploy <method>
  *
- * Called by a project's github.actions.pack-deploy script after it has written
- * its deploy files (including deploy.yml with deployCommand) to DEPLOY_OUTPUT_DIR.
+ * Convention-driven deploy bundle builder.  Called by a project's
+ * github.actions.pack-deploy-{method} script to copy the standard source files
+ * for the given deploy method into DEPLOY_OUTPUT_DIR and write a deploy.yml
+ * with the conventional deployCommand.
  *
- * Reads release-artifacts.yml to find deploy artifact entries, dispatches each
- * to the deploy type handler's packDeploy() method, then updates the existing
- * .artifact.yml descriptor with the produced zip path(s).
+ * Method resolution delegates to the registered DeployMethodHandler for the
+ * artifact type.  Built-in handlers:
+ *   docker.compose — copies docker-compose.yml + overrides; deploy.yml = docker compose pull && up -d
+ *   docker.swarm   — copies stack.yml + overlays; deploy.yml = docker stack deploy -c stack.yml ...
+ *   npm.node       — copies ecosystem.config.js; deploy.yml = pm2 reload ecosystem.config.js
+ *
+ * Plugins can register additional handlers via registerDeployMethod().
  *
  * Required env vars:
- *   PROJECT_NAME        — package name
- *   PROJECT_VERSION     — semver string
- *   GITHUB_RELEASE_ID   — numeric release ID
- *   GITHUB_REPOSITORY   — owner/repo
- *   DEPLOY_OUTPUT_DIR   — directory the project wrote deploy files to
- *   ARTIFACT_OUTPUT_DIR — output directory (defaults to /tmp/git-flow-artifacts)
+ *   DEPLOY_OUTPUT_DIR  — destination directory (the orchestrator sets this per method)
+ *   ARTIFACT_TYPE      — artifact type (the orchestrator sets this; defaults to 'docker')
+ *   PROJECT_NAME       — package name (used for swarm stack name derivation)
  */
 
-import { Command, Flags } from '@oclif/core';
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { Args, Command, Flags } from '@oclif/core';
+import { mkdir } from 'node:fs/promises';
 import {
-  getArtifactType,
-  safeName,
-  writeArtifact,
-  type PackDeployContext,
-  type DeployArtifact,
-  type ProjectArtifactDescriptor,
+  getDeployMethod,
+  listDeployMethods,
+  type DeployMethodContext,
 } from '@cpdevtools/git-flow/artifacts';
-import { loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from '@cpdevtools/git-flow/build-pack';
 
 export default class PackDeploy extends Command {
   static override description =
-    'Validate a project-built deploy folder, inject release metadata, zip it, and update the artifact descriptor';
+    'Convention-driven deploy bundle builder: delegates to the registered DeployMethodHandler for the artifact type';
+
+  static override args = {
+    method: Args.string({
+      description: 'Deploy method name (e.g. compose, swarm, node, or a plugin-registered method)',
+      required: true,
+    }),
+  };
 
   static override examples = [
-    'PROJECT_NAME=@org/svc PROJECT_VERSION=1.0.0 GITHUB_RELEASE_ID=123 DEPLOY_OUTPUT_DIR=.deploy-output/<%= config.bin %> <%= command.id %>',
+    'DEPLOY_OUTPUT_DIR=.deploy-output/compose ARTIFACT_TYPE=docker <%= config.bin %> <%= command.id %> compose',
+    'DEPLOY_OUTPUT_DIR=.deploy-output/swarm  ARTIFACT_TYPE=docker <%= config.bin %> <%= command.id %> swarm',
+    'DEPLOY_OUTPUT_DIR=.deploy-output/node   ARTIFACT_TYPE=npm   <%= config.bin %> <%= command.id %> node',
   ];
 
   static override flags = {
-    'output-dir': Flags.string({
-      char: 'o',
-      description: 'Artifact output directory (overrides ARTIFACT_OUTPUT_DIR)',
-    }),
     'deploy-output-dir': Flags.string({
       char: 'd',
-      description: 'Directory containing project deploy files (overrides DEPLOY_OUTPUT_DIR)',
+      description: 'Destination directory (overrides DEPLOY_OUTPUT_DIR)',
     }),
     'project-name': Flags.string({
       char: 'n',
       description: 'Project name (overrides PROJECT_NAME env var)',
     }),
-    version: Flags.string({
-      char: 'v',
-      description: 'Project version (overrides PROJECT_VERSION env var)',
+    'artifact-type': Flags.string({
+      char: 't',
+      description: "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker')",
     }),
-    'release-id': Flags.integer({
-      char: 'r',
-      description: 'GitHub Release ID (overrides GITHUB_RELEASE_ID env var)',
+    'version': Flags.string({
+      char: 'v',
+      description: 'Package version (overrides PROJECT_VERSION env var)',
     }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(PackDeploy);
+    const { args, flags } = await this.parse(PackDeploy);
+    const method = args.method;
 
-    const projectName = flags['project-name'] ?? process.env.PROJECT_NAME;
-    const version = flags.version ?? process.env.PROJECT_VERSION;
-    const releaseIdRaw = flags['release-id'] ?? process.env.GITHUB_RELEASE_ID;
-    const githubRepository = process.env.GITHUB_REPOSITORY ?? '';
-    const cwd = process.cwd();
-    const outputDir = flags['output-dir'] ?? process.env.ARTIFACT_OUTPUT_DIR ?? ARTIFACT_OUTPUT_DIR;
+    const projectName = flags['project-name'] ?? process.env.PROJECT_NAME ?? '';
+    const version = flags['version'] ?? process.env.PROJECT_VERSION ?? '';
     const deployOutputDir = flags['deploy-output-dir'] ?? process.env.DEPLOY_OUTPUT_DIR;
+    const artifactTypeFlag = flags['artifact-type'] ?? process.env.ARTIFACT_TYPE;
 
-    if (!projectName || !version) {
-      this.error('PROJECT_NAME and PROJECT_VERSION are required');
-    }
-    if (!releaseIdRaw) {
-      this.error('GITHUB_RELEASE_ID is required');
-    }
     if (!deployOutputDir) {
-      this.error('DEPLOY_OUTPUT_DIR is required');
+      this.error('DEPLOY_OUTPUT_DIR is required (via --deploy-output-dir or env var)');
     }
 
-    const releaseId =
-      typeof releaseIdRaw === 'number' ? releaseIdRaw : parseInt(String(releaseIdRaw), 10);
-    const artifactFilename = safeName(projectName);
-
-    // Load release-artifacts config to find deploy artifact entries
-    const envVars: Record<string, string> = {
-      PROJECT_NAME: artifactFilename,
-      ARTIFACT_OUTPUT_DIR: outputDir,
-      PACKAGE_NAME: projectName,
-      PACKAGE_VERSION: version,
-    };
-    const config = await loadArtifactConfig(cwd, envVars);
-    if (!config) {
-      this.error(`No release-artifacts configuration found in ${cwd}`);
+    // Orchestrator sets ARTIFACT_TYPE before running project scripts; default to 'docker'
+    const artifactType = artifactTypeFlag ?? 'docker';
+    if (!artifactTypeFlag) {
+      this.warn(`ARTIFACT_TYPE not set; defaulting to 'docker'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`);
     }
 
-    const deployArtifacts = (config.artifacts ?? []).filter(
-      (a): a is DeployArtifact => a.type === 'deploy',
-    );
-    if (deployArtifacts.length === 0) {
-      this.error('No deploy artifacts declared in release-artifacts.yml');
-    }
+    await mkdir(deployOutputDir, { recursive: true });
 
-    const ctx: PackDeployContext = {
-      projectCwd: cwd,
-      artifactOutputDir: outputDir,
+    const ctx: DeployMethodContext = {
+      projectCwd: process.cwd(),
       deployOutputDir,
       projectName,
       version,
-      releaseId,
-      githubRepository,
+      method,
     };
 
-    for (const artifact of deployArtifacts) {
-      await getArtifactType('deploy').packDeploy(artifact, ctx);
+    const handler = getDeployMethod(artifactType, method);
+    if (!handler) {
+      const known = listDeployMethods(artifactType);
+      this.error(
+        `No deploy method handler registered for ${artifactType}.${method}.\n` +
+          `Registered methods for '${artifactType}': ${known.join(', ') || '(none)'}.\n` +
+          `Register one with: registerDeployMethod('${artifactType}', '${method}', { copyFiles, generateDeployYml })`,
+      );
     }
 
-    // Update the existing .artifact.yml descriptor with the produced zip path(s)
-    const descriptorPath = join(outputDir, `${artifactFilename}.artifact.yml`);
-    process.env.ARTIFACT_OUTPUT_DIR = outputDir;
-    process.env.PROJECT_NAME = artifactFilename;
+    await handler.copyFiles(ctx);
+    await handler.generateDeployYml(ctx);
 
-    if (existsSync(descriptorPath)) {
-      const existing = parseYaml(
-        await readFile(descriptorPath, 'utf-8'),
-      ) as ProjectArtifactDescriptor;
-      for (const deployArtifact of deployArtifacts) {
-        const match = existing.artifacts.find(
-          (a) => a.type === 'deploy' && a.name === deployArtifact.name,
-        ) as DeployArtifact | undefined;
-        if (match) {
-          match.path = deployArtifact.path;
-        } else {
-          existing.artifacts.push(deployArtifact);
-        }
-      }
-      await writeArtifact(existing);
-    } else {
-      // No prior descriptor — write one containing only the deploy artifacts
-      await writeArtifact({ project: projectName, artifacts: deployArtifacts });
-    }
-
-    this.log(`\u2713 ${projectName}: pack-deploy complete`);
+    this.log(`\u2713 pack-deploy-${method} complete`);
   }
 }
+
