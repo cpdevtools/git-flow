@@ -2,9 +2,6 @@
  * Type definitions for Phase 2 Build & Pack workflow
  */
 
-// TEST ERROR — revert after verifying summary
-const _test: number = 'not a number';
-
 import type { Project } from '../lib/project';
 
 /**
