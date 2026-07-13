@@ -134,6 +134,41 @@ describe('Deploy Service (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Status endpoint
+  // ---------------------------------------------------------------------------
+
+  describe('GET /deploy/:id', () => {
+    const releaseId = 9010;
+
+    beforeAll(async () => {
+      const body = JSON.stringify({ repo: 'cpdevtools/test-git-flow', release_id: releaseId });
+      await request(app.getHttpServer())
+        .post('/deploy')
+        .set(signedHeaders(body))
+        .send(body)
+        .expect(202);
+    });
+
+    it('returns running status for an in-progress deploy', async () => {
+      const res = await request(app.getHttpServer()).get(`/deploy/${releaseId}`).expect(200);
+      expect(res.body).toMatchObject({
+        release_id: releaseId,
+        repo: 'cpdevtools/test-git-flow',
+        status: 'running',
+      });
+      expect(res.body.startedAt).toBeDefined();
+    });
+
+    it('returns 404 for an unknown release_id', async () => {
+      await request(app.getHttpServer()).get('/deploy/99998').expect(404);
+    });
+
+    it('returns 404 for a non-numeric id', async () => {
+      await request(app.getHttpServer()).get('/deploy/notanumber').expect(404);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Log streaming
   // ---------------------------------------------------------------------------
 
