@@ -6,6 +6,10 @@ on:
       - 'release/**'
   workflow_dispatch:
 
+concurrency:
+  group: create-release-pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   create-release-pr:
     runs-on: ubuntu-latest
