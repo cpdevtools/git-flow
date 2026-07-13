@@ -141,6 +141,7 @@ const npm: ArtifactType<NpmArtifact> = {
     // no-op
   },
   async upload(artifact, ctx) {
+    if (!artifact.path) throw new Error(`npm artifact ${artifact.name} missing path`);
     const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
     await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
   },
