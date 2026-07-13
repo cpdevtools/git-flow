@@ -56,7 +56,7 @@ export class DeployController {
     }
 
     const record = this.store.start(releaseId, repo);
-    this.runDeployAsync(record, repo, releaseId);
+    this.runDeployAsync(record, repo, releaseId, body.bundle);
     res.status(202).end();
   }
 
@@ -151,15 +151,16 @@ export class DeployController {
     };
   }
 
-  private runDeployAsync(record: DeployRecord, repo: string, releaseId: number): void {
+  private runDeployAsync(record: DeployRecord, repo: string, releaseId: number, bundle?: string): void {
     (async () => {
       const workDir = join(this.config.workDir, String(releaseId));
+      const assetName = bundle ?? 'deploy.zip';
 
-      this.store.appendLine(record, `▸ Fetching deploy.zip from release ${releaseId}...`);
+      this.store.appendLine(record, `▸ Fetching ${assetName} from release ${releaseId}...`);
 
       let manifest;
       try {
-        manifest = await fetchDeployBundle(this.config.githubToken, repo, releaseId, workDir);
+        manifest = await fetchDeployBundle(this.config.githubToken, repo, releaseId, workDir, assetName);
       } catch (err) {
         this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
         this.store.finish(record, 1);

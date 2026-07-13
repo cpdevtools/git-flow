@@ -1,11 +1,10 @@
 artifacts:
   - type: npm
-    name: "${PACKAGE_NAME}"
-    path: "${TARBALL_PATH}"
     registries:
       - github-npm
+
   - type: docker
-    name: ghcr.io/cpdevtools/git-flow-deploy-service
-    localTag: git-flow-deploy-service:latest
     registries:
       - ghcr
+    deploy:
+      - compose

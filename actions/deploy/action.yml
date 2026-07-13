@@ -24,6 +24,11 @@ inputs:
     description: 'HMAC shared secret (DEPLOY_TOKEN from the GitHub Environment)'
     required: true
 
+  bundle:
+    description: 'Deploy bundle asset name (e.g. deploy-compose.zip). Defaults to deploy.zip'
+    required: false
+    default: 'deploy.zip'
+
 runs:
   using: 'composite'
   steps:
@@ -45,3 +50,4 @@ runs:
         INPUT_RELEASE_ID: ${{ inputs.release_id }}
         INPUT_DEPLOY_URL: ${{ inputs.deploy_url }}
         INPUT_DEPLOY_TOKEN: ${{ inputs.deploy_token }}
+        INPUT_BUNDLE: ${{ inputs.bundle }}

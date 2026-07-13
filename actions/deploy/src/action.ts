@@ -12,6 +12,7 @@ const repo = process.env['INPUT_REPO'] ?? '';
 const releaseId = parseInt(process.env['INPUT_RELEASE_ID'] ?? '', 10);
 const deployUrl = (process.env['INPUT_DEPLOY_URL'] ?? '').replace(/\/$/, '');
 const deployToken = process.env['INPUT_DEPLOY_TOKEN'] ?? '';
+const bundle = process.env['INPUT_BUNDLE'] || 'deploy.zip';
 
 if (!repo || isNaN(releaseId) || !deployUrl || !deployToken) {
   core.setFailed('Missing required inputs: repo, release_id, deploy_url, deploy_token');
@@ -108,7 +109,7 @@ function streamLines(
 // ---------------------------------------------------------------------------
 async function run(): Promise<void> {
   // 1. POST /deploy
-  const rawBody = JSON.stringify({ repo, release_id: releaseId });
+  const rawBody = JSON.stringify({ repo, release_id: releaseId, bundle });
   const ts = String(Math.floor(Date.now() / 1000));
   const signature = signRequest(deployToken, ts, rawBody);
 

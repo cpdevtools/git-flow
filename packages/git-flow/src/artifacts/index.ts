@@ -133,7 +133,10 @@ const npm: ArtifactType<NpmArtifact> = {
   async pack(artifact, ctx) {
     await mkdir(ctx.artifactOutputDir, { recursive: true });
     await $({ cwd: ctx.projectCwd })`pnpm pack --pack-destination ${ctx.artifactOutputDir}`;
-    const tarballName = `${safeName(artifact.name)}-${ctx.version}.tgz`;
+    // Derive name from project name if absent in release-artifacts.yml
+    const resolvedName = artifact.name || ctx.projectName;
+    if (!artifact.name) (artifact as { name: string }).name = resolvedName;
+    const tarballName = `${safeName(resolvedName)}-${ctx.version}.tgz`;
     artifact.path = join(ctx.artifactOutputDir, tarballName);
     console.log(`  ✓ npm: ${tarballName}`);
   },
@@ -200,7 +203,14 @@ const nuget: ArtifactType<NuGetArtifact> = {
 /** Docker — save the built image to a tarball artifact; publish loads & pushes it */
 const docker: ArtifactType<DockerArtifact> = {
   async pack(artifact, ctx) {
-    const source = (artifact as { localTag?: string }).localTag ?? `${artifact.name}:latest`;
+    // Derive image name if absent: ghcr.io/{owner}/{bare-project-name}
+    if (!artifact.name) {
+      const owner = process.env.GITHUB_REPOSITORY_OWNER ?? '';
+      const bareName = safeName(ctx.projectName);
+      (artifact as { name: string }).name = `ghcr.io/${owner}/${bareName}`;
+    }
+    // localTag is the image as it was built locally (no registry prefix)
+    const source = (artifact as { localTag?: string }).localTag ?? `${safeName(ctx.projectName)}:latest`;
     const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
     const archiveName = `${safeName(artifact.name)}.image.tar.gz`;
     const archivePath = join(ctx.artifactOutputDir, archiveName);
