@@ -102,7 +102,7 @@ export async function createDraftRelease(
   body: string,
   prerelease: boolean,
   sha: string,
-): Promise<{ id: number; upload_url: string }> {
+): Promise<{ id: number; upload_url: string; html_url: string }> {
   const octokit = getOctokit(githubToken);
 
   const { data: release } = await octokit.rest.repos.createRelease({
@@ -119,6 +119,7 @@ export async function createDraftRelease(
   return {
     id: release.id,
     upload_url: release.upload_url,
+    html_url: release.html_url,
   };
 }
 
@@ -149,7 +150,7 @@ export async function findOrCreateDraftRelease(
   project: ProjectConfig,
   context: BuildPackContext,
   artifactMetadata?: string,
-): Promise<{ id: number; upload_url: string }> {
+): Promise<{ id: number; upload_url: string; html_url: string }> {
   // Extract owner/repo from GitHub context (would come from environment in real action)
   // For now, using placeholders
   const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';

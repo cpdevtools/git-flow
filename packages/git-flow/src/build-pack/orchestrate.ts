@@ -18,6 +18,7 @@ import {
 import { extractPRMetadata } from './options.js';
 import type {
   BuildPackContext,
+  BuildPackRelease,
   BuildPackResult,
   ExecutionResult,
   PRMetadata,
@@ -134,6 +135,7 @@ export async function runBuildPack(
     allProjectsToProcess.map((p) => [p.name, p]),
   );
   const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
+  const releaseUrlMap = new Map<string, string>(); // project name → html_url
 
   // Map ProjectConfig[] to the scheduler's Project type so the scheduler can
   // build a real dependency graph from packageJson.dependencies/devDependencies.
@@ -174,6 +176,9 @@ export async function runBuildPack(
         if (!uploadResult.success) {
           throw new Error(uploadResult.error || 'Upload failed');
         }
+        if (uploadResult.releaseUrl) {
+          releaseUrlMap.set(project.name, uploadResult.releaseUrl);
+        }
       }
     },
     _discover: async () => schedulerProjects,
@@ -188,6 +193,13 @@ export async function runBuildPack(
     .filter((t) => releaseSet.has(t.project))
     .map((t) => t.project);
   const uploadedProjects = context.skipUpload ? [] : [...packedProjects];
+
+  const releases: BuildPackRelease[] = packedProjects
+    .filter((name) => releaseUrlMap.has(name))
+    .map((name) => {
+      const config = projectConfigMap.get(name)!;
+      return { name, version: config.version, url: releaseUrlMap.get(name)! };
+    });
 
   const failedResults: ExecutionResult[] = [
     ...summary.failed.map((t) => ({
@@ -221,6 +233,7 @@ export async function runBuildPack(
     uploaded: uploadedProjects,
     skipped: projectsToSkip.map((p) => p.name),
     failed: failedResults,
+    releases,
   };
 }
 
