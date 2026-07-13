@@ -6,9 +6,9 @@
   "license": "MIT",
   "files": ["dist"],
   "scripts": {
-    "build": "nest build",
+    "build": "wireit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "github.actions.build": "pnpm build && cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION:-dev} -t git-flow-deploy-service:latest .",
+    "github.actions.build": "wireit",
     "github.actions.pack": "gitflow pack",
     "github.actions.test": "pnpm test",
     "start": "nest start",
@@ -76,5 +76,33 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "wireit": {
+    "build": {
+      "command": "nest build",
+      "files": [
+        "src/**/*.ts",
+        "tsconfig.json",
+        "tsconfig.build.json",
+        "nest-cli.json"
+      ],
+      "output": [
+        "dist/**"
+      ]
+    },
+    "github.actions.build": {
+      "command": "cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION:-dev} -t git-flow-deploy-service:latest .",
+      "dependencies": [
+        "build"
+      ],
+      "files": [
+        "Dockerfile",
+        "../../pnpm-workspace.yaml",
+        "../../pnpm-lock.yaml",
+        "../../packages/git-flow-deploy/src/**/*.ts",
+        "../../packages/git-flow-deploy/package.json"
+      ],
+      "output": []
+    }
   }
 }
