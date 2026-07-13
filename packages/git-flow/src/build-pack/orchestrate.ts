@@ -152,6 +152,7 @@ export async function runBuildPack(
       ARTIFACT_OUTPUT_DIR,
       GITHUB_SHA: context.sha,
     },
+    onOutput: (_project, chunk) => process.stdout.write(chunk),
     beforeTask: async (project) => {
       const config = projectConfigMap.get(project.name)!;
       console.log(`  📝 ${project.name}: Applying version ${config.version}...`);
