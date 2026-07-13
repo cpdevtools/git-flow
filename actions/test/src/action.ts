@@ -96,13 +96,15 @@ async function renderSummary(summary: RunSummary): Promise<void> {
     ])
     .write();
 
-  // Inline failed-task output in summary — use 'ansi' language to render colors
+  // Inline failed-task output in summary
   for (const task of summary.failed) {
     if (task.output) {
-      const output = task.truncated ? `[Output truncated]\n${task.output}` : task.output;
+      const output = await stripAnsi(
+        task.truncated ? `[Output truncated]\n${task.output}` : task.output,
+      );
       await core.summary
         .addHeading(`❌ ${task.project}`, 3)
-        .addCodeBlock(output, 'ansi')
+        .addCodeBlock(output, 'text')
         .write();
     }
   }

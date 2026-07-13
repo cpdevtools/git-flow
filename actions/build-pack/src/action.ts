@@ -118,10 +118,10 @@ projects:
       core.summary.addHeading('Failed Projects', 3);
       for (const failure of result.failed) {
         const rawError = failure.error || 'Unknown error';
-        // Strip ANSI for the headline (plain text), keep for the code block (ansi lang)
+        // Strip ANSI for both headline and code block (summaries don't support ansi lang)
         // eslint-disable-next-line no-control-regex
-        const cleanHeadline = rawError.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
-        const errorLines = cleanHeadline
+        const cleanError = rawError.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
+        const errorLines = cleanError
           .split('\n')
           .map((l) => l.trim())
           .filter((l) => /error|Error|failed|exit code/i.test(l) && l.length > 0)
@@ -129,7 +129,7 @@ projects:
           .join('\n');
         core.summary.addRaw(
           `<details><summary>❌ <strong>${failure.project}</strong>${errorLines ? ` — ${errorLines.split('\n')[0].slice(0, 120)}` : ''}</summary>\n\n` +
-          `\`\`\`ansi\n${rawError.trim().slice(0, 8000)}\n\`\`\`\n\n</details>\n`,
+          `\`\`\`\n${cleanError.trim().slice(0, 8000)}\n\`\`\`\n\n</details>\n`,
           true,
         );
       }
