@@ -65,7 +65,7 @@ async function run(): Promise<void> {
   }
 }
 
-async function stripAnsi(text: string): string {
+async function stripAnsi(text: string): Promise<string> {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
 }
@@ -76,7 +76,7 @@ async function renderSummary(summary: RunSummary): Promise<void> {
     const rawOutput = task.output
       ? `${task.truncated ? '[Output truncated]\n' : ''}${task.output.trimEnd()}`
       : '(no output)';
-    const output = stripAnsi(rawOutput);
+    const output = await stripAnsi(rawOutput);
     core.error(`${task.project} failed:\n${output}`, { title: `Failed: ${task.project}` });
   }
 
