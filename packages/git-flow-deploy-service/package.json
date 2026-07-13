@@ -90,19 +90,39 @@
         "dist/**"
       ]
     },
-    "github.actions.build": {
-      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-staging && pnpm deploy --legacy --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-staging && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION:-dev} -t git-flow-deploy-service:latest packages/git-flow-deploy-service/.docker-staging",
+    "build:bundle": {
+      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-bundle && pnpm deploy --legacy --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-bundle",
       "dependencies": [
         "build",
         "../git-flow-deploy:build"
       ],
       "files": [
-        "Dockerfile",
         "../../pnpm-workspace.yaml",
         "../../pnpm-lock.yaml",
         "../../packages/git-flow-deploy/package.json"
       ],
       "output": []
+    },
+    "build:docker": {
+      "command": "cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION} -t git-flow-deploy-service:latest packages/git-flow-deploy-service/.docker-bundle",
+      "dependencies": [
+        "build:bundle"
+      ],
+      "env": {
+        "PROJECT_VERSION": {
+          "external": true,
+          "default": "dev"
+        }
+      },
+      "files": [
+        "Dockerfile"
+      ],
+      "output": []
+    },
+    "github.actions.build": {
+      "dependencies": [
+        "build:docker"
+      ]
     }
   }
 }

@@ -7,7 +7,7 @@ coverage/
 .env.local
 .artifacts/
 .wireit/
-.docker-staging/
+.docker-bundle/
 
 # Production lockfile dir — only the lockfile is committed
 .pnpm-prod/*
