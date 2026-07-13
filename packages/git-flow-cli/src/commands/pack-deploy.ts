@@ -58,6 +58,10 @@ export default class PackDeploy extends Command {
       char: 't',
       description: "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker')",
     }),
+    'version': Flags.string({
+      char: 'v',
+      description: 'Package version (overrides PROJECT_VERSION env var)',
+    }),
   };
 
   async run(): Promise<void> {
@@ -65,6 +69,7 @@ export default class PackDeploy extends Command {
     const method = args.method;
 
     const projectName = flags['project-name'] ?? process.env.PROJECT_NAME ?? '';
+    const version = flags['version'] ?? process.env.PROJECT_VERSION ?? '';
     const deployOutputDir = flags['deploy-output-dir'] ?? process.env.DEPLOY_OUTPUT_DIR;
     const artifactTypeFlag = flags['artifact-type'] ?? process.env.ARTIFACT_TYPE;
 
@@ -84,6 +89,7 @@ export default class PackDeploy extends Command {
       projectCwd: process.cwd(),
       deployOutputDir,
       projectName,
+      version,
       method,
     };
 
