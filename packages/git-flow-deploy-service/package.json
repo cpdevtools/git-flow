@@ -106,7 +106,7 @@
       "output": []
     },
     "build:docker": {
-      "command": "cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION} -t git-flow-deploy-service:latest packages/git-flow-deploy-service/.docker-bundle",
+      "command": "cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t cpdevtools-git-flow-deploy-service:${PROJECT_VERSION} -t cpdevtools-git-flow-deploy-service:latest packages/git-flow-deploy-service/.docker-bundle",
       "dependencies": [
         "build:bundle"
       ],
