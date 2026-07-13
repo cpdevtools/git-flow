@@ -2,6 +2,9 @@
  * Type definitions for Phase 2 Build & Pack workflow
  */
 
+// deliberate type error for ANSI stripping test — revert me
+const _testError: number = 'this is not a number';
+
 import type { Project } from '../lib/project';
 
 /**
