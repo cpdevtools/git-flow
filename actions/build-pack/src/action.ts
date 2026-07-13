@@ -5,7 +5,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { resolve } from 'node:path';
-import { runBuildPack } from '@cpdevtools/git-flow/build-pack';
+import { runBuildPack, cleanupEmptyDraftReleases } from '@cpdevtools/git-flow/build-pack';
 
 async function run(): Promise<void> {
   try {
@@ -126,12 +126,26 @@ projects:
 
     // Fail if any projects failed
     if (result.failed.length > 0) {
+      await cleanupEmptyDraftReleases(token, owner, repo, runNumber);
       core.setFailed(`${result.failed.length} project(s) failed`);
     } else {
       core.info(`✅ All projects completed successfully`);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Best-effort cleanup of empty drafts left by this run
+    try {
+      const token = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
+      const [owner, repo] = (process.env.GITHUB_REPOSITORY || '/').split('/');
+      const runNumber = parseInt(process.env.GITHUB_RUN_NUMBER || '0', 10);
+      if (token && owner && repo && runNumber) {
+        await cleanupEmptyDraftReleases(token, owner, repo, runNumber);
+      }
+    } catch (cleanupErr) {
+      core.warning(`Cleanup failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`);
+    }
+
     core.setFailed(`Build & Pack workflow failed: ${errorMessage}`);
     
     if (error instanceof Error && error.stack) {
