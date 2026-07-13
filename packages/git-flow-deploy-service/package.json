@@ -91,15 +91,15 @@
       ]
     },
     "github.actions.build": {
-      "command": "cd ../.. && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION:-dev} -t git-flow-deploy-service:latest .",
+      "command": "cd ../.. && pnpm deploy --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-staging && cp -r packages/git-flow-deploy/dist packages/git-flow-deploy-service/.docker-staging/node_modules/@cpdevtools/git-flow-deploy/ && docker build -f packages/git-flow-deploy-service/Dockerfile -t git-flow-deploy-service:${PROJECT_VERSION:-dev} -t git-flow-deploy-service:latest packages/git-flow-deploy-service/.docker-staging",
       "dependencies": [
-        "build"
+        "build",
+        "../git-flow-deploy:build"
       ],
       "files": [
         "Dockerfile",
         "../../pnpm-workspace.yaml",
         "../../pnpm-lock.yaml",
-        "../../packages/git-flow-deploy/src/**/*.ts",
         "../../packages/git-flow-deploy/package.json"
       ],
       "output": []
