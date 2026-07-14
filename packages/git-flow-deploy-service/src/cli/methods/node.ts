@@ -126,10 +126,9 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
 function isPm2AppRunning(): boolean {
   try {
     const env = withGlobalBinInPath();
-    const result = spawnSync('pm2', ['list', '--json'], { encoding: 'utf-8', env });
-    if (result.status !== 0 || !result.stdout) return false;
-    const list = JSON.parse(result.stdout) as Array<{ name: string }>;
-    return list.some(app => app.name === PM2_APP_NAME);
+    // pm2 describe exits 0 if the app is known to pm2, non-zero if not
+    const result = spawnSync('pm2', ['describe', PM2_APP_NAME], { encoding: 'utf-8', env });
+    return result.status === 0 && result.stdout.includes(PM2_APP_NAME);
   } catch {
     return false;
   }
@@ -169,13 +168,21 @@ function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
   }
 
   let content = readFileSync(ecoPath, 'utf-8');
+
+  // Already patched to the correct absolute path — nothing to do
+  if (content.includes(`'${scriptPath}'`) || content.includes(`"${scriptPath}"`)) {
+    console.log('ecosystem.config.js script already correct ✓');
+    return;
+  }
+
+  // Match relative dist/main.js or dist/src/main.js (pre-tsconfig-fix builds)
   const patched = content.replace(
-    /script:\s*['"][^'"]*dist\/main\.js['"]/g,
+    /script:\s*['"][^'"]*dist\/(?:src\/)?main\.js['"]/g,
     `script: '${scriptPath}'`,
   );
 
   if (patched === content) {
-    console.warn('Warning: could not find "script: …dist/main.js" in ecosystem.config.js to patch');
+    console.warn('Warning: could not find script path in ecosystem.config.js to patch');
   } else {
     writeFileSync(ecoPath, patched);
     console.log(`Patched ecosystem.config.js: script → ${scriptPath}`);
