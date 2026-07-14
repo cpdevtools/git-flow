@@ -55,9 +55,16 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
     ? filenameVersion.split('-')[1].split('.')[0]
     : undefined;
 
+  // Add --provenance when OIDC is available (GitHub Actions with id-token: write)
+  const provenance = !!process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+
   try {
-    if (prereleaseTag) {
+    if (prereleaseTag && provenance) {
+      await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${prereleaseTag} --provenance`;
+    } else if (prereleaseTag) {
       await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${prereleaseTag}`;
+    } else if (provenance) {
+      await $`npm publish ${artifactPath} --registry ${registry.url} --provenance`;
     } else {
       await $`npm publish ${artifactPath} --registry ${registry.url}`;
     }

@@ -18,6 +18,7 @@ export type {
   PRMetadata,
   PRProjectMetadata,
   BuildPackResult,
+  BuildPackRelease,
 } from './types.js';
 
 // Execution functions (for advanced usage/testing)

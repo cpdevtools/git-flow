@@ -436,6 +436,7 @@ export async function executeUpload(
       project: project.name,
       success: true,
       exitCode: 0,
+      releaseUrl: release.html_url,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

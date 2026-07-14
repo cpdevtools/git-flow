@@ -32,6 +32,8 @@ export interface ExecutionResult {
   error?: string;
   /** Exit code if available */
   exitCode?: number;
+  /** URL of the created/updated draft release (upload phase only) */
+  releaseUrl?: string;
 }
 
 /**
@@ -81,6 +83,18 @@ export interface PRProjectMetadata {
 }
 
 /**
+ * Release entry in build & pack result
+ */
+export interface BuildPackRelease {
+  /** Project name */
+  name: string;
+  /** Release version */
+  version: string;
+  /** GitHub release URL */
+  url: string;
+}
+
+/**
  * Result of build & pack workflow
  */
 export interface BuildPackResult {
@@ -94,4 +108,6 @@ export interface BuildPackResult {
   skipped: string[];
   /** Projects that failed */
   failed: ExecutionResult[];
+  /** Draft releases created/updated during this run */
+  releases: BuildPackRelease[];
 }
