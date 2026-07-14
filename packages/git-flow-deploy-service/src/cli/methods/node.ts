@@ -6,10 +6,8 @@ import { join } from 'node:path';
 /** Returns an env object with the npm global bin directory prepended to PATH */
 function withGlobalBinInPath(): NodeJS.ProcessEnv {
   try {
-    const globalBin = execSync('npm bin -g 2>/dev/null || npm prefix -g', { encoding: 'utf-8' })
-      .trim()
-      .replace(/\/lib\/node_modules$/, '/bin')  // npm prefix -g returns prefix, derive bin
-      .split('\n')[0];                           // take first line if multiple
+    const prefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
+    const globalBin = join(prefix, 'bin');
     const currentPath = process.env['PATH'] ?? '';
     return { ...process.env, PATH: `${globalBin}:${currentPath}` };
   } catch {
@@ -191,10 +189,13 @@ function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void 
 
   for (const [key, value] of Object.entries(vars)) {
     const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    // Replace existing key if present
-    const existing = new RegExp(`(\\s+)${key}:\\s*['"][^'"]*['"]`, 'g');
+    // Match existing key with either a quoted string or a bare number value
+    const existing = new RegExp(`([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`, 'g');
     if (existing.test(content)) {
-      content = content.replace(existing, `$1${key}: '${escaped}'`);
+      content = content.replace(
+        new RegExp(`([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`, 'g'),
+        `$1${key}: '${escaped}'`,
+      );
     } else {
       // Inject after NODE_ENV line
       content = content.replace(
