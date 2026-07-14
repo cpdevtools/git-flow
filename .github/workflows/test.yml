@@ -5,6 +5,10 @@ on:
     branches-ignore:
       - 'release/**'
 
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   checks: write # Write step summaries / check runs
   actions: read # Read workflow context

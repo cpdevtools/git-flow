@@ -90,8 +90,20 @@ projects:
     core.setOutput('projects-skipped', result.skipped.length);
 
     // Log summary
+    const repoUrl = `https://github.com/${owner}/${repo}`;
+    const prLink = !isManualDispatch ? `[PR #${prNumber}](${repoUrl}/pull/${prNumber})` : '_manual dispatch_';
+
+    core.summary.addHeading('Build & Pack Results');
+
+    if (result.releases.length > 0) {
+      core.summary.addHeading('Draft Releases', 3);
+      core.summary.addRaw(
+        result.releases.map((r) => `- **${r.name}** [${r.version}](${r.url})`).join('\n') + '\n',
+        true,
+      );
+    }
+
     core.summary
-      .addHeading('Build & Pack Results')
       .addTable([
         [{ data: 'Phase', header: true }, { data: 'Count', header: true }],
         ['Built', result.built.length.toString()],
@@ -99,15 +111,16 @@ projects:
         ['Uploaded', result.uploaded.length.toString()],
         ['Skipped', result.skipped.length.toString()],
         ['Failed', result.failed.length.toString()],
-      ]);
+      ])
+      .addRaw(`\n**Triggered by:** ${prLink}\n`, true);
 
     if (result.failed.length > 0) {
       core.summary.addHeading('Failed Projects', 3);
       for (const failure of result.failed) {
         const rawError = failure.error || 'Unknown error';
-        // Strip ANSI escape codes
-        const cleanError = rawError.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
-        // Pull out lines that look like actual errors for the headline
+        // Strip ANSI for both headline and code block (summaries don't support ansi lang)
+        // eslint-disable-next-line no-control-regex
+        const cleanError = rawError.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
         const errorLines = cleanError
           .split('\n')
           .map((l) => l.trim())

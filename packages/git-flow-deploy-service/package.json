@@ -4,7 +4,12 @@
   "description": "Deploy gateway service for git-flow",
   "author": "CPDevTools",
   "license": "MIT",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "gitflow-deploy-service": "./dist/cli.cjs"
+  },
   "scripts": {
     "build": "wireit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -55,6 +60,7 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
@@ -81,12 +87,13 @@
   },
   "wireit": {
     "build": {
-      "command": "nest build",
+      "command": "nest build && tsup --config tsup.config.cli.ts",
       "files": [
         "src/**/*.ts",
         "tsconfig.json",
         "tsconfig.build.json",
-        "nest-cli.json"
+        "nest-cli.json",
+        "tsup.config.cli.ts"
       ],
       "output": [
         "dist/**"
