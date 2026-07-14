@@ -13,6 +13,9 @@ function parseArgs(): {
   latest: boolean;
   token?: string;
   repo: string;
+  'install-dir'?: string;
+  'npm-prefix'?: string;
+  'hmac-secret'?: string;
 } {
   const argv = process.argv.slice(2);
   const result: Record<string, string | boolean> = { latest: false, repo: 'cpdevtools/git-flow' };
@@ -27,7 +30,7 @@ function parseArgs(): {
     }
   }
 
-  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string };
+  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string; 'install-dir'?: string; 'npm-prefix'?: string; 'hmac-secret'?: string };
 }
 
 async function resolveLatestVersion(owner: string, repo: string, token: string): Promise<string> {
@@ -74,8 +77,11 @@ async function main(): Promise<void> {
     );
     console.error('  --version  Specific version to install (e.g. 1.2.3)');
     console.error('  --latest   Resolve and install the latest published release');
-    console.error('  --token    GitHub token (default: GITHUB_TOKEN env var)');
-    console.error('  --repo     GitHub repo (default: cpdevtools/git-flow)');
+    console.error('  --token        GitHub token (default: GITHUB_TOKEN env var)');
+    console.error('  --repo         GitHub repo (default: cpdevtools/git-flow)');
+    console.error('  --install-dir  Override install directory (default: /opt/git-flow-deploy-service)');
+    console.error('  --npm-prefix   Custom npm prefix for global install (e.g. ~/npm-packages)');
+    console.error('  --hmac-secret  HMAC secret for webhook validation (required for first-time node setup)');
     process.exit(1);
   }
 
@@ -108,13 +114,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const installDir = args['install-dir'];
+  const npmPrefix = args['npm-prefix'];
+  const hmacSecret = args['hmac-secret'];
+
   console.log(`\nDeploying ${PACKAGE_NAME} v${version} (method: ${method}) from ${owner}/${repoName}...\n`);
 
-  const extractDir = await downloadBundle({ method, version, owner, repo: repoName, token });
+  const extractDir = await downloadBundle({ method, version, owner, repo: repoName, token, installDir });
 
   switch (method) {
     case 'node':
-      await handleNode({ extractDir, version, token });
+      await handleNode({ extractDir, version, token, npmPrefix, hmacSecret });
       break;
     case 'compose':
       await handleCompose({ extractDir });

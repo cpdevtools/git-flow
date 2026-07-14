@@ -1,11 +1,16 @@
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export interface NodeHandlerOptions {
   extractDir: string;
   version: string;
   token: string;
+  /** Custom npm prefix (e.g. ~/npm-packages). Omit to use the global npm prefix. */
+  npmPrefix?: string;
+  /** HMAC secret for webhook validation (DEPLOY_HMAC_SECRET). Required for first-time setup. */
+  hmacSecret?: string;
 }
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
@@ -13,19 +18,23 @@ const NPM_REGISTRY = 'https://npm.pkg.github.com';
 const PM2_APP_NAME = 'git-flow-deploy-service';
 
 export async function handleNode(options: NodeHandlerOptions): Promise<void> {
-  const { extractDir, version, token } = options;
+  const { extractDir, version, token, npmPrefix, hmacSecret } = options;
 
   const isRunning = isPm2AppRunning();
 
   if (!isRunning) {
-    await firstTimeSetup(extractDir, version, token);
+    await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret);
   } else {
-    await updateExisting(version, token);
+    await updateExisting(version, token, npmPrefix);
   }
 }
 
-async function firstTimeSetup(extractDir: string, version: string, token: string): Promise<void> {
+async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix?: string, hmacSecret?: string): Promise<void> {
   console.log('First-time setup detected...\n');
+
+  if (!hmacSecret) {
+    throw new Error('--hmac-secret is required for first-time setup (used as DEPLOY_HMAC_SECRET)');
+  }
 
   // Ensure pm2 is installed globally
   if (!isPm2Available()) {
@@ -35,12 +44,13 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
     console.log('pm2 already installed ✓');
   }
 
-  // Install the service package globally
-  installGlobally(version, token);
+  // Install the service package
+  installGlobally(version, token, npmPrefix);
 
-  // Patch ecosystem.config.js script path to the resolved global install location
+  // Patch ecosystem.config.js: script path + env vars
   const ecoPath = join(extractDir, 'ecosystem.config.js');
-  patchEcosystemScript(ecoPath);
+  patchEcosystemScript(ecoPath, npmPrefix);
+  patchEcosystemEnv(ecoPath, { DEPLOY_HMAC_SECRET: hmacSecret, GITHUB_TOKEN: token });
 
   // Start with pm2
   console.log('\nStarting service with pm2...');
@@ -51,10 +61,10 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   printStartupHint();
 }
 
-async function updateExisting(version: string, token: string): Promise<void> {
+async function updateExisting(version: string, token: string, npmPrefix?: string): Promise<void> {
   console.log('Existing pm2 process detected — running update...\n');
 
-  installGlobally(version, token);
+  installGlobally(version, token, npmPrefix);
 
   console.log('\nReloading pm2 process...');
   execSync(`pm2 reload ${PM2_APP_NAME} --update-env`, { stdio: 'inherit' });
@@ -63,16 +73,30 @@ async function updateExisting(version: string, token: string): Promise<void> {
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
 }
 
-function installGlobally(version: string, token: string): void {
-  console.log(`\nInstalling ${PACKAGE_NAME}@${version} globally from ${NPM_REGISTRY}...`);
-  execSync(
-    `npm install -g "${PACKAGE_NAME}@${version}" --registry "${NPM_REGISTRY}"`,
-    {
-      stdio: 'inherit',
-      env: { ...process.env, NODE_AUTH_TOKEN: token },
-    },
+function installGlobally(version: string, token: string, npmPrefix?: string): void {
+  const destination = npmPrefix ? `prefix: ${npmPrefix}` : 'global';
+  console.log(`\nInstalling ${PACKAGE_NAME}@${version} (${destination}) from ${NPM_REGISTRY}...`);
+
+  // Write a scoped .npmrc so only @cpdevtools resolves via GitHub Packages;
+  // passing --registry would override the registry for ALL deps (including @nestjs/*)
+  const tempDir = mkdtempSync(join(tmpdir(), 'gitflow-install-'));
+  const npmrcPath = join(tempDir, '.npmrc');
+  writeFileSync(
+    npmrcPath,
+    `@cpdevtools:registry=${NPM_REGISTRY}\n//${new URL(NPM_REGISTRY).host}/:_authToken=${token}\n`,
   );
-  console.log('Global install complete ✓');
+
+  const prefixFlag = npmPrefix ? `--prefix "${npmPrefix}"` : '';
+  try {
+    execSync(`npm install -g ${prefixFlag} "${PACKAGE_NAME}@${version}"`, {
+      stdio: 'inherit',
+      env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrcPath },
+    });
+  } finally {
+    try { execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
+  }
+
+  console.log('Install complete ✓');
 }
 
 function isPm2AppRunning(): boolean {
@@ -95,19 +119,27 @@ function isPm2Available(): boolean {
   }
 }
 
-function patchEcosystemScript(ecoPath: string): void {
+function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
   if (!existsSync(ecoPath)) {
     console.warn(`Warning: ecosystem.config.js not found at ${ecoPath} — skipping script patch`);
     return;
   }
 
-  // Resolve the absolute path of the globally installed dist/main.js
+  // Resolve the install location for dist/main.js
+  // Older builds (before tsconfig rootDir fix) put it at dist/src/main.js
   let scriptPath: string;
   try {
-    const globalRoot = execSync('npm root -g', { encoding: 'utf-8' }).trim();
-    scriptPath = join(globalRoot, PACKAGE_NAME, 'dist', 'main.js');
+    let modulesRoot: string;
+    if (npmPrefix) {
+      modulesRoot = join(npmPrefix, 'lib', 'node_modules');
+    } else {
+      modulesRoot = execSync('npm root -g', { encoding: 'utf-8' }).trim();
+    }
+    const primary = join(modulesRoot, PACKAGE_NAME, 'dist', 'main.js');
+    const fallback = join(modulesRoot, PACKAGE_NAME, 'dist', 'src', 'main.js');
+    scriptPath = existsSync(primary) ? primary : fallback;
   } catch {
-    console.warn('Warning: could not resolve npm global root — ecosystem script path may be incorrect');
+    console.warn('Warning: could not resolve install root — ecosystem script path may be incorrect');
     return;
   }
 
@@ -125,8 +157,31 @@ function patchEcosystemScript(ecoPath: string): void {
   }
 }
 
-function printStartupHint(): void {
-  console.log('\n' + '─'.repeat(70));
+function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void {
+  if (!existsSync(ecoPath)) return;
+
+  let content = readFileSync(ecoPath, 'utf-8');
+
+  for (const [key, value] of Object.entries(vars)) {
+    const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    // Replace existing key if present
+    const existing = new RegExp(`(\\s+)${key}:\\s*['"][^'"]*['"]`, 'g');
+    if (existing.test(content)) {
+      content = content.replace(existing, `$1${key}: '${escaped}'`);
+    } else {
+      // Inject after NODE_ENV line
+      content = content.replace(
+        /(NODE_ENV:\s*['"]production['"])/,
+        `$1,\n        ${key}: '${escaped}'`,
+      );
+    }
+  }
+
+  writeFileSync(ecoPath, content);
+  console.log(`Patched ecosystem.config.js: env vars → ${Object.keys(vars).join(', ')}`);
+}
+
+function printStartupHint(): void {  console.log('\n' + '─'.repeat(70));
   console.log('⚡ To configure pm2 to start on system boot, run:');
   console.log('');
   console.log('   pm2 startup');
