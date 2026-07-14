@@ -11,6 +11,10 @@ export interface NodeHandlerOptions {
   npmPrefix?: string;
   /** HMAC secret for webhook validation (DEPLOY_HMAC_SECRET). Required for first-time setup. */
   hmacSecret?: string;
+  /** Override service port (default: 3700) */
+  port?: string;
+  /** Override bind host (default: 0.0.0.0) */
+  host?: string;
 }
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
@@ -18,18 +22,18 @@ const NPM_REGISTRY = 'https://npm.pkg.github.com';
 const PM2_APP_NAME = 'git-flow-deploy-service';
 
 export async function handleNode(options: NodeHandlerOptions): Promise<void> {
-  const { extractDir, version, token, npmPrefix, hmacSecret } = options;
+  const { extractDir, version, token, npmPrefix, hmacSecret, port, host } = options;
 
   const isRunning = isPm2AppRunning();
 
   if (!isRunning) {
-    await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret);
+    await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret, port, host);
   } else {
     await updateExisting(version, token, npmPrefix);
   }
 }
 
-async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix?: string, hmacSecret?: string): Promise<void> {
+async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix?: string, hmacSecret?: string, port?: string, host?: string): Promise<void> {
   console.log('First-time setup detected...\n');
 
   if (!hmacSecret) {
@@ -50,7 +54,13 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   // Patch ecosystem.config.js: script path + env vars
   const ecoPath = join(extractDir, 'ecosystem.config.js');
   patchEcosystemScript(ecoPath, npmPrefix);
-  patchEcosystemEnv(ecoPath, { DEPLOY_HMAC_SECRET: hmacSecret, GITHUB_TOKEN: token });
+  const envVars: Record<string, string> = {
+    DEPLOY_HMAC_SECRET: hmacSecret,
+    GITHUB_TOKEN: token,
+    ...(port ? { PORT: port } : {}),
+    ...(host ? { HOST: host } : {}),
+  };
+  patchEcosystemEnv(ecoPath, envVars);
 
   // Start with pm2
   console.log('\nStarting service with pm2...');
