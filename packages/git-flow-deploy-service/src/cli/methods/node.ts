@@ -3,6 +3,20 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+/** Returns an env object with the npm global bin directory prepended to PATH */
+function withGlobalBinInPath(): NodeJS.ProcessEnv {
+  try {
+    const globalBin = execSync('npm bin -g 2>/dev/null || npm prefix -g', { encoding: 'utf-8' })
+      .trim()
+      .replace(/\/lib\/node_modules$/, '/bin')  // npm prefix -g returns prefix, derive bin
+      .split('\n')[0];                           // take first line if multiple
+    const currentPath = process.env['PATH'] ?? '';
+    return { ...process.env, PATH: `${globalBin}:${currentPath}` };
+  } catch {
+    return process.env;
+  }
+}
+
 export interface NodeHandlerOptions {
   extractDir: string;
   version: string;
@@ -43,7 +57,7 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   // Ensure pm2 is installed globally
   if (!isPm2Available()) {
     console.log('Installing pm2 globally...');
-    execSync('npm install -g pm2', { stdio: 'inherit' });
+    execSync('npm install -g pm2', { stdio: 'inherit', env: withGlobalBinInPath() });
   } else {
     console.log('pm2 already installed ✓');
   }
@@ -64,8 +78,9 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
 
   // Start with pm2
   console.log('\nStarting service with pm2...');
-  execSync(`pm2 start "${ecoPath}" --update-env`, { stdio: 'inherit' });
-  execSync('pm2 save', { stdio: 'inherit' });
+  const pathEnv = withGlobalBinInPath();
+  execSync(`pm2 start "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
 
   // Print pm2 startup command for the operator
   printStartupHint();
@@ -77,8 +92,9 @@ async function updateExisting(version: string, token: string, npmPrefix?: string
   installGlobally(version, token, npmPrefix);
 
   console.log('\nReloading pm2 process...');
-  execSync(`pm2 reload ${PM2_APP_NAME} --update-env`, { stdio: 'inherit' });
-  execSync('pm2 save', { stdio: 'inherit' });
+  const pathEnv = withGlobalBinInPath();
+  execSync(`pm2 reload ${PM2_APP_NAME} --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
 
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
 }
@@ -100,7 +116,7 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
   try {
     execSync(`npm install -g ${prefixFlag} "${PACKAGE_NAME}@${version}"`, {
       stdio: 'inherit',
-      env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrcPath },
+      env: { ...withGlobalBinInPath(), NPM_CONFIG_USERCONFIG: npmrcPath },
     });
   } finally {
     try { execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
@@ -111,7 +127,8 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
 
 function isPm2AppRunning(): boolean {
   try {
-    const result = spawnSync('pm2', ['list', '--json'], { encoding: 'utf-8' });
+    const env = withGlobalBinInPath();
+    const result = spawnSync('pm2', ['list', '--json'], { encoding: 'utf-8', env });
     if (result.status !== 0 || !result.stdout) return false;
     const list = JSON.parse(result.stdout) as Array<{ name: string }>;
     return list.some(app => app.name === PM2_APP_NAME);
@@ -122,7 +139,7 @@ function isPm2AppRunning(): boolean {
 
 function isPm2Available(): boolean {
   try {
-    execSync('pm2 --version', { stdio: 'pipe' });
+    execSync('pm2 --version', { stdio: 'pipe', env: withGlobalBinInPath() });
     return true;
   } catch {
     return false;
