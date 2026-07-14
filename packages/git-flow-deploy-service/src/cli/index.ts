@@ -13,6 +13,7 @@ function parseArgs(): {
   latest: boolean;
   token?: string;
   repo: string;
+  'install-dir'?: string;
 } {
   const argv = process.argv.slice(2);
   const result: Record<string, string | boolean> = { latest: false, repo: 'cpdevtools/git-flow' };
@@ -27,7 +28,7 @@ function parseArgs(): {
     }
   }
 
-  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string };
+  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string; 'install-dir'?: string };
 }
 
 async function resolveLatestVersion(owner: string, repo: string, token: string): Promise<string> {
@@ -74,8 +75,9 @@ async function main(): Promise<void> {
     );
     console.error('  --version  Specific version to install (e.g. 1.2.3)');
     console.error('  --latest   Resolve and install the latest published release');
-    console.error('  --token    GitHub token (default: GITHUB_TOKEN env var)');
-    console.error('  --repo     GitHub repo (default: cpdevtools/git-flow)');
+    console.error('  --token        GitHub token (default: GITHUB_TOKEN env var)');
+    console.error('  --repo         GitHub repo (default: cpdevtools/git-flow)');
+    console.error('  --install-dir  Override install directory (default: /opt/git-flow-deploy-service)');
     process.exit(1);
   }
 
@@ -108,9 +110,11 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const installDir = args['install-dir'];
+
   console.log(`\nDeploying ${PACKAGE_NAME} v${version} (method: ${method}) from ${owner}/${repoName}...\n`);
 
-  const extractDir = await downloadBundle({ method, version, owner, repo: repoName, token });
+  const extractDir = await downloadBundle({ method, version, owner, repo: repoName, token, installDir });
 
   switch (method) {
     case 'node':
