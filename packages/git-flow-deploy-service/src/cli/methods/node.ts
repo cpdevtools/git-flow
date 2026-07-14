@@ -9,6 +9,8 @@ export interface NodeHandlerOptions {
   token: string;
   /** Custom npm prefix (e.g. ~/npm-packages). Omit to use the global npm prefix. */
   npmPrefix?: string;
+  /** HMAC secret for webhook validation (DEPLOY_HMAC_SECRET). Required for first-time setup. */
+  hmacSecret?: string;
 }
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
@@ -16,19 +18,23 @@ const NPM_REGISTRY = 'https://npm.pkg.github.com';
 const PM2_APP_NAME = 'git-flow-deploy-service';
 
 export async function handleNode(options: NodeHandlerOptions): Promise<void> {
-  const { extractDir, version, token, npmPrefix } = options;
+  const { extractDir, version, token, npmPrefix, hmacSecret } = options;
 
   const isRunning = isPm2AppRunning();
 
   if (!isRunning) {
-    await firstTimeSetup(extractDir, version, token, npmPrefix);
+    await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret);
   } else {
     await updateExisting(version, token, npmPrefix);
   }
 }
 
-async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix?: string): Promise<void> {
+async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix?: string, hmacSecret?: string): Promise<void> {
   console.log('First-time setup detected...\n');
+
+  if (!hmacSecret) {
+    throw new Error('--hmac-secret is required for first-time setup (used as DEPLOY_HMAC_SECRET)');
+  }
 
   // Ensure pm2 is installed globally
   if (!isPm2Available()) {
@@ -41,9 +47,10 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   // Install the service package
   installGlobally(version, token, npmPrefix);
 
-  // Patch ecosystem.config.js script path to the resolved install location
+  // Patch ecosystem.config.js: script path + env vars
   const ecoPath = join(extractDir, 'ecosystem.config.js');
   patchEcosystemScript(ecoPath, npmPrefix);
+  patchEcosystemEnv(ecoPath, { DEPLOY_HMAC_SECRET: hmacSecret, GITHUB_TOKEN: token });
 
   // Start with pm2
   console.log('\nStarting service with pm2...');
@@ -150,8 +157,31 @@ function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
   }
 }
 
-function printStartupHint(): void {
-  console.log('\n' + '─'.repeat(70));
+function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void {
+  if (!existsSync(ecoPath)) return;
+
+  let content = readFileSync(ecoPath, 'utf-8');
+
+  for (const [key, value] of Object.entries(vars)) {
+    const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    // Replace existing key if present
+    const existing = new RegExp(`(\\s+)${key}:\\s*['"][^'"]*['"]`, 'g');
+    if (existing.test(content)) {
+      content = content.replace(existing, `$1${key}: '${escaped}'`);
+    } else {
+      // Inject after NODE_ENV line
+      content = content.replace(
+        /(NODE_ENV:\s*['"]production['"])/,
+        `$1,\n        ${key}: '${escaped}'`,
+      );
+    }
+  }
+
+  writeFileSync(ecoPath, content);
+  console.log(`Patched ecosystem.config.js: env vars → ${Object.keys(vars).join(', ')}`);
+}
+
+function printStartupHint(): void {  console.log('\n' + '─'.repeat(70));
   console.log('⚡ To configure pm2 to start on system boot, run:');
   console.log('');
   console.log('   pm2 startup');
