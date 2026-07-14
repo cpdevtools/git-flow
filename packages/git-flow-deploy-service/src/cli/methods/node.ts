@@ -41,7 +41,7 @@ export async function handleNode(options: NodeHandlerOptions): Promise<void> {
   if (!isRunning) {
     await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret, port, host);
   } else {
-    await updateExisting(version, token, npmPrefix);
+    await updateExisting(extractDir, version, token, npmPrefix, port, host);
   }
 }
 
@@ -84,14 +84,24 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   printStartupHint();
 }
 
-async function updateExisting(version: string, token: string, npmPrefix?: string): Promise<void> {
+async function updateExisting(extractDir: string, version: string, token: string, npmPrefix?: string, port?: string, host?: string): Promise<void> {
   console.log('Existing pm2 process detected — running update...\n');
 
   installGlobally(version, token, npmPrefix);
 
+  // Re-patch env vars in ecosystem.config.js (port/host may have changed)
+  const ecoPath = join(extractDir, 'ecosystem.config.js');
+  const envVars: Record<string, string> = {
+    GITHUB_TOKEN: token,
+    ...(port ? { PORT: port } : {}),
+    ...(host ? { HOST: host } : {}),
+  };
+  patchEcosystemEnv(ecoPath, envVars);
+
+  // Reload via ecosystem file path so pm2 picks up updated env vars
   console.log('\nReloading pm2 process...');
   const pathEnv = withGlobalBinInPath();
-  execSync(`pm2 reload ${PM2_APP_NAME} --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync(`pm2 reload "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
   execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
 
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
