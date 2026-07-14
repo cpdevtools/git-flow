@@ -28,7 +28,14 @@ export interface DependencyGraph {
 export async function discoverProjects(workspaceRoot: string): Promise<Project[]> {
   const packageJsonPaths = await fg(['**/package.json'], {
     cwd: workspaceRoot,
-    ignore: ['**/node_modules/**'],
+    followSymbolicLinks: false,
+    ignore: [
+      '**/node_modules/**',
+      '**/.pnpm-prod/**',
+      '**/.docker-bundle/**',
+      '**/.wireit/**',
+      '**/dist/**',
+    ],
   });
 
   const projects: Project[] = [];
