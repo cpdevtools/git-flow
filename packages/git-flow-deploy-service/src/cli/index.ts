@@ -14,6 +14,7 @@ function parseArgs(): {
   token?: string;
   repo: string;
   'install-dir'?: string;
+  'npm-prefix'?: string;
 } {
   const argv = process.argv.slice(2);
   const result: Record<string, string | boolean> = { latest: false, repo: 'cpdevtools/git-flow' };
@@ -28,7 +29,7 @@ function parseArgs(): {
     }
   }
 
-  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string; 'install-dir'?: string };
+  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string; 'install-dir'?: string; 'npm-prefix'?: string };
 }
 
 async function resolveLatestVersion(owner: string, repo: string, token: string): Promise<string> {
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
     console.error('  --token        GitHub token (default: GITHUB_TOKEN env var)');
     console.error('  --repo         GitHub repo (default: cpdevtools/git-flow)');
     console.error('  --install-dir  Override install directory (default: /opt/git-flow-deploy-service)');
+    console.error('  --npm-prefix   Custom npm prefix for global install (e.g. ~/npm-packages)');
     process.exit(1);
   }
 
@@ -111,6 +113,7 @@ async function main(): Promise<void> {
   }
 
   const installDir = args['install-dir'];
+  const npmPrefix = args['npm-prefix'];
 
   console.log(`\nDeploying ${PACKAGE_NAME} v${version} (method: ${method}) from ${owner}/${repoName}...\n`);
 
@@ -118,7 +121,7 @@ async function main(): Promise<void> {
 
   switch (method) {
     case 'node':
-      await handleNode({ extractDir, version, token });
+      await handleNode({ extractDir, version, token, npmPrefix });
       break;
     case 'compose':
       await handleCompose({ extractDir });
