@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -73,7 +73,8 @@ export async function downloadBundle(options: DownloadOptions): Promise<string> 
   }
 
   const buf = await dlRes.arrayBuffer();
-  const zipPath = join(tmpdir(), `gf-deploy-${method}-${version}.zip`);
+  const tempDir = mkdtempSync(join(tmpdir(), 'gitflow-deploy-'));
+  const zipPath = join(tempDir, assetName);
   writeFileSync(zipPath, Buffer.from(buf));
 
   // Extract to versioned install directory
