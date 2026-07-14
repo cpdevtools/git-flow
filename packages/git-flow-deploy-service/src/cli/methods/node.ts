@@ -1,5 +1,6 @@
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export interface NodeHandlerOptions {
@@ -65,13 +66,26 @@ async function updateExisting(version: string, token: string): Promise<void> {
 
 function installGlobally(version: string, token: string): void {
   console.log(`\nInstalling ${PACKAGE_NAME}@${version} globally from ${NPM_REGISTRY}...`);
-  execSync(
-    `npm install -g "${PACKAGE_NAME}@${version}" --registry "${NPM_REGISTRY}"`,
-    {
-      stdio: 'inherit',
-      env: { ...process.env, NODE_AUTH_TOKEN: token },
-    },
+
+  // Write a scoped .npmrc so only @cpdevtools resolves via GitHub Packages;
+  // passing --registry would override the registry for ALL deps (including @nestjs/*)
+  const tempDir = mkdtempSync(join(tmpdir(), 'gitflow-install-'));
+  const npmrcPath = join(tempDir, '.npmrc');
+  writeFileSync(
+    npmrcPath,
+    `@cpdevtools:registry=${NPM_REGISTRY}\n//${new URL(NPM_REGISTRY).host}/:_authToken=${token}\n`,
   );
+
+  try {
+    execSync(`npm install -g "${PACKAGE_NAME}@${version}"`, {
+      stdio: 'inherit',
+      env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrcPath },
+    });
+  } finally {
+    // temp dir is small — OS will clean it up, but remove npmrc immediately for security
+    try { execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
+  }
+
   console.log('Global install complete ✓');
 }
 
