@@ -6,14 +6,13 @@
   "scripts": {
     "build": "wireit",
     "gitflow": "gitflow",
-    "gitflow:dev": "pnpm --filter @cpdevtools/git-flow-cli build && gitflow",
     "check": "wireit",
-    "clean": "wireit",
+    "clean": "git clean -dfX && pnpm install && pnpm build && ln -sf ../../packages/git-flow-cli/dist/bin.js node_modules/.bin/gitflow",
     "fix": "wireit",
     "format": "wireit",
     "lint": "pnpm -r lint",
     "prepare": "wireit",
-    "reset": "wireit",
+    "reset": "git reset --hard && pnpm install && pnpm build && ln -sf ../../packages/git-flow-cli/dist/bin.js node_modules/.bin/gitflow",
     "test": "wireit",
     "typecheck": "wireit"
   },
@@ -125,38 +124,6 @@
     },
     "check.syncpack": {
       "command": "syncpack list-mismatches"
-    },
-    "clean": {
-      "dependencies": [
-        "clean.install"
-      ]
-    },
-    "clean.git": {
-      "command": "git clean -dfX",
-      "cache": false
-    },
-    "clean.install": {
-      "command": "pnpm install",
-      "cache": false,
-      "dependencies": [
-        "clean.git"
-      ]
-    },
-    "reset": {
-      "dependencies": [
-        "reset.install"
-      ]
-    },
-    "reset.git": {
-      "command": "git reset --hard",
-      "cache": false
-    },
-    "reset.install": {
-      "command": "pnpm install",
-      "cache": false,
-      "dependencies": [
-        "reset.git"
-      ]
     },
     "pnpm.install": {
       "command": "pnpm install",
