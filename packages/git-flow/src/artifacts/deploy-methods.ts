@@ -185,10 +185,11 @@ registerDeployMethod('npm', 'node', {
     await copyFile(ecoFile, join(deployOutputDir, 'ecosystem.config.js'));
   },
   async generateDeployYml({ deployOutputDir, projectName, version }) {
-    const installCmd = `npm install -g ${projectName}@${version}`;
+    const appName = safeName(projectName);
+    const installCmd = `NODE_AUTH_TOKEN=$GITHUB_TOKEN npm install -g ${projectName}@${version} --registry https://npm.pkg.github.com`;
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: `${installCmd} && pm2 reload ecosystem.config.js` }),
+      stringify({ deployCommand: `${installCmd} && pm2 reload ${appName} --update-env` }),
     );
   },
 });
