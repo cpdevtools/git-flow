@@ -48,7 +48,7 @@ export async function versionExists(version: string, projectName?: string): Prom
     }
 
     // Check remote tags (for CI where local might not have all tags)
-    const remoteResult = await $`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
+    const remoteResult = await $({ timeout: 10000 })`git ls-remote --tags origin refs/tags/${tag}`.nothrow();
     console.log(
       `[versionExists] Remote git tag result: "${remoteResult.stdout.trim().substring(0, 100)}"`,
     );
