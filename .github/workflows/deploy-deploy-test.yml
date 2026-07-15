@@ -47,3 +47,4 @@ jobs:
           deploy_url: ${{ vars.DEPLOY_URL }}
           deploy_token: ${{ secrets.DEPLOY_TOKEN }}
           bundle: ${{ inputs.bundle || vars.DEPLOY_BUNDLE || 'deploy.zip' }}
+          token: ${{ github.token }}

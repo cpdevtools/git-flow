@@ -29,6 +29,11 @@ inputs:
     required: false
     default: 'deploy.zip'
 
+  token:
+    description: 'GitHub token for registry auth and API access (defaults to GITHUB_TOKEN)'
+    required: false
+    default: ${{ github.token }}
+
 runs:
   using: 'composite'
   steps:
@@ -36,7 +41,7 @@ runs:
       shell: bash
       run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
       env:
-        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ inputs.token }}
 
     - name: Install action dependencies
       shell: bash
@@ -44,6 +49,8 @@ runs:
       run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-deploy...
       env:
         HUSKY: '0'
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
 
     - name: Run Deploy Action
       shell: bash
