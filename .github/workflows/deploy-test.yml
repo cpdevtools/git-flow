@@ -1,0 +1,33 @@
+name: Deploy — Test
+
+# Per-environment wrapper for the "Deploy Test" GitHub Environment.
+# Discovered by `gitflow deploy` via convention: deploy-{env}.yml.
+# Dispatched by the CLI with resolved repo + release_id arguments.
+# All secrets/vars live in the "Deploy Test" GitHub Environment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'owner/repo that owns the GitHub Release'
+        required: true
+        type: string
+      release_id:
+        description: 'Numeric GitHub Release ID to deploy'
+        required: true
+        type: string
+      bundle:
+        description: 'Deploy bundle asset name (leave blank for environment default)'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      repo: ${{ inputs.repo }}
+      release_id: ${{ inputs.release_id }}
+      environment: 'Deploy Test'
+      bundle: ${{ inputs.bundle }}
+    secrets: inherit
