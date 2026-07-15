@@ -11,7 +11,7 @@
     "fix": "wireit",
     "format": "wireit",
     "lint": "pnpm -r lint",
-    "prepare": "wireit",
+    "prepare": "husky || true",
     "reset": "git reset --hard && pnpm install && pnpm build && ln -sf ../../packages/git-flow-cli/dist/bin.js node_modules/.bin/gitflow",
     "test": "wireit",
     "typecheck": "wireit"
@@ -47,18 +47,6 @@
   },
   "packageManager": "pnpm@11.7.0",
   "wireit": {
-    "prepare": {
-      "dependencies": [
-        "prepare.husky"
-      ]
-    },
-    "prepare.husky": {
-      "command": "husky",
-      "files": [
-        ".husky/**"
-      ],
-      "output": []
-    },
     "build": {
       "dependencies": [
         "./packages/git-flow:build",
