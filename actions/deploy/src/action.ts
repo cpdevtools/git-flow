@@ -216,7 +216,29 @@ async function run(): Promise<void> {
   } else if (exitCode !== 0) {
     core.setFailed(`Deploy failed (EXIT:${exitCode})`);
   } else {
-    core.info('Deploy succeeded.');
+    // 4. Health check — confirm service came back up after any restart
+    core.info('Waiting for service health check...');
+    const HEALTH_TIMEOUT_MS = 30_000;
+    const HEALTH_POLL_MS = 2_000;
+    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+    let healthy = false;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, HEALTH_POLL_MS));
+      try {
+        const healthRes = await makeRequest(`${deployUrl}/health`, { method: 'GET', headers: {} });
+        if (healthRes.statusCode === 200) {
+          healthy = true;
+          break;
+        }
+      } catch {
+        // service not up yet — keep polling
+      }
+    }
+    if (healthy) {
+      core.info('Service is healthy ✓');
+    } else {
+      core.setFailed(`Service did not return healthy within ${HEALTH_TIMEOUT_MS / 1000}s after deploy`);
+    }
   }
 }
 
