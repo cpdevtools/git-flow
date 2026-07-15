@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       release_id:
-        description: 'Numeric GitHub Release ID to deploy'
+        description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
         required: true
         type: string
       bundle:

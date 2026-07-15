@@ -13,7 +13,7 @@ inputs:
     default: ${{ github.repository }}
 
   release_id:
-    description: 'GitHub Release ID'
+    description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
     required: true
 
   deploy_url:
