@@ -20,8 +20,8 @@ inputs:
     description: 'Base URL of the deploy gateway (e.g. https://deploy.example.com)'
     required: true
 
-  deploy_token:
-    description: 'HMAC shared secret (DEPLOY_TOKEN from the GitHub Environment)'
+  hmac_secret:
+    description: 'HMAC shared secret for signing deploy requests (DEPLOY_HMAC_SECRET from the GitHub Environment)'
     required: true
 
   bundle:
@@ -62,5 +62,5 @@ runs:
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_RELEASE_ID: ${{ inputs.release_id }}
         INPUT_DEPLOY_URL: ${{ inputs.deploy_url }}
-        INPUT_DEPLOY_TOKEN: ${{ inputs.deploy_token }}
+        INPUT_HMAC_SECRET: ${{ inputs.hmac_secret }}
         INPUT_BUNDLE: ${{ inputs.bundle }}
