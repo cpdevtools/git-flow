@@ -148,7 +148,17 @@
     },
     "pnpm.install": {
       "command": "pnpm install",
-      "cache": false
+      "cache": false,
+      "dependencies": [
+        {
+          "script": "clean.git",
+          "cascade": false
+        },
+        {
+          "script": "reset.git",
+          "cascade": false
+        }
+      ]
     }
   }
 }
