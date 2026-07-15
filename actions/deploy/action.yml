@@ -35,11 +35,13 @@ runs:
     - name: Configure registry auth
       shell: bash
       run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      env:
+        GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
 
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm i --no-frozen-lockfile
+      run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-deploy...
       env:
         HUSKY: '0'
 
