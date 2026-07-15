@@ -186,8 +186,11 @@ registerDeployMethod('npm', 'node', {
   },
   async generateDeployYml({ deployOutputDir, projectName, version }) {
     const appName = safeName(projectName);
-    const configAuth = `npm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"`;
-    const installCmd = `npm install -g ${projectName}@${version} --registry https://npm.pkg.github.com`;
+    const configAuth = [
+      `npm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"`,
+      `npm config set @cpdevtools:registry https://npm.pkg.github.com`,
+    ].join(' && ');
+    const installCmd = `npm install -g ${projectName}@${version}`;
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
       stringify({ deployCommand: `${configAuth} && ${installCmd} && pm2 reload ${appName} --update-env` }),
