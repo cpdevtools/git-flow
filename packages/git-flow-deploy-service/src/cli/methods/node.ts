@@ -101,7 +101,7 @@ async function updateExisting(extractDir: string, version: string, token: string
   // Reload via ecosystem file path so pm2 picks up updated env vars
   console.log('\nReloading pm2 process...');
   const pathEnv = withGlobalBinInPath();
-  execSync(`pm2 reload "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync(`pm2 restart "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
   execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
 
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
