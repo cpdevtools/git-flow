@@ -28,7 +28,7 @@ function buildTagName(version: string, projectName?: string): string {
  * 1. Git tags (indicates a published release)
  * 2. GitHub release body - checks if ANY artifact has published:true or missing published field
  */
-async function versionExists(version: string, projectName?: string): Promise<boolean> {
+export async function versionExists(version: string, projectName?: string): Promise<boolean> {
   try {
     console.log(
       `[versionExists] Checking version: ${version} for project: ${projectName || 'unknown'}`,

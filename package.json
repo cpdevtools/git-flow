@@ -5,6 +5,8 @@
   "description": "Git-based versioning and release workflow automation",
   "scripts": {
     "build": "wireit",
+    "gitflow": "gitflow",
+    "gitflow:dev": "pnpm --filter @cpdevtools/git-flow-cli build && gitflow",
     "check": "wireit",
     "clean": "wireit",
     "fix": "wireit",

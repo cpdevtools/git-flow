@@ -22,7 +22,7 @@ function readPackage(pkg, context) {
   if (process.env.DEV_LOCAL === 'true') {
     // Map of npm package names to their local paths (relative to workspace root)
     const localPackagesConfig = {
-      '@cpdevtools/ts-dev-utilities': '../ts-dev-utilities',
+      '@cpdevtools/ts-dev-utilities': '../ts-dev-utilities/packages/ts-dev-utilities',
       '@cpdevtools/git-flow': './packages/git-flow',
     };
 
