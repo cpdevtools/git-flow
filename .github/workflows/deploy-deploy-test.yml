@@ -1,0 +1,49 @@
+name: Deploy — Deploy Test
+
+# Per-environment deploy workflow for the "Deploy Test" GitHub Environment.
+# Discovered by `gitflow deploy` via convention: deploy-{env}.yml.
+# Dispatched by the CLI with resolved repo + release_id arguments.
+# Environment is hardcoded — secrets/vars come only from "Deploy Test".
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
+        required: true
+        type: string
+      bundle:
+        description: 'Deploy bundle asset name (leave blank for environment default)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: 'Deploy Test'
+    steps:
+      - name: Checkout git-flow (for action)
+        uses: actions/checkout@v4
+        with:
+          repository: cpdevtools/git-flow
+          ref: main
+          path: .git-flow-action
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - name: Deploy via gateway
+        uses: ./.git-flow-action/actions/deploy
+        with:
+          repo: ${{ github.repository }}
+          release_id: ${{ inputs.release_id }}
+          deploy_url: ${{ vars.DEPLOY_URL }}
+          deploy_token: ${{ secrets.DEPLOY_TOKEN }}
+          bundle: ${{ inputs.bundle || vars.DEPLOY_BUNDLE || 'deploy.zip' }}

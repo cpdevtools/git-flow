@@ -9,14 +9,38 @@ import { URL } from 'node:url';
 // Config
 // ---------------------------------------------------------------------------
 const repo = process.env['INPUT_REPO'] ?? '';
-const releaseId = parseInt(process.env['INPUT_RELEASE_ID'] ?? '', 10);
+const releaseIdRaw = process.env['INPUT_RELEASE_ID'] ?? '';
 const deployUrl = (process.env['INPUT_DEPLOY_URL'] ?? '').replace(/\/$/, '');
 const deployToken = process.env['INPUT_DEPLOY_TOKEN'] ?? '';
 const bundle = process.env['INPUT_BUNDLE'] || 'deploy.zip';
+const githubToken = process.env['GITHUB_TOKEN'] ?? '';
 
-if (!repo || isNaN(releaseId) || !deployUrl || !deployToken) {
+if (!repo || !releaseIdRaw || !deployUrl || !deployToken) {
   core.setFailed('Missing required inputs: repo, release_id, deploy_url, deploy_token');
   process.exit(1);
+}
+
+/** Accept either a numeric release ID or a tag string — resolves tag via GitHub API if needed. */
+async function resolveReleaseId(raw: string): Promise<number> {
+  const asNum = parseInt(raw, 10);
+  if (!isNaN(asNum) && String(asNum) === raw.trim()) return asNum;
+
+  core.info(`Resolving tag "${raw}" to release ID...`);
+  const [owner, repoName] = repo.split('/');
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repoName}/releases/tags/${encodeURIComponent(raw)}`,
+    {
+      headers: {
+        ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'gitflow-deploy-action',
+      },
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to resolve tag "${raw}": ${res.status} ${await res.text()}`);
+  const release = (await res.json()) as { id: number };
+  core.info(`Resolved "${raw}" \u2192 release ID ${release.id}`);
+  return release.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +132,8 @@ function streamLines(
 // Main
 // ---------------------------------------------------------------------------
 async function run(): Promise<void> {
+  const releaseId = await resolveReleaseId(releaseIdRaw);
+
   // 1. POST /deploy
   const rawBody = JSON.stringify({ repo, release_id: releaseId, bundle });
   const ts = String(Math.floor(Date.now() / 1000));

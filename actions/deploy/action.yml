@@ -13,7 +13,7 @@ inputs:
     default: ${{ github.repository }}
 
   release_id:
-    description: 'GitHub Release ID'
+    description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
     required: true
 
   deploy_url:
@@ -32,6 +32,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Configure registry auth
+      shell: bash
+      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}

@@ -3,6 +3,18 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+/** Returns an env object with the npm global bin directory prepended to PATH */
+function withGlobalBinInPath(): NodeJS.ProcessEnv {
+  try {
+    const prefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
+    const globalBin = join(prefix, 'bin');
+    const currentPath = process.env['PATH'] ?? '';
+    return { ...process.env, PATH: `${globalBin}:${currentPath}` };
+  } catch {
+    return process.env;
+  }
+}
+
 export interface NodeHandlerOptions {
   extractDir: string;
   version: string;
@@ -29,7 +41,7 @@ export async function handleNode(options: NodeHandlerOptions): Promise<void> {
   if (!isRunning) {
     await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret, port, host);
   } else {
-    await updateExisting(version, token, npmPrefix);
+    await updateExisting(extractDir, version, token, npmPrefix, port, host);
   }
 }
 
@@ -43,7 +55,7 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   // Ensure pm2 is installed globally
   if (!isPm2Available()) {
     console.log('Installing pm2 globally...');
-    execSync('npm install -g pm2', { stdio: 'inherit' });
+    execSync('npm install -g pm2', { stdio: 'inherit', env: withGlobalBinInPath() });
   } else {
     console.log('pm2 already installed ✓');
   }
@@ -64,21 +76,33 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
 
   // Start with pm2
   console.log('\nStarting service with pm2...');
-  execSync(`pm2 start "${ecoPath}" --update-env`, { stdio: 'inherit' });
-  execSync('pm2 save', { stdio: 'inherit' });
+  const pathEnv = withGlobalBinInPath();
+  execSync(`pm2 start "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
 
   // Print pm2 startup command for the operator
   printStartupHint();
 }
 
-async function updateExisting(version: string, token: string, npmPrefix?: string): Promise<void> {
+async function updateExisting(extractDir: string, version: string, token: string, npmPrefix?: string, port?: string, host?: string): Promise<void> {
   console.log('Existing pm2 process detected — running update...\n');
 
   installGlobally(version, token, npmPrefix);
 
+  // Re-patch env vars in ecosystem.config.js (port/host may have changed)
+  const ecoPath = join(extractDir, 'ecosystem.config.js');
+  const envVars: Record<string, string> = {
+    GITHUB_TOKEN: token,
+    ...(port ? { PORT: port } : {}),
+    ...(host ? { HOST: host } : {}),
+  };
+  patchEcosystemEnv(ecoPath, envVars);
+
+  // Reload via ecosystem file path so pm2 picks up updated env vars
   console.log('\nReloading pm2 process...');
-  execSync(`pm2 reload ${PM2_APP_NAME} --update-env`, { stdio: 'inherit' });
-  execSync('pm2 save', { stdio: 'inherit' });
+  const pathEnv = withGlobalBinInPath();
+  execSync(`pm2 reload "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
 
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
 }
@@ -100,7 +124,7 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
   try {
     execSync(`npm install -g ${prefixFlag} "${PACKAGE_NAME}@${version}"`, {
       stdio: 'inherit',
-      env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrcPath },
+      env: { ...withGlobalBinInPath(), NPM_CONFIG_USERCONFIG: npmrcPath },
     });
   } finally {
     try { execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
@@ -111,10 +135,10 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
 
 function isPm2AppRunning(): boolean {
   try {
-    const result = spawnSync('pm2', ['list', '--json'], { encoding: 'utf-8' });
-    if (result.status !== 0 || !result.stdout) return false;
-    const list = JSON.parse(result.stdout) as Array<{ name: string }>;
-    return list.some(app => app.name === PM2_APP_NAME);
+    const env = withGlobalBinInPath();
+    // pm2 describe exits 0 if the app is known to pm2, non-zero if not
+    const result = spawnSync('pm2', ['describe', PM2_APP_NAME], { encoding: 'utf-8', env });
+    return result.status === 0 && result.stdout.includes(PM2_APP_NAME);
   } catch {
     return false;
   }
@@ -122,7 +146,7 @@ function isPm2AppRunning(): boolean {
 
 function isPm2Available(): boolean {
   try {
-    execSync('pm2 --version', { stdio: 'pipe' });
+    execSync('pm2 --version', { stdio: 'pipe', env: withGlobalBinInPath() });
     return true;
   } catch {
     return false;
@@ -154,13 +178,21 @@ function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
   }
 
   let content = readFileSync(ecoPath, 'utf-8');
+
+  // Already patched to the correct absolute path — nothing to do
+  if (content.includes(`'${scriptPath}'`) || content.includes(`"${scriptPath}"`)) {
+    console.log('ecosystem.config.js script already correct ✓');
+    return;
+  }
+
+  // Match relative dist/main.js or dist/src/main.js (pre-tsconfig-fix builds)
   const patched = content.replace(
-    /script:\s*['"][^'"]*dist\/main\.js['"]/g,
+    /script:\s*['"][^'"]*dist\/(?:src\/)?main\.js['"]/g,
     `script: '${scriptPath}'`,
   );
 
   if (patched === content) {
-    console.warn('Warning: could not find "script: …dist/main.js" in ecosystem.config.js to patch');
+    console.warn('Warning: could not find script path in ecosystem.config.js to patch');
   } else {
     writeFileSync(ecoPath, patched);
     console.log(`Patched ecosystem.config.js: script → ${scriptPath}`);
@@ -174,10 +206,13 @@ function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void 
 
   for (const [key, value] of Object.entries(vars)) {
     const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    // Replace existing key if present
-    const existing = new RegExp(`(\\s+)${key}:\\s*['"][^'"]*['"]`, 'g');
+    // Match existing key with either a quoted string or a bare number value
+    const existing = new RegExp(`([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`, 'g');
     if (existing.test(content)) {
-      content = content.replace(existing, `$1${key}: '${escaped}'`);
+      content = content.replace(
+        new RegExp(`([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`, 'g'),
+        `$1${key}: '${escaped}'`,
+      );
     } else {
       // Inject after NODE_ENV line
       content = content.replace(
