@@ -36,6 +36,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
+        with:
+          version: 11
 
       - name: Deploy via gateway
         uses: ./.git-flow-action/actions/deploy
