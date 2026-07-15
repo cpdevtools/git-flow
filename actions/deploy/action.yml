@@ -32,6 +32,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Configure registry auth
+      shell: bash
+      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
