@@ -45,7 +45,7 @@ jobs:
         with:
           repo: ${{ github.repository }}
           release_id: ${{ inputs.release_id }}
-          deploy_url: ${{ vars.DEPLOY_SERVICE_URL }}
+          deploy_url: ${{ vars.DEPLOY_URL }}
           hmac_secret: ${{ secrets.DEPLOY_HMAC_SECRET }}
           bundle: ${{ inputs.deploy_type != '' && format('deploy-{0}.zip', inputs.deploy_type) || vars.DEPLOY_TYPE_DEFAULT != '' && format('deploy-{0}.zip', vars.DEPLOY_TYPE_DEFAULT) || 'deploy.zip' }}
           token: ${{ secrets.DEPLOY_TOKEN || github.token }}
