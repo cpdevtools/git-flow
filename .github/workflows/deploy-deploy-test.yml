@@ -1,9 +1,9 @@
-name: Deploy — Test
+name: Deploy — Deploy Test
 
-# Per-environment wrapper for the "Deploy Test" GitHub Environment.
+# Per-environment deploy workflow for the "Deploy Test" GitHub Environment.
 # Discovered by `gitflow deploy` via convention: deploy-{env}.yml.
 # Dispatched by the CLI with resolved repo + release_id arguments.
-# All secrets/vars live in the "Deploy Test" GitHub Environment.
+# Environment is hardcoded — secrets/vars come only from "Deploy Test".
 
 on:
   workflow_dispatch:
@@ -22,12 +22,30 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   deploy:
-    uses: ./.github/workflows/deploy.yml
-    with:
-      repo: ${{ inputs.repo }}
-      release_id: ${{ inputs.release_id }}
-      environment: 'Deploy Test'
-      bundle: ${{ inputs.bundle }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    environment: 'Deploy Test'
+    steps:
+      - name: Checkout git-flow (for action)
+        uses: actions/checkout@v4
+        with:
+          repository: cpdevtools/git-flow
+          ref: main
+          path: .git-flow-action
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Deploy via gateway
+        uses: ./.git-flow-action/actions/deploy
+        with:
+          repo: ${{ inputs.repo }}
+          release_id: ${{ inputs.release_id }}
+          deploy_url: ${{ vars.DEPLOY_URL }}
+          deploy_token: ${{ secrets.DEPLOY_TOKEN }}
+          bundle: ${{ inputs.bundle || vars.DEPLOY_BUNDLE || 'deploy.zip' }}
