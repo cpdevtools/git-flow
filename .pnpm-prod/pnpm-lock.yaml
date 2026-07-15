@@ -73,7 +73,7 @@ importers:
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.3
+        version: 0.4.0-dev.6
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -112,7 +112,7 @@ importers:
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.3
+        version: 0.4.0-dev.6
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -124,7 +124,7 @@ importers:
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.3
+        version: 0.4.0-dev.6
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -139,7 +139,7 @@ importers:
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
         specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.3
+        version: 0.4.0-dev.6
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -191,7 +191,7 @@ importers:
         version: link:../git-flow
       '@oclif/core':
         specifier: ^4.8.0
-        version: 4.11.11
+        version: 4.11.14
       '@oclif/plugin-autocomplete':
         specifier: ^3.2.40
         version: 3.2.53
@@ -268,7 +268,7 @@ importers:
         version: link:../git-flow-deploy
       '@oclif/core':
         specifier: ^4.8.0
-        version: 4.11.11
+        version: 4.11.14
       '@oclif/plugin-help':
         specifier: ^6.2.37
         version: 6.2.53
@@ -609,8 +609,8 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@cpdevtools/ts-dev-utilities@0.4.0-dev.3':
-    resolution: {integrity: sha512-TCnJwq003+/gA1OFW8SUWEffbQb+M8aU5d3eUaQXL90P2olKaQJckMKzjlPWEaJUwpnWFOjojz8zCdMb+AFEeg==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.4.0-dev.3/42ac21111e62aa640d5cdaefe7627189f12dbacd}
+  '@cpdevtools/ts-dev-utilities@0.4.0-dev.6':
+    resolution: {integrity: sha512-NLvgKIcP5K0bpMZMi7IqddJi3McZkqD1tfrRdgLh6krYweuQZFnUI+GRZ27jjVtTHKWvNxlA1nCzYH+d2WNCAg==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.4.0-dev.6/3ff23d2029e56568b0af1167f98dacec86fd5044}
     engines: {node: '>=24'}
 
   '@cspotcode/source-map-support@0.8.1':
@@ -1495,8 +1495,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@oclif/core@4.11.11':
-    resolution: {integrity: sha512-LoGzrvkH9I8dwhxuLafcf90MAp+fYfAiAhpyixaVAWaclIgs+vXeMMQwBG90/wqjdygIKcFAqNnNJrfl3s3X8Q==}
+  '@oclif/core@4.11.14':
+    resolution: {integrity: sha512-cZ5Ktd+rT0PO+o7KBH4vRFTgg+xMLf8F41WK39p8MkXEViZA/Qqe+4lzZT6102zgUxMORET1HtF9t5w8CB3tnQ==}
     engines: {node: '>=18.0.0'}
 
   '@oclif/plugin-autocomplete@3.2.53':
@@ -4937,7 +4937,7 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@cpdevtools/ts-dev-utilities@0.4.0-dev.3':
+  '@cpdevtools/ts-dev-utilities@0.4.0-dev.6':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
@@ -5736,7 +5736,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@oclif/core@4.11.11':
+  '@oclif/core@4.11.14':
     dependencies:
       ansi-escapes: 4.3.2
       ansis: 3.17.0
@@ -5759,7 +5759,7 @@ snapshots:
 
   '@oclif/plugin-autocomplete@3.2.53':
     dependencies:
-      '@oclif/core': 4.11.11
+      '@oclif/core': 4.11.14
       ansis: 3.17.0
       debug: 4.4.3(supports-color@8.1.1)
       ejs: 3.1.10
@@ -5768,7 +5768,7 @@ snapshots:
 
   '@oclif/plugin-help@6.2.53':
     dependencies:
-      '@oclif/core': 4.11.11
+      '@oclif/core': 4.11.14
 
   '@octokit/auth-token@4.0.0': {}
 
@@ -5950,7 +5950,7 @@ snapshots:
 
   '@types/adm-zip@0.5.8':
     dependencies:
-      '@types/node': 20.19.43
+      '@types/node': 24.13.3
 
   '@types/babel__core@7.20.5':
     dependencies:
