@@ -192,7 +192,7 @@ registerDeployMethod('npm', 'node', {
     const installCmd = `npm install -g ${projectName}@${version}`;
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: `${configAuth} && ${installCmd} && pm2 reload ecosystem.config.js --update-env` }),
+      stringify({ deployCommand: `${configAuth} && ${installCmd} && echo "\u25b8 Service restarting..." && (sleep 5 && pm2 restart ecosystem.config.js --update-env &)` }),
     );
   },
 });
