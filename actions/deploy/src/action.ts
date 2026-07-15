@@ -11,7 +11,7 @@ import { URL } from 'node:url';
 const repo = process.env['INPUT_REPO'] ?? '';
 const releaseIdRaw = process.env['INPUT_RELEASE_ID'] ?? '';
 const deployUrl = (process.env['INPUT_DEPLOY_URL'] ?? '').replace(/\/$/, '');
-const deployToken = process.env['INPUT_DEPLOY_TOKEN'] ?? '';
+const deployToken = process.env['INPUT_HMAC_SECRET'] ?? '';
 const bundle = process.env['INPUT_BUNDLE'] || 'deploy.zip';
 const githubToken = process.env['GITHUB_TOKEN'] ?? '';
 

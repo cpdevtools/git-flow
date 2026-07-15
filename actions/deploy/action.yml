@@ -20,8 +20,8 @@ inputs:
     description: 'Base URL of the deploy gateway (e.g. https://deploy.example.com)'
     required: true
 
-  deploy_token:
-    description: 'HMAC shared secret (DEPLOY_TOKEN from the GitHub Environment)'
+  hmac_secret:
+    description: 'HMAC shared secret for signing deploy requests (DEPLOY_HMAC_SECRET from the GitHub Environment)'
     required: true
 
   bundle:
@@ -29,19 +29,28 @@ inputs:
     required: false
     default: 'deploy.zip'
 
+  token:
+    description: 'GitHub token for registry auth and API access (defaults to GITHUB_TOKEN)'
+    required: false
+    default: ${{ github.token }}
+
 runs:
   using: 'composite'
   steps:
     - name: Configure registry auth
       shell: bash
       run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
 
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: pnpm i --no-frozen-lockfile
+      run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-deploy...
       env:
         HUSKY: '0'
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
 
     - name: Run Deploy Action
       shell: bash
@@ -53,5 +62,5 @@ runs:
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_RELEASE_ID: ${{ inputs.release_id }}
         INPUT_DEPLOY_URL: ${{ inputs.deploy_url }}
-        INPUT_DEPLOY_TOKEN: ${{ inputs.deploy_token }}
+        INPUT_HMAC_SECRET: ${{ inputs.hmac_secret }}
         INPUT_BUNDLE: ${{ inputs.bundle }}

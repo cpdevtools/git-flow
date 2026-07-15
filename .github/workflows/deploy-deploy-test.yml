@@ -12,8 +12,8 @@ on:
         description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
         required: true
         type: string
-      bundle:
-        description: 'Deploy bundle asset name (leave blank for environment default)'
+      deploy_type:
+        description: 'Deploy type (node, compose, swarm). Leave blank for environment default.'
         required: false
         type: string
         default: ''
@@ -21,6 +21,7 @@ on:
 permissions:
   contents: read
   deployments: write
+  packages: read
 
 jobs:
   deploy:
@@ -44,6 +45,7 @@ jobs:
         with:
           repo: ${{ github.repository }}
           release_id: ${{ inputs.release_id }}
-          deploy_url: ${{ vars.DEPLOY_URL }}
-          deploy_token: ${{ secrets.DEPLOY_TOKEN }}
-          bundle: ${{ inputs.bundle || vars.DEPLOY_BUNDLE || 'deploy.zip' }}
+          deploy_url: ${{ vars.DEPLOY_SERVICE_URL }}
+          hmac_secret: ${{ secrets.DEPLOY_HMAC_SECRET }}
+          bundle: ${{ inputs.deploy_type != '' && format('deploy-{0}.zip', inputs.deploy_type) || vars.DEPLOY_TYPE_DEFAULT != '' && format('deploy-{0}.zip', vars.DEPLOY_TYPE_DEFAULT) || 'deploy.zip' }}
+          token: ${{ secrets.DEPLOY_TOKEN || github.token }}
