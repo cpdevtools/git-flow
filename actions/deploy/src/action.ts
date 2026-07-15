@@ -104,6 +104,11 @@ function streamLines(
         headers,
       },
       (res: IncomingMessage) => {
+        if (res.statusCode !== 200) {
+          res.resume(); // drain body
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
         let pending = '';
         res.on('data', (chunk: Buffer) => {
           pending += chunk.toString('utf-8');
