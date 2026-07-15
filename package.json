@@ -128,37 +128,39 @@
     },
     "clean": {
       "dependencies": [
-        "clean.git",
-        "pnpm.install"
+        "clean.install"
       ]
     },
     "clean.git": {
       "command": "git clean -dfX",
       "cache": false
     },
+    "clean.install": {
+      "command": "pnpm install",
+      "cache": false,
+      "dependencies": [
+        "clean.git"
+      ]
+    },
     "reset": {
       "dependencies": [
-        "reset.git",
-        "pnpm.install"
+        "reset.install"
       ]
     },
     "reset.git": {
       "command": "git reset --hard",
       "cache": false
     },
-    "pnpm.install": {
+    "reset.install": {
       "command": "pnpm install",
       "cache": false,
       "dependencies": [
-        {
-          "script": "clean.git",
-          "cascade": false
-        },
-        {
-          "script": "reset.git",
-          "cascade": false
-        }
+        "reset.git"
       ]
+    },
+    "pnpm.install": {
+      "command": "pnpm install",
+      "cache": false
     }
   }
 }
