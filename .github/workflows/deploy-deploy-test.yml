@@ -8,10 +8,6 @@ name: Deploy — Deploy Test
 on:
   workflow_dispatch:
     inputs:
-      repo:
-        description: 'owner/repo that owns the GitHub Release'
-        required: true
-        type: string
       release_id:
         description: 'Numeric GitHub Release ID to deploy'
         required: true
@@ -44,7 +40,7 @@ jobs:
       - name: Deploy via gateway
         uses: ./.git-flow-action/actions/deploy
         with:
-          repo: ${{ inputs.repo }}
+          repo: ${{ github.repository }}
           release_id: ${{ inputs.release_id }}
           deploy_url: ${{ vars.DEPLOY_URL }}
           deploy_token: ${{ secrets.DEPLOY_TOKEN }}
