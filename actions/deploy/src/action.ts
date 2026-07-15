@@ -16,7 +16,7 @@ const bundle = process.env['INPUT_BUNDLE'] || 'deploy.zip';
 const githubToken = process.env['GITHUB_TOKEN'] ?? '';
 
 if (!repo || !releaseIdRaw || !deployUrl || !deployToken) {
-  core.setFailed('Missing required inputs: repo, release_id, deploy_url, deploy_token');
+  core.setFailed('Missing required inputs: repo, release_id, deploy_url, hmac_secret');
   process.exit(1);
 }
 
