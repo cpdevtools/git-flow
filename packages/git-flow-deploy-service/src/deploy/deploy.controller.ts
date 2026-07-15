@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Logger,
   NotFoundException,
   Param,
   Post,
@@ -24,6 +25,8 @@ const HEARTBEAT_INTERVAL_MS = 5_000;
 
 @Controller()
 export class DeployController {
+  private readonly logger = new Logger(DeployController.name);
+
   constructor(
     private readonly store: DeployStore,
     private readonly config: ConfigService,
@@ -51,10 +54,12 @@ export class DeployController {
     }
 
     if (this.store.isRunning(releaseId)) {
+      this.logger.log(`Deploy already running for release ${releaseId} — attaching observer`);
       res.status(200).end();
       return;
     }
 
+    this.logger.log(`Deploy triggered: ${repo} release ${releaseId} bundle=${body.bundle ?? 'default'}`);
     const record = this.store.start(releaseId, repo);
     this.runDeployAsync(record, repo, releaseId, body.bundle);
     res.status(202).end();
@@ -164,6 +169,7 @@ export class DeployController {
       } catch (err) {
         this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
         this.store.finish(record, 1);
+        this.logger.error(`Deploy failed (fetch): ${repo} release ${releaseId} — ${(err as Error).message}`);
         return;
       }
 
@@ -177,6 +183,7 @@ export class DeployController {
         } catch (err) {
           this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
           this.store.finish(record, 1);
+          this.logger.error(`Deploy failed (storage): ${repo} release ${releaseId} — ${(err as Error).message}`);
           return;
         }
       }
@@ -194,6 +201,11 @@ export class DeployController {
       }
 
       this.store.finish(record, exitCode);
+      if (exitCode === 0) {
+        this.logger.log(`Deploy completed: ${repo} release ${releaseId}`);
+      } else {
+        this.logger.error(`Deploy failed: ${repo} release ${releaseId} (exit ${exitCode})`);
+      }
     })();
   }
 }
