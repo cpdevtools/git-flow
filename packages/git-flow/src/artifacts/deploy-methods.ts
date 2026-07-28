@@ -189,10 +189,17 @@ registerDeployMethod('npm', 'node', {
       `npm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"`,
       `npm config set @cpdevtools:registry https://npm.pkg.github.com`,
     ].join(' && ');
-    const installCmd = `npm install -g ${projectName}@${version}`;
+    // Install into a user-writable prefix (defaults to ~/.npm-global, matching
+    // the self-installer) so the unprivileged service user can update itself
+    // without EACCES on the root-owned global node_modules. pm2 is invoked by
+    // its absolute path under the same prefix so the restart never depends on
+    // PATH. GITFLOW_NPM_PREFIX (exported by the service) overrides the default.
+    const prefixExpr = `NPM_PREFIX="\${GITFLOW_NPM_PREFIX:-$HOME/.npm-global}"`;
+    const installCmd = `npm install -g --prefix "$NPM_PREFIX" ${projectName}@${version}`;
+    const restartCmd = `(sleep 5 && "$NPM_PREFIX/bin/pm2" restart ecosystem.config.js --update-env </dev/null >/dev/null 2>&1 &)`;
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: `${configAuth} && ${installCmd} && echo "\\u25b8 Service restarting..." && (sleep 5 && pm2 restart ecosystem.config.js --update-env </dev/null >/dev/null 2>&1 &)` }),
+      stringify({ deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "\\u25b8 Service restarting..." && ${restartCmd}` }),
     );
   },
 });

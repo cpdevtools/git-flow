@@ -105,6 +105,7 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   const envVars: Record<string, string> = {
     DEPLOY_HMAC_SECRET: hmacSecret,
     GITHUB_TOKEN: token,
+    GITFLOW_NPM_PREFIX: npmPrefix,
     ...(port ? { PORT: port } : {}),
     ...(host ? { HOST: host } : {}),
   };
@@ -135,6 +136,7 @@ async function updateExisting(extractDir: string, version: string, token: string
   const ecoPath = join(extractDir, 'ecosystem.config.js');
   const envVars: Record<string, string> = {
     GITHUB_TOKEN: token,
+    GITFLOW_NPM_PREFIX: npmPrefix,
     ...(port ? { PORT: port } : {}),
     ...(host ? { HOST: host } : {}),
   };
