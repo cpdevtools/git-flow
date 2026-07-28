@@ -10,37 +10,133 @@ import { URL } from 'node:url';
 // ---------------------------------------------------------------------------
 const repo = process.env['INPUT_REPO'] ?? '';
 const releaseIdRaw = process.env['INPUT_RELEASE_ID'] ?? '';
-const deployUrl = (process.env['INPUT_DEPLOY_URL'] ?? '').replace(/\/$/, '');
-const deployToken = process.env['INPUT_HMAC_SECRET'] ?? '';
-const bundle = process.env['INPUT_BUNDLE'] || 'deploy.zip';
+const deployUrl = (process.env['INPUT_DEPLOY_URL'] || process.env['DEPLOY_URL'] || '').replace(/\/$/, '');
+const deployToken = process.env['INPUT_HMAC_SECRET'] || process.env['DEPLOY_HMAC_SECRET'] || '';
+// Resolve the deploy bundle asset name: explicit INPUT_BUNDLE override wins, else
+// deploy-<type>.zip where type = deploy_type input || DEPLOY_TYPE_DEFAULT env || 'node'.
+const deployType = process.env['INPUT_DEPLOY_TYPE'] || process.env['DEPLOY_TYPE_DEFAULT'] || 'node';
+const bundle = process.env['INPUT_BUNDLE'] || `deploy-${deployType}.zip`;
 const githubToken = process.env['GITHUB_TOKEN'] ?? '';
+
+// GitHub Deployments tracking — opt-in via INPUT_ENVIRONMENT. When empty, all
+// deployment tracking is skipped and deploy behaviour is unchanged.
+const environment = process.env['INPUT_ENVIRONMENT'] ?? '';
+const githubRepository = process.env['GITHUB_REPOSITORY'] ?? '';
+const githubSha = process.env['GITHUB_SHA'] ?? '';
 
 if (!repo || !releaseIdRaw || !deployUrl || !deployToken) {
   core.setFailed('Missing required inputs: repo, release_id, deploy_url, hmac_secret');
   process.exit(1);
 }
 
-/** Accept either a numeric release ID or a tag string — resolves tag via GitHub API if needed. */
-async function resolveReleaseId(raw: string): Promise<number> {
+/** Common headers for GitHub REST API calls. */
+function ghHeaders(): Record<string, string> {
+  return {
+    ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'gitflow-deploy-action',
+  };
+}
+
+/**
+ * Resolve a release reference to its numeric ID and tag.
+ *
+ * Accepts either a numeric release ID or a tag string. The tag is used as the
+ * GitHub Deployment ref; it may be null when a numeric ID cannot be looked up
+ * (e.g. missing token) — callers fall back to GITHUB_SHA in that case.
+ */
+async function resolveRelease(raw: string): Promise<{ id: number; tag: string | null }> {
+  const [owner, repoName] = repo.split('/');
   const asNum = parseInt(raw, 10);
-  if (!isNaN(asNum) && String(asNum) === raw.trim()) return asNum;
+  const isNumeric = !isNaN(asNum) && String(asNum) === raw.trim();
+
+  if (isNumeric) {
+    // Recover the tag for the deployment ref (best-effort).
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repoName}/releases/${asNum}`,
+        { headers: ghHeaders() },
+      );
+      if (res.ok) {
+        const release = (await res.json()) as { tag_name?: string };
+        return { id: asNum, tag: release.tag_name ?? null };
+      }
+    } catch {
+      // ignore — fall back to no tag
+    }
+    return { id: asNum, tag: null };
+  }
 
   core.info(`Resolving tag "${raw}" to release ID...`);
-  const [owner, repoName] = repo.split('/');
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repoName}/releases/tags/${encodeURIComponent(raw)}`,
-    {
-      headers: {
-        ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'gitflow-deploy-action',
-      },
-    },
+    { headers: ghHeaders() },
   );
   if (!res.ok) throw new Error(`Failed to resolve tag "${raw}": ${res.status} ${await res.text()}`);
   const release = (await res.json()) as { id: number };
   core.info(`Resolved "${raw}" \u2192 release ID ${release.id}`);
-  return release.id;
+  return { id: release.id, tag: raw };
+}
+
+/**
+ * Open a GitHub Deployment against the target environment. Best-effort:
+ * returns null (and never throws) when tracking is disabled or the API call
+ * fails, so deploy behaviour is unchanged when the environment/token is absent.
+ */
+async function createDeployment(ref: string): Promise<number | null> {
+  if (!environment || !githubRepository || !githubToken || !ref) return null;
+  const [owner, repoName] = githubRepository.split('/');
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repoName}/deployments`, {
+      method: 'POST',
+      headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ref,
+        environment,
+        auto_merge: false,
+        required_contexts: [],
+        description: `Deploy ${repo} @ ${releaseIdRaw}`,
+      }),
+    });
+    if (!res.ok) {
+      core.warning(`Could not create GitHub Deployment: ${res.status} ${await res.text()}`);
+      return null;
+    }
+    const dep = (await res.json()) as { id: number };
+    core.info(`Opened GitHub Deployment ${dep.id} (${environment} @ ${ref})`);
+    return dep.id;
+  } catch (err) {
+    core.warning(`Could not create GitHub Deployment: ${String(err)}`);
+    return null;
+  }
+}
+
+/** Set a GitHub Deployment status. Best-effort — warns but never throws. */
+async function setDeploymentStatus(
+  deploymentId: number,
+  state: 'in_progress' | 'success' | 'failure',
+): Promise<void> {
+  if (!githubRepository || !githubToken) return;
+  const [owner, repoName] = githubRepository.split('/');
+  const serverUrl = process.env['GITHUB_SERVER_URL'] ?? 'https://github.com';
+  const runId = process.env['GITHUB_RUN_ID'] ?? '';
+  const logUrl = runId ? `${serverUrl}/${githubRepository}/actions/runs/${runId}` : undefined;
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repoName}/deployments/${deploymentId}/statuses`,
+      {
+        method: 'POST',
+        headers: { ...ghHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state, environment, ...(logUrl ? { log_url: logUrl } : {}) }),
+      },
+    );
+    if (!res.ok) {
+      core.warning(`Could not set deployment status (${state}): ${res.status} ${await res.text()}`);
+    }
+  } catch (err) {
+    core.warning(`Could not set deployment status (${state}): ${String(err)}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +233,12 @@ function streamLines(
 // Main
 // ---------------------------------------------------------------------------
 async function run(): Promise<void> {
-  const releaseId = await resolveReleaseId(releaseIdRaw);
+  const { id: releaseId, tag } = await resolveRelease(releaseIdRaw);
+
+  // Open a GitHub Deployment (best-effort; skipped when no environment/token).
+  const deployRef = tag ?? githubSha;
+  const deploymentId = await createDeployment(deployRef);
+  if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'in_progress');
 
   // 1. POST /deploy
   const rawBody = JSON.stringify({ repo, release_id: releaseId, bundle });
@@ -157,6 +258,7 @@ async function run(): Promise<void> {
   });
 
   if (postRes.statusCode !== 202 && postRes.statusCode !== 200) {
+    if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
     core.setFailed(`Deploy trigger failed: HTTP ${postRes.statusCode}`);
     return;
   }
@@ -212,8 +314,10 @@ async function run(): Promise<void> {
     .write();
 
   if (exitCode === null) {
+    if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
     core.setFailed('Log stream ended without EXIT marker');
   } else if (exitCode !== 0) {
+    if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
     core.setFailed(`Deploy failed (EXIT:${exitCode})`);
   } else {
     // 4. Health check — confirm service came back up after any restart
@@ -235,8 +339,10 @@ async function run(): Promise<void> {
       }
     }
     if (healthy) {
+      if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'success');
       core.info('Service is healthy ✓');
     } else {
+      if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
       core.setFailed(`Service did not return healthy within ${HEALTH_TIMEOUT_MS / 1000}s after deploy`);
     }
   }

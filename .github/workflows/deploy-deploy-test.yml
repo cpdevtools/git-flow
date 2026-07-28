@@ -9,14 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       release_id:
-        description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
+        description: "GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)"
         required: true
         type: string
       deploy_type:
-        description: 'Deploy type (node, compose, swarm). Leave blank for environment default.'
+        description: "Deploy type (node, compose, swarm). Leave blank for environment default."
         required: false
         type: string
-        default: ''
+        default: ""
 
 permissions:
   contents: read
@@ -26,26 +26,20 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: 'Deploy Test'
+    environment: "Deploy Test"
+    env:
+      DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+      DEPLOY_HMAC_SECRET: ${{ secrets.DEPLOY_HMAC_SECRET }}
+      DEPLOY_TYPE_DEFAULT: ${{ vars.DEPLOY_TYPE_DEFAULT }}
     steps:
       - name: Checkout git-flow (for action)
         uses: actions/checkout@v4
         with:
           repository: cpdevtools/git-flow
-          ref: main
           path: .git-flow-action
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 11
 
       - name: Deploy via gateway
         uses: ./.git-flow-action/actions/deploy
         with:
-          repo: ${{ github.repository }}
+          environment: "Deploy Test"
           release_id: ${{ inputs.release_id }}
-          deploy_url: ${{ vars.DEPLOY_URL }}
-          hmac_secret: ${{ secrets.DEPLOY_HMAC_SECRET }}
-          bundle: ${{ inputs.deploy_type != '' && format('deploy-{0}.zip', inputs.deploy_type) || vars.DEPLOY_TYPE_DEFAULT != '' && format('deploy-{0}.zip', vars.DEPLOY_TYPE_DEFAULT) || 'deploy-node.zip' }}
-          token: ${{ secrets.DEPLOY_TOKEN || github.token }}
