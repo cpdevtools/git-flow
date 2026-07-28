@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -9,12 +9,12 @@ export interface DownloadOptions {
   owner: string;
   repo: string;
   token: string;
-  /** Override the base install directory. Defaults to /opt/git-flow-deploy-service */
+  /** Override the base install directory. Defaults to ~/git-flow-deploy-service */
   installDir?: string;
 }
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
-const DEFAULT_INSTALL_BASE = '/opt/git-flow-deploy-service';
+const DEFAULT_INSTALL_BASE = join(homedir(), 'git-flow-deploy-service');
 
 export async function downloadBundle(options: DownloadOptions): Promise<string> {
   const { method, version, owner, repo, token, installDir } = options;

@@ -81,8 +81,8 @@ async function main(): Promise<void> {
     console.error('  --latest   Resolve and install the latest published release');
     console.error('  --token        GitHub token (default: GITHUB_TOKEN env var)');
     console.error('  --repo         GitHub repo (default: cpdevtools/git-flow)');
-    console.error('  --install-dir  Override install directory (default: /opt/git-flow-deploy-service)');
-    console.error('  --npm-prefix   Custom npm prefix for global install (e.g. ~/npm-packages)');
+    console.error('  --install-dir  Override install directory (default: ~/git-flow-deploy-service)');
+    console.error('  --npm-prefix   Custom npm prefix for global install (default: ~/.npm-global)');
     console.error('  --hmac-secret  HMAC secret for webhook validation (required for first-time node setup)');
     console.error('  --port         Service port (default: 3700)');
     console.error('  --host         Bind address (default: 0.0.0.0)');

@@ -1,18 +1,32 @@
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/** Returns an env object with the npm global bin directory prepended to PATH */
-function withGlobalBinInPath(): NodeJS.ProcessEnv {
+/**
+ * Default npm prefix for global installs when --npm-prefix is not provided.
+ * Home-based so installs work as a non-root user without writing to system
+ * directories (e.g. the nvm-managed global node_modules).
+ */
+function defaultNpmPrefix(): string {
+  return join(homedir(), '.npm-global');
+}
+
+/**
+ * Returns an env object with the given prefix's bin directory (and the npm
+ * global bin directory as a fallback) prepended to PATH, so binaries installed
+ * under a custom prefix (pm2, the service) are discoverable.
+ */
+function withGlobalBinInPath(prefix: string): NodeJS.ProcessEnv {
+  const bins = [join(prefix, 'bin')];
   try {
-    const prefix = execSync('npm prefix -g', { encoding: 'utf-8' }).trim();
-    const globalBin = join(prefix, 'bin');
-    const currentPath = process.env['PATH'] ?? '';
-    return { ...process.env, PATH: `${globalBin}:${currentPath}` };
+    const globalBin = join(execSync('npm prefix -g', { encoding: 'utf-8' }).trim(), 'bin');
+    if (globalBin !== bins[0]) bins.push(globalBin);
   } catch {
-    return process.env;
+    // npm prefix -g may fail in minimal environments — the custom prefix bin is enough
   }
+  const currentPath = process.env['PATH'] ?? '';
+  return { ...process.env, PATH: [...bins, currentPath].filter(Boolean).join(':') };
 }
 
 export interface NodeHandlerOptions {
@@ -33,29 +47,45 @@ const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
 const NPM_REGISTRY = 'https://npm.pkg.github.com';
 const PM2_APP_NAME = 'git-flow-deploy-service';
 
+/**
+ * Absolute path to the pm2 binary under the given prefix, falling back to a
+ * PATH-resolved `pm2` when it isn't installed under the prefix. Using the
+ * absolute path means the service lifecycle never depends on the host having
+ * the prefix's bin directory on PATH.
+ */
+function pm2Bin(prefix: string): string {
+  const local = join(prefix, 'bin', 'pm2');
+  return existsSync(local) ? local : 'pm2';
+}
+
 export async function handleNode(options: NodeHandlerOptions): Promise<void> {
   const { extractDir, version, token, npmPrefix, hmacSecret, port, host } = options;
 
-  const isRunning = isPm2AppRunning();
+  // Resolve the npm prefix once (defaults to a home-based, user-writable prefix)
+  // and ensure it exists so every global install below targets the same location.
+  const prefix = npmPrefix ?? defaultNpmPrefix();
+  mkdirSync(prefix, { recursive: true });
+
+  const isRunning = isPm2AppRunning(prefix);
 
   if (!isRunning) {
-    await firstTimeSetup(extractDir, version, token, npmPrefix, hmacSecret, port, host);
+    await firstTimeSetup(extractDir, version, token, prefix, hmacSecret, port, host);
   } else {
-    await updateExisting(extractDir, version, token, npmPrefix, port, host);
+    await updateExisting(extractDir, version, token, prefix, port, host);
   }
 }
 
-async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix?: string, hmacSecret?: string, port?: string, host?: string): Promise<void> {
+async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix: string, hmacSecret?: string, port?: string, host?: string): Promise<void> {
   console.log('First-time setup detected...\n');
 
   if (!hmacSecret) {
     throw new Error('--hmac-secret is required for first-time setup (used as DEPLOY_HMAC_SECRET)');
   }
 
-  // Ensure pm2 is installed globally
-  if (!isPm2Available()) {
-    console.log('Installing pm2 globally...');
-    execSync('npm install -g pm2', { stdio: 'inherit', env: withGlobalBinInPath() });
+  // Ensure pm2 is installed under the same (writable) prefix as the service
+  if (!isPm2Available(npmPrefix)) {
+    console.log(`Installing pm2 (prefix: ${npmPrefix})...`);
+    execSync(`npm install -g --prefix "${npmPrefix}" pm2`, { stdio: 'inherit', env: withGlobalBinInPath(npmPrefix) });
   } else {
     console.log('pm2 already installed ✓');
   }
@@ -74,17 +104,18 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   };
   patchEcosystemEnv(ecoPath, envVars);
 
-  // Start with pm2
+  // Start with pm2 (absolute path so this never depends on PATH configuration)
   console.log('\nStarting service with pm2...');
-  const pathEnv = withGlobalBinInPath();
-  execSync(`pm2 start "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
-  execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
+  const pm2 = pm2Bin(npmPrefix);
+  const pathEnv = withGlobalBinInPath(npmPrefix);
+  execSync(`"${pm2}" start "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync(`"${pm2}" save`, { stdio: 'inherit', env: pathEnv });
 
   // Print pm2 startup command for the operator
-  printStartupHint();
+  printStartupHint(pm2);
 }
 
-async function updateExisting(extractDir: string, version: string, token: string, npmPrefix?: string, port?: string, host?: string): Promise<void> {
+async function updateExisting(extractDir: string, version: string, token: string, npmPrefix: string, port?: string, host?: string): Promise<void> {
   console.log('Existing pm2 process detected — running update...\n');
 
   installGlobally(version, token, npmPrefix);
@@ -99,17 +130,18 @@ async function updateExisting(extractDir: string, version: string, token: string
   patchEcosystemEnv(ecoPath, envVars);
 
   // Reload via ecosystem file path so pm2 picks up updated env vars
+  // (absolute pm2 path so this never depends on PATH configuration)
   console.log('\nReloading pm2 process...');
-  const pathEnv = withGlobalBinInPath();
-  execSync(`pm2 restart "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
-  execSync('pm2 save', { stdio: 'inherit', env: pathEnv });
+  const pm2 = pm2Bin(npmPrefix);
+  const pathEnv = withGlobalBinInPath(npmPrefix);
+  execSync(`"${pm2}" restart "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync(`"${pm2}" save`, { stdio: 'inherit', env: pathEnv });
 
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
 }
 
-function installGlobally(version: string, token: string, npmPrefix?: string): void {
-  const destination = npmPrefix ? `prefix: ${npmPrefix}` : 'global';
-  console.log(`\nInstalling ${PACKAGE_NAME}@${version} (${destination}) from ${NPM_REGISTRY}...`);
+function installGlobally(version: string, token: string, npmPrefix: string): void {
+  console.log(`\nInstalling ${PACKAGE_NAME}@${version} (prefix: ${npmPrefix}) from ${NPM_REGISTRY}...`);
 
   // Write a scoped .npmrc so only @cpdevtools resolves via GitHub Packages;
   // passing --registry would override the registry for ALL deps (including @nestjs/*)
@@ -120,11 +152,10 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
     `@cpdevtools:registry=${NPM_REGISTRY}\n//${new URL(NPM_REGISTRY).host}/:_authToken=${token}\n`,
   );
 
-  const prefixFlag = npmPrefix ? `--prefix "${npmPrefix}"` : '';
   try {
-    execSync(`npm install -g ${prefixFlag} "${PACKAGE_NAME}@${version}"`, {
+    execSync(`npm install -g --prefix "${npmPrefix}" "${PACKAGE_NAME}@${version}"`, {
       stdio: 'inherit',
-      env: { ...withGlobalBinInPath(), NPM_CONFIG_USERCONFIG: npmrcPath },
+      env: { ...withGlobalBinInPath(npmPrefix), NPM_CONFIG_USERCONFIG: npmrcPath },
     });
   } finally {
     try { execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
@@ -133,20 +164,20 @@ function installGlobally(version: string, token: string, npmPrefix?: string): vo
   console.log('Install complete ✓');
 }
 
-function isPm2AppRunning(): boolean {
+function isPm2AppRunning(prefix: string): boolean {
   try {
-    const env = withGlobalBinInPath();
+    const env = withGlobalBinInPath(prefix);
     // pm2 describe exits 0 if the app is known to pm2, non-zero if not
-    const result = spawnSync('pm2', ['describe', PM2_APP_NAME], { encoding: 'utf-8', env });
+    const result = spawnSync(pm2Bin(prefix), ['describe', PM2_APP_NAME], { encoding: 'utf-8', env });
     return result.status === 0 && result.stdout.includes(PM2_APP_NAME);
   } catch {
     return false;
   }
 }
 
-function isPm2Available(): boolean {
+function isPm2Available(prefix: string): boolean {
   try {
-    execSync('pm2 --version', { stdio: 'pipe', env: withGlobalBinInPath() });
+    execSync(`"${pm2Bin(prefix)}" --version`, { stdio: 'pipe', env: withGlobalBinInPath(prefix) });
     return true;
   } catch {
     return false;
@@ -226,10 +257,11 @@ function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void 
   console.log(`Patched ecosystem.config.js: env vars → ${Object.keys(vars).join(', ')}`);
 }
 
-function printStartupHint(): void {  console.log('\n' + '─'.repeat(70));
+function printStartupHint(pm2: string): void {
+  console.log('\n' + '─'.repeat(70));
   console.log('⚡ To configure pm2 to start on system boot, run:');
   console.log('');
-  console.log('   pm2 startup');
+  console.log(`   ${pm2} startup`);
   console.log('');
   console.log('   Then copy and run the command it prints (requires root/sudo).');
   console.log('─'.repeat(70) + '\n');
