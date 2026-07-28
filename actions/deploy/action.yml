@@ -17,17 +17,29 @@ inputs:
     required: true
 
   deploy_url:
-    description: 'Base URL of the deploy gateway (e.g. https://deploy.example.com)'
-    required: true
+    description: 'Base URL of the deploy gateway (e.g. https://deploy.example.com). Falls back to the DEPLOY_URL env var (e.g. a job-level env from vars.DEPLOY_URL).'
+    required: false
+    default: ''
 
   hmac_secret:
-    description: 'HMAC shared secret for signing deploy requests (DEPLOY_HMAC_SECRET from the GitHub Environment)'
-    required: true
+    description: 'HMAC shared secret for signing deploy requests. Falls back to the DEPLOY_HMAC_SECRET env var (e.g. a job-level env from secrets.DEPLOY_HMAC_SECRET).'
+    required: false
+    default: ''
+
+  deploy_type:
+    description: 'Deploy method (node, compose, swarm, …) selecting the deploy-<type>.zip bundle. Falls back to the DEPLOY_TYPE_DEFAULT env var, then to "node".'
+    required: false
+    default: ''
 
   bundle:
-    description: 'Deploy bundle asset name (e.g. deploy-compose.zip). Defaults to deploy.zip'
+    description: 'Explicit deploy bundle asset name. Overrides deploy_type resolution. Defaults to deploy-<type>.zip (type = deploy_type || DEPLOY_TYPE_DEFAULT || node).'
     required: false
-    default: 'deploy.zip'
+    default: ''
+
+  environment:
+    description: 'GitHub Environment name for deployment tracking (omit to skip GitHub Deployments API tracking)'
+    required: false
+    default: ''
 
   token:
     description: 'GitHub token for registry auth and API access (defaults to GITHUB_TOKEN)'
@@ -37,6 +49,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+      with:
+        version: 11
+
     - name: Configure registry auth
       shell: bash
       run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
@@ -64,3 +81,6 @@ runs:
         INPUT_DEPLOY_URL: ${{ inputs.deploy_url }}
         INPUT_HMAC_SECRET: ${{ inputs.hmac_secret }}
         INPUT_BUNDLE: ${{ inputs.bundle }}
+        INPUT_DEPLOY_TYPE: ${{ inputs.deploy_type }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        GITHUB_TOKEN: ${{ inputs.token }}
