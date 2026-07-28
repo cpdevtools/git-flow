@@ -30,6 +30,7 @@ const GROUP_ORDER: BumpOption['group'][] = [
   'stay-prerelease',
   'finish-prerelease',
   'next-version',
+  'next-version-stable',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

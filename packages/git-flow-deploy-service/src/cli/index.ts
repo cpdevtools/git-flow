@@ -18,21 +18,24 @@ function parseArgs(): {
   'hmac-secret'?: string;
   'port'?: string;
   'host'?: string;
+  'enable-boot': boolean;
 } {
   const argv = process.argv.slice(2);
-  const result: Record<string, string | boolean> = { latest: false, repo: 'cpdevtools/git-flow' };
+  const result: Record<string, string | boolean> = { latest: false, repo: 'cpdevtools/git-flow', 'enable-boot': false };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--latest') {
       result['latest'] = true;
+    } else if (arg === '--enable-boot') {
+      result['enable-boot'] = true;
     } else if (arg.startsWith('--')) {
       const key = arg.slice(2);
       result[key] = argv[++i] ?? '';
     }
   }
 
-  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string; 'install-dir'?: string; 'npm-prefix'?: string; 'hmac-secret'?: string; 'port'?: string; 'host'?: string };
+  return result as { method?: string; version?: string; latest: boolean; token?: string; repo: string; 'install-dir'?: string; 'npm-prefix'?: string; 'hmac-secret'?: string; 'port'?: string; 'host'?: string; 'enable-boot': boolean };
 }
 
 async function resolveLatestVersion(owner: string, repo: string, token: string): Promise<string> {
@@ -86,6 +89,7 @@ async function main(): Promise<void> {
     console.error('  --hmac-secret  HMAC secret for webhook validation (required for first-time node setup)');
     console.error('  --port         Service port (default: 3700)');
     console.error('  --host         Bind address (default: 0.0.0.0)');
+    console.error('  --enable-boot  Configure pm2 to start on system boot (runs one sudo step; node method only)');
     process.exit(1);
   }
 
@@ -123,6 +127,7 @@ async function main(): Promise<void> {
   const hmacSecret = args['hmac-secret'];
   const port = args['port'];
   const host = args['host'];
+  const enableBoot = args['enable-boot'];
 
   console.log(`\nDeploying ${PACKAGE_NAME} v${version} (method: ${method}) from ${owner}/${repoName}...\n`);
 
@@ -130,7 +135,7 @@ async function main(): Promise<void> {
 
   switch (method) {
     case 'node':
-      await handleNode({ extractDir, version, token, npmPrefix, hmacSecret, port, host });
+      await handleNode({ extractDir, version, token, npmPrefix, hmacSecret, port, host, enableBoot });
       break;
     case 'compose':
       await handleCompose({ extractDir });
