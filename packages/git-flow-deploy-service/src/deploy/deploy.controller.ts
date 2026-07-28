@@ -20,6 +20,7 @@ import { HmacGuard } from './hmac.guard.js';
 import { ConfigService } from './config.service.js';
 import { ReposConfigService } from './repos-config.service.js';
 import type { DeployRecord } from './deploy-record.js';
+import { getServiceInfo } from '../version.js';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 
@@ -34,8 +35,9 @@ export class DeployController {
   ) {}
 
   @Get('health')
-  health(): { ok: boolean } {
-    return { ok: true };
+  health(): { ok: boolean; name: string; version: string } {
+    const { name, version } = getServiceInfo();
+    return { ok: true, name, version };
   }
 
   @UseGuards(HmacGuard)
