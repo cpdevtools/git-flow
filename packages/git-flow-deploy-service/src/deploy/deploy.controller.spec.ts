@@ -53,8 +53,15 @@ describe('DeployController', () => {
   // GET /health
   // ---------------------------------------------------------------------------
   describe('GET /health', () => {
-    it('returns 200 {ok: true}', () => {
-      return request(app.getHttpServer()).get('/health').expect(200).expect({ ok: true });
+    it('returns 200 with ok:true and service info', () => {
+      return request(app.getHttpServer())
+        .get('/health')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.ok).toBe(true);
+          expect(typeof res.body.name).toBe('string');
+          expect(typeof res.body.version).toBe('string');
+        });
     });
   });
 

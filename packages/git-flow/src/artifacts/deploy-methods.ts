@@ -175,6 +175,88 @@ registerDeployMethod('docker', 'swarm', {
 });
 
 // ── npm.node ───────────────────────────────────────────────────────────────
+
+/**
+ * Restart supervisor bundled into every npm.node deploy (written as restart.sh).
+ *
+ * The pm2 restart swaps the service onto the freshly-installed version, which
+ * KILLS this very process (the service is what's running the deploy). To
+ * survive, the supervisor re-execs itself in a new session (setsid) and writes
+ * ALL output to a durable, timestamped log file — output is NEVER discarded.
+ * After restarting it polls /health and, when the service reports a version,
+ * verifies it matches the deployed version so a failed/partial restart is
+ * recorded instead of silently reported as success.
+ */
+const NODE_RESTART_SCRIPT = `#!/bin/sh
+# Supervised restart for a node (npm + pm2) deploy. Output is never discarded:
+# everything is written to a durable, timestamped log and the new version is
+# verified via /health.
+set -u
+
+VERSION="\${1:-}"
+NPM_PREFIX="\${GITFLOW_NPM_PREFIX:-$HOME/.npm-global}"
+PM2="$NPM_PREFIX/bin/pm2"
+PORT="\${PORT:-3700}"
+LOG_DIR="\${GITFLOW_RESTART_LOG_DIR:-$HOME/.git-flow-deploy/restart-logs}"
+mkdir -p "$LOG_DIR"
+
+# Phase 1 (attached): launch the detached supervisor, report where the log is,
+# then return promptly so the deploy's own log stream can flush.
+if [ "\${GITFLOW_RESTART_DETACHED:-}" != "1" ]; then
+  LOG="$LOG_DIR/restart-$(date -u +%Y%m%dT%H%M%SZ).log"
+  ln -sf "$LOG" "$LOG_DIR/latest.log" 2>/dev/null || true
+  echo "\\u25b8 Restart running in background (survives the restart)."
+  echo "\\u25b8 Full restart log: $LOG"
+  GITFLOW_RESTART_DETACHED=1 setsid sh "$0" "$VERSION" >"$LOG" 2>&1 </dev/null &
+  exit 0
+fi
+
+# Phase 2 (detached): perform the restart + verification, all captured to the log.
+echo "=== restart $(date -u +%FT%TZ) -> v\${VERSION:-?} ==="
+
+# Give the deploy HTTP response / log stream a moment to flush before we kill it.
+sleep 3
+
+# Restart by app name (reuses the running app's absolute script path) when it can
+# be resolved from ecosystem.config.js; otherwise fall back to the config file.
+APP=$(node -e "try{const c=require(process.cwd()+'/ecosystem.config.js');const a=((c&&c.apps)||(c&&c.default&&c.default.apps)||[])[0];process.stdout.write((a&&a.name)||'')}catch(e){}" 2>/dev/null)
+if [ -n "$APP" ]; then
+  echo "\\u25b8 pm2 restart $APP --update-env"
+  "$PM2" restart "$APP" --update-env
+else
+  echo "\\u25b8 pm2 restart ecosystem.config.js --update-env"
+  "$PM2" restart ecosystem.config.js --update-env
+fi
+rc=$?
+if [ "$rc" -ne 0 ]; then
+  echo "\\u2717 pm2 restart exited $rc"
+  exit "$rc"
+fi
+
+echo "\\u25b8 Verifying /health on 127.0.0.1:$PORT ..."
+i=0
+while [ "$i" -lt 30 ]; do
+  i=$((i + 1))
+  sleep 2
+  body=$(node -e "fetch('http://127.0.0.1:$PORT/health').then(r=>r.text()).then(t=>process.stdout.write(t)).catch(()=>process.exit(1))" 2>/dev/null) || { echo "  [$i] no response yet"; continue; }
+  echo "  [$i] health: $body"
+  got=$(printf '%s' "$body" | sed -n 's/.*"version"[": ]*"\\([^"]*\\)".*/\\1/p')
+  if [ -z "$got" ]; then
+    echo "\\u2713 Service healthy (no version reported by /health)."
+    exit 0
+  fi
+  if [ "$got" = "$VERSION" ]; then
+    echo "\\u2713 Restart verified: now running v$got."
+    exit 0
+  fi
+  echo "\\u2717 Version mismatch: /health reports v$got, expected v$VERSION."
+  exit 1
+done
+
+echo "\\u26a0 Restart issued but /health did not confirm within timeout."
+exit 0
+`;
+
 registerDeployMethod('npm', 'node', {
   async copyFiles({ projectCwd, deployOutputDir }) {
     const ecoFile = join(projectCwd, 'ecosystem.config.js');
@@ -191,15 +273,19 @@ registerDeployMethod('npm', 'node', {
     ].join(' && ');
     // Install into a user-writable prefix (defaults to ~/.npm-global, matching
     // the self-installer) so the unprivileged service user can update itself
-    // without EACCES on the root-owned global node_modules. pm2 is invoked by
-    // its absolute path under the same prefix so the restart never depends on
-    // PATH. GITFLOW_NPM_PREFIX (exported by the service) overrides the default.
+    // without EACCES on the root-owned global node_modules. GITFLOW_NPM_PREFIX
+    // (exported by the service) overrides the default.
     const prefixExpr = `NPM_PREFIX="\${GITFLOW_NPM_PREFIX:-$HOME/.npm-global}"`;
     const installCmd = `npm install -g --prefix "$NPM_PREFIX" ${projectName}@${version}`;
-    const restartCmd = `(sleep 5 && "$NPM_PREFIX/bin/pm2" restart ecosystem.config.js --update-env </dev/null >/dev/null 2>&1 &)`;
+    // restart.sh supervises the pm2 restart: it survives the restart that kills
+    // this process, logs ALL output to a durable file (never /dev/null), and
+    // verifies /health reports the new version.
+    await writeFile(join(deployOutputDir, 'restart.sh'), NODE_RESTART_SCRIPT);
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "\\u25b8 Service restarting..." && ${restartCmd}` }),
+      stringify({
+        deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "\\u25b8 Service updated; restarting (supervised)..." && sh ./restart.sh "${version}"`,
+      }),
     );
   },
 });

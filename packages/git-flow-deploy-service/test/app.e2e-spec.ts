@@ -41,11 +41,14 @@ describe('Deploy Service (e2e)', () => {
   // ---------------------------------------------------------------------------
 
   describe('GET /health', () => {
-    it('returns { ok: true } without authentication', async () => {
+    it('returns ok:true with service info, without authentication', async () => {
       await request(app.getHttpServer())
         .get('/health')
         .expect(200)
-        .expect({ ok: true });
+        .expect((res) => {
+          expect(res.body.ok).toBe(true);
+          expect(typeof res.body.version).toBe('string');
+        });
     });
   });
 
