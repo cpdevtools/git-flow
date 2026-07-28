@@ -23,6 +23,7 @@ jobs:
       contents: write
       packages: write
     steps:
+      - uses: actions/checkout@v7
       - uses: ./actions/cleanup-old-builds
         with:
           days-old: ${{ inputs.days_old }}
