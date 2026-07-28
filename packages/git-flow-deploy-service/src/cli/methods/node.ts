@@ -1,6 +1,6 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 
 /**
@@ -41,6 +41,12 @@ export interface NodeHandlerOptions {
   port?: string;
   /** Override bind host (default: 0.0.0.0) */
   host?: string;
+  /**
+   * When true, configure pm2 to resurrect the service on system boot. This runs
+   * a single privileged (sudo) `pm2 startup` step; the service itself keeps
+   * running as the current unprivileged user.
+   */
+  enableBoot?: boolean;
 }
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
@@ -59,7 +65,7 @@ function pm2Bin(prefix: string): string {
 }
 
 export async function handleNode(options: NodeHandlerOptions): Promise<void> {
-  const { extractDir, version, token, npmPrefix, hmacSecret, port, host } = options;
+  const { extractDir, version, token, npmPrefix, hmacSecret, port, host, enableBoot } = options;
 
   // Resolve the npm prefix once (defaults to a home-based, user-writable prefix)
   // and ensure it exists so every global install below targets the same location.
@@ -69,13 +75,13 @@ export async function handleNode(options: NodeHandlerOptions): Promise<void> {
   const isRunning = isPm2AppRunning(prefix);
 
   if (!isRunning) {
-    await firstTimeSetup(extractDir, version, token, prefix, hmacSecret, port, host);
+    await firstTimeSetup(extractDir, version, token, prefix, hmacSecret, port, host, enableBoot);
   } else {
-    await updateExisting(extractDir, version, token, prefix, port, host);
+    await updateExisting(extractDir, version, token, prefix, port, host, enableBoot);
   }
 }
 
-async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix: string, hmacSecret?: string, port?: string, host?: string): Promise<void> {
+async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix: string, hmacSecret?: string, port?: string, host?: string, enableBoot?: boolean): Promise<void> {
   console.log('First-time setup detected...\n');
 
   if (!hmacSecret) {
@@ -111,11 +117,16 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   execSync(`"${pm2}" start "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
   execSync(`"${pm2}" save`, { stdio: 'inherit', env: pathEnv });
 
-  // Print pm2 startup command for the operator
-  printStartupHint(pm2);
+  // Configure boot persistence for the operator when opted in, otherwise just
+  // print the one privileged command they can run themselves.
+  if (enableBoot) {
+    configureBootStartup(pm2, npmPrefix);
+  } else {
+    printStartupHint(pm2);
+  }
 }
 
-async function updateExisting(extractDir: string, version: string, token: string, npmPrefix: string, port?: string, host?: string): Promise<void> {
+async function updateExisting(extractDir: string, version: string, token: string, npmPrefix: string, port?: string, host?: string, enableBoot?: boolean): Promise<void> {
   console.log('Existing pm2 process detected — running update...\n');
 
   installGlobally(version, token, npmPrefix);
@@ -136,6 +147,10 @@ async function updateExisting(extractDir: string, version: string, token: string
   const pathEnv = withGlobalBinInPath(npmPrefix);
   execSync(`"${pm2}" restart "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
   execSync(`"${pm2}" save`, { stdio: 'inherit', env: pathEnv });
+
+  if (enableBoot) {
+    configureBootStartup(pm2, npmPrefix);
+  }
 
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
 }
@@ -265,4 +280,31 @@ function printStartupHint(pm2: string): void {
   console.log('');
   console.log('   Then copy and run the command it prints (requires root/sudo).');
   console.log('─'.repeat(70) + '\n');
+}
+
+/**
+ * Configures pm2 to resurrect the service on system boot. This is the ONLY step
+ * that needs elevated privileges (writing a systemd/init unit), so it is run
+ * with sudo while the service itself keeps running as the current, unprivileged
+ * user. The generated unit runs `pm2 resurrect` as that user — the service
+ * never runs as root.
+ */
+function configureBootStartup(pm2: string, npmPrefix: string): void {
+  const { username } = userInfo();
+  const home = homedir();
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  const sudo = isRoot ? '' : 'sudo ';
+  // env PATH="$PATH" bakes the current PATH (incl. node + the prefix bin) into
+  // the generated boot unit so `pm2 resurrect` can find node at boot time.
+  const cmd = `${sudo}env PATH="$PATH" "${pm2}" startup -u "${username}" --hp "${home}"`;
+
+  console.log('\nConfiguring pm2 to start on system boot...');
+  if (!isRoot) console.log('  (sudo may prompt for your password)');
+  try {
+    execSync(cmd, { stdio: 'inherit', env: withGlobalBinInPath(npmPrefix) });
+    console.log('✓ Boot startup configured — the service will resurrect on reboot.');
+  } catch {
+    console.warn('⚠ Could not configure boot startup automatically. Run this manually:');
+    console.warn(`   ${cmd}`);
+  }
 }

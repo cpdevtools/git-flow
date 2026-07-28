@@ -10,7 +10,7 @@ export interface BumpOption {
   label: string;
   result: string;
   description: string;
-  group: 'finish-prerelease' | 'stay-prerelease' | 'next-version';
+  group: 'finish-prerelease' | 'stay-prerelease' | 'next-version' | 'next-version-stable';
   disabled?: boolean;
   disabledReason?: string;
 }
@@ -56,6 +56,33 @@ function changeChannel(prerelease: string[], newChannel: Channel): string[] {
     result.push('0');
   }
   return result;
+}
+
+/**
+ * Build the patch/minor/major bump options for a base version. Each bump yields
+ * both a pre-release (`-dev.0`) option and a direct stable option, so the caller
+ * can offer "start a pre-release" and "ship a stable release" side by side.
+ */
+function nextVersionOptions(base: string): BumpOption[] {
+  const opts: BumpOption[] = [];
+  for (const bump of ['patch', 'minor', 'major'] as const) {
+    const bumped = semver.inc(base, bump)!;
+    opts.push({
+      id: bump,
+      label: bump,
+      result: buildVersion(bumped, ['dev', '0']),
+      description: 'pre-release',
+      group: 'next-version',
+    });
+    opts.push({
+      id: `${bump}-stable`,
+      label: bump,
+      result: bumped,
+      description: 'stable',
+      group: 'next-version-stable',
+    });
+  }
+  return opts;
 }
 
 /**
@@ -107,28 +134,10 @@ export function computeBumpOptions(currentVersion: string): BumpOption[] {
     }
 
     // ── next-version ──────────────────────────────────────────────────────
-    for (const bump of ['patch', 'minor', 'major'] as const) {
-      const bumped = semver.inc(base, bump)!;
-      options.push({
-        id: bump,
-        label: bump,
-        result: buildVersion(bumped, ['dev', '0']),
-        description: '',
-        group: 'next-version',
-      });
-    }
+    options.push(...nextVersionOptions(base));
   } else {
-    // ── stable: next-version only ─────────────────────────────────────────
-    for (const bump of ['patch', 'minor', 'major'] as const) {
-      const bumped = semver.inc(base, bump)!;
-      options.push({
-        id: bump,
-        label: bump,
-        result: buildVersion(bumped, ['dev', '0']),
-        description: '',
-        group: 'next-version',
-      });
-    }
+    // ── stable: next-version (pre-release + stable variants) ──────────────
+    options.push(...nextVersionOptions(base));
   }
 
   return options;
