@@ -8,6 +8,7 @@ import {
   readFileSync,
   writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { DeployRecord, DeployStatus } from './deploy-record.js';
 import { getServiceInfo } from '../version.js';
@@ -40,7 +41,10 @@ const TAIL_MAX_WAIT_MS = 5 * 60_000;
 @Injectable()
 export class DeployStore implements OnModuleInit {
   private readonly records = new Map<number, DeployRecord>();
-  private readonly workDir: string = process.env['DEPLOY_WORK_DIR'] ?? '/tmp/deployments';
+  // Must match ConfigService.workDir so boot-restore reads the same durable
+  // deploy.log the running service wrote (shared across methods via bind mount).
+  private readonly workDir: string =
+    process.env['DEPLOY_WORK_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'work');
 
   onModuleInit(): void {
     this.loadPersistedRecords();

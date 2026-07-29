@@ -5,12 +5,17 @@ services:
       - "3700:3700"
     environment:
       DEPLOY_WORK_DIR: /var/deploy/work
+      DEPLOY_STATE_DIR: /var/deploy/state
       SHARED_STORAGE_BASE_DIR: /var/deploy/shared
     secrets:
       - DEPLOY_HMAC_SECRET
       - GITHUB_TOKEN
     volumes:
-      - work:/var/deploy/work
+      # Work dir + per-slot state live on a HOST path shared with the node method
+      # so a mode-change hands the in-flight deploy record/log across the runtime
+      # boundary: the new task restores it on boot and finalizes status.
+      - ${HOME}/.git-flow-deploy-service/work:/var/deploy/work
+      - ${HOME}/.git-flow-deploy-service/state:/var/deploy/state
       - shared:/var/deploy/shared
       # Required so the containerized service can run `docker`/`docker stack`
       # deploys against the host Docker engine.
@@ -23,7 +28,6 @@ services:
         order: start-first
 
 volumes:
-  work:
   shared:
 
 secrets:

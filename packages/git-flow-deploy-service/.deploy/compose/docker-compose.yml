@@ -5,6 +5,7 @@ services:
       - "3700:3700"
     environment:
       DEPLOY_WORK_DIR: /var/deploy/work
+      DEPLOY_STATE_DIR: /var/deploy/state
       SHARED_STORAGE_BASE_DIR: /var/deploy/shared
       # Non-swarm `docker compose` cannot consume external (swarm) secrets, so the
       # HMAC secret and GitHub token are passed through from the environment of the
@@ -13,7 +14,12 @@ services:
       DEPLOY_HMAC_SECRET: "${DEPLOY_HMAC_SECRET:?DEPLOY_HMAC_SECRET must be set in the environment running docker compose}"
       GITHUB_TOKEN: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set in the environment running docker compose}"
     volumes:
-      - work:/var/deploy/work
+      # Work dir + per-slot state live on a HOST path shared with the node method
+      # (same ~/.git-flow-deploy-service paths), so a mode-change (e.g. node →
+      # compose) hands the in-flight deploy record/log across the runtime boundary:
+      # the new container restores it on boot and finalizes status for the client.
+      - ${HOME}/.git-flow-deploy-service/work:/var/deploy/work
+      - ${HOME}/.git-flow-deploy-service/state:/var/deploy/state
       - shared:/var/deploy/shared
       # Required so the containerized service can run `docker compose`/`docker`
       # deploys against the host Docker engine.
@@ -21,5 +27,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  work:
   shared:
