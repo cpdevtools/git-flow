@@ -193,7 +193,6 @@ async function dispatchWorkflow(
   repo: string,
   target: DeployTarget,
   branch: string,
-  fullRepo: string,
   releaseId: number,
   method?: string,
 ): Promise<string> {
@@ -206,7 +205,6 @@ async function dispatchWorkflow(
       body: JSON.stringify({
         ref: branch,
         inputs: {
-          repo: fullRepo,
           release_id: String(releaseId),
           ...(method ? { deploy_type: method } : {}),
         },
@@ -427,7 +425,6 @@ export default class Deploy extends Command {
         repoName,
         target,
         branch,
-        repo,
         d.release.id,
         d.method,
       );
