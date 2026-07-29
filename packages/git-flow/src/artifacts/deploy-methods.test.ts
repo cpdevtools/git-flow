@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse } from 'yaml';
@@ -30,6 +30,10 @@ async function readDeployYml(): Promise<Record<string, unknown>> {
   return parse(await readFile(join(dir, 'deploy.yml'), 'utf-8')) as Record<string, unknown>;
 }
 
+async function readEnv(): Promise<string> {
+  return readFile(join(dir, '.env'), 'utf-8');
+}
+
 describe('docker.compose generateDeployYml', () => {
   it('singleton: slot = safeName and pins a stable -p project on up + down', async () => {
     await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose'));
@@ -51,6 +55,17 @@ describe('docker.compose generateDeployYml', () => {
     expect(m.deployCommand).toContain('-p org-svc-v2');
     expect(m.teardownCommand).toBe('docker compose -p org-svc-v2 down');
   });
+
+  it('pins the image to the release version via .env', async () => {
+    await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose'));
+    expect(await readEnv()).toBe('DEPLOY_IMAGE_TAG=2.3.5\n');
+  });
+
+  it('preserves unrelated .env lines and replaces a stale tag', async () => {
+    await writeFile(join(dir, '.env'), 'FOO=bar\nDEPLOY_IMAGE_TAG=0.0.1\n');
+    await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose'));
+    expect(await readEnv()).toBe('FOO=bar\nDEPLOY_IMAGE_TAG=2.3.5\n');
+  });
 });
 
 describe('docker.swarm generateDeployYml', () => {
@@ -69,6 +84,11 @@ describe('docker.swarm generateDeployYml', () => {
     expect(m.slot).toBe('org-svc-v2');
     expect(m.deployCommand).toBe('docker stack deploy -c stack.yml org_svc_v2');
     expect(m.teardownCommand).toBe('docker stack rm org_svc_v2');
+  });
+
+  it('pins the image to the release version via .env', async () => {
+    await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm'));
+    expect(await readEnv()).toBe('DEPLOY_IMAGE_TAG=2.3.5\n');
   });
 });
 

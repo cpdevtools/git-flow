@@ -214,13 +214,22 @@ const nuget: ArtifactType<NuGetArtifact> = {
 /** Docker — save the built image to a tarball artifact; publish loads & pushes it */
 const docker: ArtifactType<DockerArtifact> = {
   async pack(artifact, ctx) {
-    // Derive image name if absent: ghcr.io/{owner}/{bare-project-name}
+    // Derive image name if absent: ghcr.io/{owner}/{unscoped-project-name}
+    //
+    // The npm scope must be DROPPED, not flattened. The registry path already
+    // carries the org, so `safeName('@cpdevtools/git-flow-deploy-service')`
+    // would produce ghcr.io/cpdevtools/cpdevtools-git-flow-deploy-service —
+    // the org repeated. Strip the scope so it stays
+    // ghcr.io/cpdevtools/git-flow-deploy-service.
     if (!artifact.name) {
       const owner = process.env.GITHUB_REPOSITORY_OWNER ?? '';
-      const bareName = safeName(ctx.projectName);
+      const bareName = safeName(ctx.projectName.replace(/^@[^/]+\//, ''));
       (artifact as { name: string }).name = `ghcr.io/${owner}/${bareName}`;
     }
-    // localTag is the image as it was built locally (no registry prefix)
+    // localTag is the image as it was built locally (no registry prefix). This
+    // one KEEPS the flattened scope (`cpdevtools-git-flow-deploy-service`)
+    // because local tags share a flat namespace across the workspace and must
+    // match what the project's own `build:docker` script tagged.
     const source = (artifact as { localTag?: string }).localTag ?? `${safeName(ctx.projectName)}:latest`;
     const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
     const archiveName = `${safeName(artifact.name)}.image.tar.gz`;
