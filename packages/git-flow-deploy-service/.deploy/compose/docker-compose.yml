@@ -6,20 +6,20 @@ services:
     environment:
       DEPLOY_WORK_DIR: /var/deploy/work
       SHARED_STORAGE_BASE_DIR: /var/deploy/shared
-    secrets:
-      - DEPLOY_HMAC_SECRET
-      - GITHUB_TOKEN
+      # Non-swarm `docker compose` cannot consume external (swarm) secrets, so the
+      # HMAC secret and GitHub token are passed through from the environment of the
+      # process running compose (the deploy-service inherits them; the CLI injects
+      # them from --hmac-secret/--token during first-time setup).
+      DEPLOY_HMAC_SECRET: "${DEPLOY_HMAC_SECRET:?DEPLOY_HMAC_SECRET must be set in the environment running docker compose}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set in the environment running docker compose}"
     volumes:
       - work:/var/deploy/work
       - shared:/var/deploy/shared
+      # Required so the containerized service can run `docker compose`/`docker`
+      # deploys against the host Docker engine.
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:
   work:
   shared:
-
-secrets:
-  DEPLOY_HMAC_SECRET:
-    external: true
-  GITHUB_TOKEN:
-    external: true
