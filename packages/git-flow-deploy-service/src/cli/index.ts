@@ -138,7 +138,7 @@ async function main(): Promise<void> {
       await handleNode({ extractDir, version, token, npmPrefix, hmacSecret, port, host, enableBoot });
       break;
     case 'compose':
-      await handleCompose({ extractDir });
+      await handleCompose({ extractDir, token, hmacSecret });
       break;
     case 'swarm':
       await handleSwarm({ extractDir });

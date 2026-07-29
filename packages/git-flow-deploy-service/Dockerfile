@@ -4,6 +4,12 @@
 
 FROM node:24-alpine
 WORKDIR /app
+
+# The service runs deploys by shelling out to `docker`/`docker compose`, so the
+# CLI + compose plugin must be present in the image (the host Docker socket is
+# mounted at runtime — see the compose/swarm bundles).
+RUN apk add --no-cache docker-cli docker-cli-compose
+
 COPY . .
 
 LABEL org.opencontainers.image.title="git-flow-deploy-service"
