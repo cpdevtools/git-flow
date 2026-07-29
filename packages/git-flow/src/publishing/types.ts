@@ -139,4 +139,6 @@ export interface PublishReleaseResult {
   published: string[];
   verified: string[];
   failed: ProjectPublishResult[];
+  /** Markdown body listing published releases (also posted as the PR comment). */
+  releaseComment?: string;
 }

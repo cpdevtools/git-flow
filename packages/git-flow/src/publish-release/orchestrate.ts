@@ -28,6 +28,7 @@ import {
   updateDraftReleaseBody,
   findDraftReleaseByTag,
   postPRReleaseComment,
+  buildReleaseComment,
 } from '../build-pack/github.js';
 
 /**
@@ -304,6 +305,9 @@ export async function runPublishRelease(
         options.prNumber,
         releaseLinks,
       );
+
+      // Expose the same markdown to callers (e.g. the action step summary).
+      result.releaseComment = buildReleaseComment(releaseLinks);
     }
 
     return result;

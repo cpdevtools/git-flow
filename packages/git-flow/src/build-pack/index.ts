@@ -46,6 +46,7 @@ export {
   detectDraftReleases,
   cleanupEmptyDraftReleases,
   postPRReleaseComment,
+  buildReleaseComment,
 } from './github.js';
 
 // Options parsing

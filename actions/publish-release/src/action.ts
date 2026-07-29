@@ -59,6 +59,11 @@ async function run() {
     core.setOutput('verified-count', result.verified.length);
     core.setOutput('failed-count', result.failed.length);
 
+    // Mirror the published-releases list (the PR comment) into the step summary.
+    if (result.releaseComment) {
+      await core.summary.addRaw(result.releaseComment, true).write();
+    }
+
     if (result.failed.length > 0) {
       core.setFailed(`${result.failed.length} projects failed to publish`);
     }

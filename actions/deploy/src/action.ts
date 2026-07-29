@@ -52,26 +52,26 @@ function ghHeaders(): Record<string, string> {
  * GitHub Deployment ref; it may be null when a numeric ID cannot be looked up
  * (e.g. missing token) — callers fall back to GITHUB_SHA in that case.
  */
-async function resolveRelease(raw: string): Promise<{ id: number; tag: string | null }> {
+async function resolveRelease(raw: string): Promise<{ id: number; tag: string | null; htmlUrl: string | null }> {
   const [owner, repoName] = repo.split('/');
   const asNum = parseInt(raw, 10);
   const isNumeric = !isNaN(asNum) && String(asNum) === raw.trim();
 
   if (isNumeric) {
-    // Recover the tag for the deployment ref (best-effort).
+    // Recover the tag + html url for the deployment ref / summary link (best-effort).
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repoName}/releases/${asNum}`,
         { headers: ghHeaders() },
       );
       if (res.ok) {
-        const release = (await res.json()) as { tag_name?: string };
-        return { id: asNum, tag: release.tag_name ?? null };
+        const release = (await res.json()) as { tag_name?: string; html_url?: string };
+        return { id: asNum, tag: release.tag_name ?? null, htmlUrl: release.html_url ?? null };
       }
     } catch {
       // ignore — fall back to no tag
     }
-    return { id: asNum, tag: null };
+    return { id: asNum, tag: null, htmlUrl: null };
   }
 
   core.info(`Resolving tag "${raw}" to release ID...`);
@@ -80,9 +80,9 @@ async function resolveRelease(raw: string): Promise<{ id: number; tag: string | 
     { headers: ghHeaders() },
   );
   if (!res.ok) throw new Error(`Failed to resolve tag "${raw}": ${res.status} ${await res.text()}`);
-  const release = (await res.json()) as { id: number };
+  const release = (await res.json()) as { id: number; html_url?: string };
   core.info(`Resolved "${raw}" \u2192 release ID ${release.id}`);
-  return { id: release.id, tag: raw };
+  return { id: release.id, tag: raw, htmlUrl: release.html_url ?? null };
 }
 
 /**
@@ -239,7 +239,9 @@ function streamLines(
 // Main
 // ---------------------------------------------------------------------------
 async function run(): Promise<void> {
-  const { id: releaseId, tag } = await resolveRelease(releaseIdRaw);
+  const { id: releaseId, tag, htmlUrl } = await resolveRelease(releaseIdRaw);
+  const releaseUrl =
+    htmlUrl ?? (tag ? `https://github.com/${repo}/releases/tag/${encodeURIComponent(tag)}` : null);
 
   // Open a GitHub Deployment (best-effort; skipped when no environment/token).
   const deployRef = tag ?? githubSha;
@@ -314,8 +316,10 @@ async function run(): Promise<void> {
   }
 
   // 3. Write step summary
+  const releaseRef = releaseUrl ? `[${tag ?? releaseId}](${releaseUrl})` : String(tag ?? releaseId);
   await core.summary
     .addHeading(`Deploy ${repo} @ ${releaseId}`)
+    .addRaw(`\n**Release:** ${releaseRef}\n`, true)
     .addCodeBlock(stripAnsi(summaryLines.join('\n')), 'text')
     .write();
 
