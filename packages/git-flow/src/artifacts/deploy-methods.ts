@@ -19,10 +19,37 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { deploymentSlot, slotStack, type VersioningStrategy } from './slot.js';
+
+/**
+ * Upsert variables into the bundle's `.env`.
+ *
+ * `docker compose` and `docker stack deploy` both auto-load `.env` from the
+ * project directory — which is the bundle extraction dir, since runDeploy spawns
+ * deployCommand with cwd set there. That makes `.env` the transport for the
+ * release version without any runtime plumbing, and it applies to every command
+ * in a chained deployCommand (an inline `VAR=x cmd` prefix would only cover the
+ * first).
+ *
+ * Existing keys are replaced and unrelated lines preserved, so a project shipping
+ * its own `.env` in a .deploy/{method}/ override folder isn't clobbered.
+ */
+async function upsertDeployEnv(
+  deployOutputDir: string,
+  vars: Record<string, string>,
+): Promise<void> {
+  const envPath = join(deployOutputDir, '.env');
+  const existing = existsSync(envPath) ? await readFile(envPath, 'utf8') : '';
+  const kept = existing
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .filter((line) => !Object.keys(vars).some((k) => line.startsWith(`${k}=`)));
+  const added = Object.entries(vars).map(([k, v]) => `${k}=${v}`);
+  await writeFile(envPath, [...kept, ...added].join('\n') + '\n');
+}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -144,6 +171,10 @@ registerDeployMethod('docker', 'compose', {
     // bundle dir on a mode change) refer to the SAME project. Without this the
     // project name defaults to the extraction dir basename and orphans containers.
     const slot = deploymentSlot(projectName, version, versioning);
+    // Pin the image to THIS release. Compose files reference
+    // ${DEPLOY_IMAGE_TAG} with no default, so a missing tag fails loudly rather
+    // than silently deploying whatever `latest` happens to point at.
+    await upsertDeployEnv(deployOutputDir, { DEPLOY_IMAGE_TAG: version });
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
       stringify({
@@ -182,6 +213,7 @@ registerDeployMethod('docker', 'swarm', {
   },
   async generateDeployYml({ deployOutputDir, projectName, version, versioning }) {
     const stackName = slotStack(deploymentSlot(projectName, version, versioning));
+    await upsertDeployEnv(deployOutputDir, { DEPLOY_IMAGE_TAG: version });
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
       stringify({

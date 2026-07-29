@@ -26,7 +26,7 @@
 # docker-compose.yml and publishes 3700 on the host as normal.
 services:
   git-flow-deploy-service:
-    image: ghcr.io/cpdevtools/git-flow-deploy-service:latest
+    image: ghcr.io/cpdevtools/git-flow-deploy-service:${DEPLOY_IMAGE_TAG:?DEPLOY_IMAGE_TAG must be set (gitflow writes it into the bundle .env as the release version)}
     # Share the dev container's network namespace (no `ports:` allowed here).
     network_mode: "container:${DEPLOY_NETNS_CONTAINER:?DEPLOY_NETNS_CONTAINER must name the dev container whose network namespace to join}"
     environment:
