@@ -22,6 +22,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
+import { deploymentSlot, slotStack, type VersioningStrategy } from './slot.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -38,6 +39,11 @@ export interface DeployMethodContext {
   version: string;
   /** Deploy method name (e.g. 'compose', 'swarm', 'node') */
   method: string;
+  /**
+   * Versioning strategy for this artifact ('singleton' | 'major'). Drives the
+   * deployment slot baked into resource names. Defaults to 'singleton'.
+   */
+  versioning?: VersioningStrategy;
 }
 
 export interface DeployMethodHandler {
@@ -108,14 +114,6 @@ export function listDeployMethods(artifactType: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-function safeName(name: string): string {
-  return name.replace(/@/g, '').replace(/\//g, '-');
-}
-
-// ---------------------------------------------------------------------------
 // Built-in handlers
 // ---------------------------------------------------------------------------
 
@@ -140,10 +138,21 @@ registerDeployMethod('docker', 'compose', {
       }
     }
   },
-  async generateDeployYml({ deployOutputDir }) {
+  async generateDeployYml({ deployOutputDir, projectName, version, versioning }) {
+    // Pin a stable compose project name to the deployment slot so `up` (run from
+    // the /tmp/<releaseId> extraction dir) and `down` (run later from the saved
+    // bundle dir on a mode change) refer to the SAME project. Without this the
+    // project name defaults to the extraction dir basename and orphans containers.
+    const slot = deploymentSlot(projectName, version, versioning);
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: 'docker compose pull && docker compose up -d' }),
+      stringify({
+        method: 'compose',
+        slot,
+        versioning: versioning ?? 'singleton',
+        deployCommand: `docker compose -p ${slot} pull && docker compose -p ${slot} up -d`,
+        teardownCommand: `docker compose -p ${slot} down`,
+      }),
     );
   },
 });
@@ -165,11 +174,17 @@ registerDeployMethod('docker', 'swarm', {
       }
     }
   },
-  async generateDeployYml({ deployOutputDir, projectName }) {
-    const stackName = safeName(projectName).replace(/-/g, '_');
+  async generateDeployYml({ deployOutputDir, projectName, version, versioning }) {
+    const stackName = slotStack(deploymentSlot(projectName, version, versioning));
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
-      stringify({ deployCommand: `docker stack deploy -c stack.yml ${stackName}` }),
+      stringify({
+        method: 'swarm',
+        slot: deploymentSlot(projectName, version, versioning),
+        versioning: versioning ?? 'singleton',
+        deployCommand: `docker stack deploy -c stack.yml ${stackName}`,
+        teardownCommand: `docker stack rm ${stackName}`,
+      }),
     );
   },
 });
@@ -229,7 +244,14 @@ registerDeployMethod('npm', 'node', {
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
       stringify({
+        method: 'node',
+        // node is singleton-only for now (parallel-major deferred): the pm2 app
+        // identity lives in the author's ecosystem.config.js. Teardown deletes
+        // exactly the apps that file defined, run from the saved bundle dir.
+        slot: deploymentSlot(projectName, version, 'singleton'),
+        versioning: 'singleton',
         deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "▸ Service updated; restarting (supervised)..." && sh ./restart.sh "${version}"`,
+        teardownCommand: `pm2 delete ecosystem.config.js`,
       }),
     );
   },

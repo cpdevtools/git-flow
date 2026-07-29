@@ -4,9 +4,10 @@ import { DeployStore } from './deploy-store.js';
 import { HmacGuard } from './hmac.guard.js';
 import { ConfigService } from './config.service.js';
 import { ReposConfigService } from './repos-config.service.js';
+import { DeploymentStateService } from './deployment-state.service.js';
 
 @Module({
   controllers: [DeployController],
-  providers: [DeployStore, HmacGuard, ConfigService, ReposConfigService],
+  providers: [DeployStore, HmacGuard, ConfigService, ReposConfigService, DeploymentStateService],
 })
 export class DeployModule {}

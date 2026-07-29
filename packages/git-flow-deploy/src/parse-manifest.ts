@@ -41,6 +41,23 @@ export async function parseDeployYml(path: string): Promise<DeployManifest> {
     throw new Error(`deploy.yml releaseId must be a positive integer`);
   }
 
+  if (raw['method'] !== undefined && raw['method'] !== null && raw['method'] !== '') {
+    manifest.method = String(raw['method']);
+  }
+  if (raw['slot'] !== undefined && raw['slot'] !== null && raw['slot'] !== '') {
+    manifest.slot = String(raw['slot']);
+  }
+  if (raw['versioning'] === 'singleton' || raw['versioning'] === 'major') {
+    manifest.versioning = raw['versioning'];
+  }
+  if (
+    raw['teardownCommand'] !== undefined &&
+    raw['teardownCommand'] !== null &&
+    raw['teardownCommand'] !== ''
+  ) {
+    manifest.teardownCommand = String(raw['teardownCommand']);
+  }
+
   if (raw['sharedStorage'] !== undefined) {
     if (raw['sharedStorage'] === true) {
       manifest.sharedStorage = true;

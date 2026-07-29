@@ -16,6 +16,7 @@ import {
   type DeployMethodContext,
   type UploadContext,
 } from '../artifacts/index.js';
+import { deploymentSlot, type VersioningStrategy } from '../artifacts/slot.js';
 import { findOrCreateDraftRelease, uploadArtifact } from './github.js';
 import { generateArtifactDescriptor, loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
@@ -216,7 +217,7 @@ async function executePackDeploy(
   descriptor: ProjectArtifactDescriptor,
   uploadCtx: UploadContext,
 ): Promise<void> {
-  type WithDeploy = { deploy?: string[] };
+  type WithDeploy = { deploy?: string[]; versioning?: string };
   const artifactsWithDeploy = descriptor.artifacts.filter(
     (a: Artifact) => Array.isArray((a as unknown as WithDeploy).deploy) && ((a as unknown as WithDeploy).deploy as string[]).length > 0,
   );
@@ -226,7 +227,22 @@ async function executePackDeploy(
     const packageJson = await readPackageJson(project.cwd);
     for (const artifact of artifactsWithDeploy) {
       const methods = (artifact as unknown as WithDeploy).deploy as string[];
+      const rawVersioning = (artifact as unknown as WithDeploy).versioning;
+      if (rawVersioning !== undefined && rawVersioning !== 'singleton' && rawVersioning !== 'major') {
+        throw new Error(
+          `Invalid versioning '${rawVersioning}' on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected 'singleton' or 'major'.`,
+        );
+      }
+      const versioning = (rawVersioning ?? 'singleton') as VersioningStrategy;
       for (const method of methods) {
+        // Parallel-major deploys are only supported for compose/swarm today
+        // (node's pm2 identity + port binding are author-controlled).
+        if (versioning === 'major' && method !== 'compose' && method !== 'swarm') {
+          throw new Error(
+            `versioning: major is only supported for compose/swarm deploy methods, not '${method}' ` +
+              `(artifact '${(artifact as { name?: string }).name ?? artifact.type}'). node multi-version is not yet supported.`,
+          );
+        }
         console.log(`  \ud83d\ude80 ${project.name}: pack-deploy-${method}...`);
 
         const deployOutputDir = join(project.cwd, '.deploy-output', method);
@@ -238,6 +254,7 @@ async function executePackDeploy(
           projectName: project.name,
           version: project.version,
           method,
+          versioning,
         };
 
         const env = {
@@ -308,10 +325,23 @@ async function executePackDeploy(
         if (!deployMeta.deployCommand) {
           throw new Error(`deploy.yml produced by pack-deploy-${method} is missing required field: deployCommand`);
         }
+        // Ensure mode-change fields are present. Built-in handlers already emit
+        // method/slot/versioning/teardownCommand; custom .deploy/ folders or
+        // pack-deploy scripts may omit them, so fill method/slot/versioning here.
+        const slot = deploymentSlot(project.name, project.version, versioning);
+        if (!deployMeta.teardownCommand) {
+          console.warn(
+            `  \u26a0\ufe0f deploy.yml for ${project.name} (${method}) has no teardownCommand \u2014 ` +
+              `mode-change teardown will be skipped for this bundle.`,
+          );
+        }
         await writeFile(
           deployYmlPath,
           stringify({
             ...deployMeta,
+            method: deployMeta.method ?? method,
+            slot: deployMeta.slot ?? slot,
+            versioning: deployMeta.versioning ?? versioning,
             name: project.name,
             version: project.version,
             repo: `https://github.com/${process.env.GITHUB_REPOSITORY ?? ''}`,
