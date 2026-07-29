@@ -7,15 +7,32 @@ import {
   groupByPackage,
   resolveVersionKeyword,
   buildVersionChoices,
+  extractArtifactMetadata,
+  releaseDeployMethods,
+  isDeployable,
+  defaultMethod,
+  parseWorkflowEnvironment,
   type GHRelease,
 } from './deploy-helpers.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+/** Build a release body with an Artifact Metadata block for the given methods per artifact. */
+function bodyWithDeploy(artifacts: Array<{ type: string; name: string; deploy?: string[] }>): string {
+  const lines = artifacts
+    .map((a) => {
+      const deploy = a.deploy ? `\n    deploy:\n${a.deploy.map((m) => `      - ${m}`).join('\n')}` : '';
+      return `  - type: ${a.type}\n    name: '${a.name}'${deploy}`;
+    })
+    .join('\n');
+  const yaml = `project: '@org/svc'\nartifacts:\n${lines}`;
+  return `📋 **Created from PR:** #12\n\n## Artifact Metadata\n\`\`\`yaml\n${yaml}\n\`\`\``;
+}
+
 function release(
   id: number,
   tag: string,
-  opts: { prerelease?: boolean; draft?: boolean } = {},
+  opts: { prerelease?: boolean; draft?: boolean; body?: string | null } = {},
 ): GHRelease {
   return {
     id,
@@ -25,7 +42,8 @@ function release(
     prerelease: opts.prerelease ?? false,
     target_commitish: 'main',
     created_at: new Date(id * 1000).toISOString(),
-    assets: [{ name: 'deploy.zip' }],
+    assets: [],
+    body: opts.body ?? bodyWithDeploy([{ type: 'npm', name: '@org/svc', deploy: ['node'] }]),
   };
 }
 
@@ -217,5 +235,116 @@ describe('buildVersionChoices', () => {
     // next and latest are the same release — only one top entry
     expect(choices[0].title).toMatch(/^next/);
     expect(choices.find((c) => (c.title as string).startsWith('latest'))).toBeUndefined();
+  });
+});
+
+// ─── extractArtifactMetadata ────────────────────────────────────────────
+
+describe('extractArtifactMetadata', () => {
+  it('parses the Artifact Metadata YAML block', () => {
+    const body = bodyWithDeploy([
+      { type: 'npm', name: '@org/svc', deploy: ['node'] },
+      { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose', 'swarm'] },
+    ]);
+    const descriptor = extractArtifactMetadata(body);
+    expect(descriptor?.project).toBe('@org/svc');
+    expect(descriptor?.artifacts).toHaveLength(2);
+  });
+
+  it('returns undefined when there is no metadata block', () => {
+    expect(extractArtifactMetadata('just a plain body')).toBeUndefined();
+    expect(extractArtifactMetadata(null)).toBeUndefined();
+    expect(extractArtifactMetadata(undefined)).toBeUndefined();
+  });
+});
+
+// ─── releaseDeployMethods ────────────────────────────────────────────────────
+
+describe('releaseDeployMethods', () => {
+  it('unions deploy arrays across artifacts, preserving declaration order', () => {
+    const r = release(1, 'v1.0.0/@org/svc', {
+      body: bodyWithDeploy([
+        { type: 'npm', name: '@org/svc', deploy: ['node'] },
+        { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose', 'swarm'] },
+      ]),
+    });
+    expect(releaseDeployMethods(r)).toEqual(['node', 'compose', 'swarm']);
+  });
+
+  it('de-duplicates methods shared across artifacts', () => {
+    const r = release(1, 'v1.0.0/@org/svc', {
+      body: bodyWithDeploy([
+        { type: 'npm', name: '@org/svc', deploy: ['node', 'compose'] },
+        { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'] },
+      ]),
+    });
+    expect(releaseDeployMethods(r)).toEqual(['node', 'compose']);
+  });
+
+  it('returns [] when no artifact declares a deploy array', () => {
+    const r = release(1, 'v1.0.0/@org/svc', {
+      body: bodyWithDeploy([{ type: 'npm', name: '@org/svc' }]),
+    });
+    expect(releaseDeployMethods(r)).toEqual([]);
+  });
+});
+
+// ─── isDeployable ───────────────────────────────────────────────────────────
+
+describe('isDeployable', () => {
+  it('is true when the release advertises a deploy method', () => {
+    expect(isDeployable(release(1, 'v1.0.0/@org/svc'))).toBe(true);
+  });
+
+  it('is false when no deploy method is advertised', () => {
+    const r = release(1, 'v1.0.0/@org/svc', {
+      body: bodyWithDeploy([{ type: 'npm', name: '@org/svc' }]),
+    });
+    expect(isDeployable(r)).toBe(false);
+  });
+
+  it('is false when there is no metadata block at all', () => {
+    expect(isDeployable(release(1, 'v1.0.0/@org/svc', { body: 'plain body' }))).toBe(false);
+  });
+});
+
+// ─── defaultMethod ──────────────────────────────────────────────────────────
+
+describe('defaultMethod', () => {
+  it('returns the first method in declaration order', () => {
+    expect(defaultMethod(['node', 'compose', 'swarm'])).toBe('node');
+  });
+
+  it('returns undefined for an empty list', () => {
+    expect(defaultMethod([])).toBeUndefined();
+  });
+});
+
+// ─── parseWorkflowEnvironment ────────────────────────────────────────────────
+
+describe('parseWorkflowEnvironment', () => {
+  it('reads a string jobs.deploy.environment', () => {
+    const yml = ['jobs:', '  deploy:', '    runs-on: ubuntu-latest', '    environment: "Deploy Test"'].join('\n');
+    expect(parseWorkflowEnvironment(yml)).toBe('Deploy Test');
+  });
+
+  it('reads an object jobs.deploy.environment.name', () => {
+    const yml = [
+      'jobs:',
+      '  deploy:',
+      '    environment:',
+      '      name: production',
+      '      url: https://example.com',
+    ].join('\n');
+    expect(parseWorkflowEnvironment(yml)).toBe('production');
+  });
+
+  it('returns undefined when environment is absent', () => {
+    const yml = ['jobs:', '  deploy:', '    runs-on: ubuntu-latest'].join('\n');
+    expect(parseWorkflowEnvironment(yml)).toBeUndefined();
+  });
+
+  it('returns undefined for malformed YAML', () => {
+    expect(parseWorkflowEnvironment('jobs: [unclosed')).toBeUndefined();
   });
 });

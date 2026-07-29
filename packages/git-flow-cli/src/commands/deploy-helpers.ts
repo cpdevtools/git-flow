@@ -4,6 +4,7 @@
  */
 
 import type prompts from 'prompts';
+import { parse as parseYaml } from 'yaml';
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,22 @@ export interface GHRelease {
   target_commitish: string;
   created_at: string;
   assets: { name: string }[];
+  /** Full release body (markdown). Carries the `## Artifact Metadata` YAML block. */
+  body?: string | null;
+}
+
+/** Minimal shape of an artifact entry in the release-body Artifact Metadata. */
+interface MetadataArtifact {
+  type?: string;
+  name?: string;
+  /** Deploy methods this artifact produces bundles for (e.g. ['node', 'compose']). */
+  deploy?: string[];
+}
+
+/** Minimal shape of the release-body Artifact Metadata descriptor. */
+interface MetadataDescriptor {
+  project?: string;
+  artifacts?: MetadataArtifact[];
 }
 
 // ─── tag helpers ──────────────────────────────────────────────────────────────
@@ -141,4 +158,79 @@ export function buildVersionChoices(releases: GHRelease[]): prompts.Choice[] {
   }
 
   return choices;
+}
+
+// ─── artifact metadata ────────────────────────────────────────────────────────
+
+/**
+ * Extract and parse the `## Artifact Metadata` YAML block from a release body.
+ * Returns the parsed descriptor, or `undefined` if the block is absent/invalid.
+ */
+export function extractArtifactMetadata(
+  body: string | null | undefined,
+): MetadataDescriptor | undefined {
+  if (!body) return undefined;
+  const match = body.match(/## Artifact Metadata\n```yaml\n([\s\S]*?)\n```/);
+  if (!match) return undefined;
+  try {
+    const parsed = parseYaml(match[1]);
+    if (parsed && typeof parsed === 'object') return parsed as MetadataDescriptor;
+  } catch {
+    // Malformed YAML — treat as no metadata.
+  }
+  return undefined;
+}
+
+/**
+ * Deploy methods advertised by a release, derived from its Artifact Metadata.
+ * Returns the de-duplicated union of every artifact's `deploy` array, preserving
+ * declaration order. Each method `m` corresponds to a `deploy-<m>.zip` asset.
+ */
+export function releaseDeployMethods(release: GHRelease): string[] {
+  const descriptor = extractArtifactMetadata(release.body);
+  if (!descriptor?.artifacts) return [];
+  const methods: string[] = [];
+  for (const artifact of descriptor.artifacts) {
+    if (!Array.isArray(artifact.deploy)) continue;
+    for (const method of artifact.deploy) {
+      if (typeof method === 'string' && method && !methods.includes(method)) {
+        methods.push(method);
+      }
+    }
+  }
+  return methods;
+}
+
+/** A release is deployable when its Artifact Metadata advertises ≥1 deploy method. */
+export function isDeployable(release: GHRelease): boolean {
+  return releaseDeployMethods(release).length > 0;
+}
+
+/** The default deploy method to pre-select: the first advertised in declaration order. */
+export function defaultMethod(methods: string[]): string | undefined {
+  return methods[0];
+}
+
+// ─── deploy workflow parsing ──────────────────────────────────────────────────
+
+/**
+ * Parse the GitHub Environment name from a `deploy-*.yml` workflow.
+ * Reads `jobs.deploy.environment`, which may be a plain string or an object
+ * with a `name` field. Returns `undefined` when it cannot be resolved.
+ */
+export function parseWorkflowEnvironment(ymlText: string): string | undefined {
+  let doc: unknown;
+  try {
+    doc = parseYaml(ymlText);
+  } catch {
+    return undefined;
+  }
+  const deployJob = (doc as { jobs?: { deploy?: { environment?: unknown } } })?.jobs?.deploy;
+  const environment = deployJob?.environment;
+  if (typeof environment === 'string') return environment.trim() || undefined;
+  if (environment && typeof environment === 'object') {
+    const name = (environment as { name?: unknown }).name;
+    if (typeof name === 'string') return name.trim() || undefined;
+  }
+  return undefined;
 }

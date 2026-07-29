@@ -12,6 +12,7 @@
  *   --target  -t  Target environment (e.g. production, dev)
  *   --package -p  Package name(s) to deploy (repeatable)
  *   --version -v  Version to deploy: semver, "latest", or "next"
+ *   --method  -m  Deploy method (e.g. node, compose, swarm)
  *   --yes     -y  Skip confirmation prompt
  *   --repo    -r  Override GitHub repo (owner/repo)
  */
@@ -28,10 +29,17 @@ import {
   groupByPackage,
   resolveVersionKeyword,
   buildVersionChoices,
+  isDeployable,
+  releaseDeployMethods,
+  defaultMethod,
+  parseWorkflowEnvironment,
 } from './deploy-helpers.js';
 
 interface DeployTarget {
+  /** GitHub Environment name (from the workflow's `jobs.deploy.environment`). */
   environment: string;
+  /** Filename slug fallback (e.g. `deploy-test` from `deploy-deploy-test.yml`). */
+  slug: string;
   workflowFile: string;
 }
 
@@ -131,12 +139,29 @@ async function discoverDeployTargets(
     token,
     `/repos/${owner}/${repo}/contents/.github/workflows?ref=${encodeURIComponent(branch)}`,
   );
-  return (contents ?? [])
-    .filter((f) => /^deploy-.+\.yml$/.test(f.name))
-    .map((f) => ({
-      environment: f.name.replace(/^deploy-(.+)\.yml$/, '$1'),
-      workflowFile: f.name,
-    }));
+  const files = (contents ?? []).filter((f) => /^deploy-.+\.yml$/.test(f.name));
+
+  return Promise.all(
+    files.map(async (f) => {
+      const slug = f.name.replace(/^deploy-(.+)\.yml$/, '$1');
+      // Read the workflow body to resolve the real GitHub Environment name
+      // (`jobs.deploy.environment`), falling back to the filename slug.
+      let environment = slug;
+      try {
+        const file = await gh<{ content?: string; encoding?: string }>(
+          token,
+          `/repos/${owner}/${repo}/contents/.github/workflows/${f.name}?ref=${encodeURIComponent(branch)}`,
+        );
+        if (file?.content) {
+          const yml = Buffer.from(file.content, (file.encoding as BufferEncoding) ?? 'base64').toString('utf-8');
+          environment = parseWorkflowEnvironment(yml) ?? slug;
+        }
+      } catch {
+        // Fall back to the slug if the workflow body can't be read/parsed.
+      }
+      return { environment, slug, workflowFile: f.name };
+    }),
+  );
 }
 
 async function listDeployableReleases(
@@ -154,7 +179,7 @@ async function listDeployableReleases(
     if (!batch || batch.length === 0) break;
     for (const r of batch) {
       if (r.draft) continue;
-      if ((r.assets ?? []).some((a) => a.name === 'deploy.zip')) results.push(r);
+      if (isDeployable(r)) results.push(r);
     }
     if (batch.length < 100) break;
     page++;
@@ -170,6 +195,7 @@ async function dispatchWorkflow(
   branch: string,
   fullRepo: string,
   releaseId: number,
+  method?: string,
 ): Promise<string> {
   await gh(
     token,
@@ -179,7 +205,11 @@ async function dispatchWorkflow(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ref: branch,
-        inputs: { repo: fullRepo, release_id: String(releaseId) },
+        inputs: {
+          repo: fullRepo,
+          release_id: String(releaseId),
+          ...(method ? { deploy_type: method } : {}),
+        },
       }),
     },
   );
@@ -223,6 +253,11 @@ export default class Deploy extends Command {
       description:
         'Version to deploy: a semver string, "latest" (highest stable), or "next" (highest including pre-release). Skips version prompt.',
     }),
+    method: Flags.string({
+      char: 'm',
+      description:
+        'Deploy method (e.g. node, compose, swarm). Must be advertised by the release. Skips method prompt.',
+    }),
     yes: Flags.boolean({
       char: 'y',
       description: 'Skip confirmation prompt.',
@@ -254,7 +289,10 @@ export default class Deploy extends Command {
     // ── 4. Select target environment ─────────────────────────────────────────
     let target: DeployTarget;
     if (flags.target) {
-      const found = targets.find((t) => t.environment === flags.target);
+      const wanted = flags.target.toLowerCase();
+      const found = targets.find(
+        (t) => t.environment.toLowerCase() === wanted || t.slug.toLowerCase() === wanted,
+      );
       if (!found) {
         this.error(
           `Target "${flags.target}" not found. Available: ${targets.map((t) => t.environment).join(', ')}.`,
@@ -279,7 +317,7 @@ export default class Deploy extends Command {
     this.log('Fetching releases...');
     const releases = await listDeployableReleases(token, owner, repoName);
     if (releases.length === 0) {
-      this.error('No deployable releases found (no published releases with a deploy.zip asset).');
+      this.error('No deployable releases found (no published releases advertising a deploy method).');
     }
 
     const byPackage = groupByPackage(releases);
@@ -309,8 +347,8 @@ export default class Deploy extends Command {
       selectedPackages = r.packages as string[];
     }
 
-    // ── 7. Select version for each package ──────────────────────────────────
-    const dispatches: { pkg: string; release: GHRelease }[] = [];
+    // ── 7. Select version + deploy method for each package ──────────────────
+    const dispatches: { pkg: string; release: GHRelease; method: string }[] = [];
 
     for (const pkg of selectedPackages) {
       const pkgReleases = byPackage[pkg];
@@ -332,14 +370,42 @@ export default class Deploy extends Command {
         selected = r.release as GHRelease;
       }
 
-      dispatches.push({ pkg, release: selected! });
+      const release = selected!;
+      const methods = releaseDeployMethods(release);
+      let method: string;
+
+      if (flags.method) {
+        if (!methods.includes(flags.method)) {
+          this.error(
+            `Method "${flags.method}" not available for ${pkg} ${versionFromTag(release.tag_name)}. Available: ${methods.join(', ')}.`,
+          );
+        }
+        method = flags.method;
+      } else if (methods.length === 1) {
+        method = methods[0];
+      } else {
+        const dflt = defaultMethod(methods);
+        const r = await prompts({
+          type: 'select',
+          name: 'method',
+          message: `Select deploy method for ${pkg} ${versionFromTag(release.tag_name)}:`,
+          choices: methods.map((m) => ({ title: m, value: m })),
+          initial: dflt ? methods.indexOf(dflt) : 0,
+        });
+        if (!r.method) process.exit(0);
+        method = r.method as string;
+      }
+
+      dispatches.push({ pkg, release, method });
     }
 
     // ── 8. Confirm ───────────────────────────────────────────────────────────
     if (!flags.yes) {
       this.log('\nDeploy plan:');
       for (const d of dispatches) {
-        this.log(`  ${d.pkg}  ${versionFromTag(d.release.tag_name)}  →  ${target.environment}`);
+        this.log(
+          `  ${d.pkg}  ${versionFromTag(d.release.tag_name)}  [${d.method}]  →  ${target.environment}`,
+        );
       }
       const r = await prompts({
         type: 'confirm',
@@ -363,8 +429,11 @@ export default class Deploy extends Command {
         branch,
         repo,
         d.release.id,
+        d.method,
       );
-      this.log(`✅ Dispatched: ${d.pkg} ${versionFromTag(d.release.tag_name)} → ${target.environment}`);
+      this.log(
+        `✅ Dispatched: ${d.pkg} ${versionFromTag(d.release.tag_name)} [${d.method}] → ${target.environment}`,
+      );
       this.log(`   ${url}`);
     }
   }
