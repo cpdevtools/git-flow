@@ -246,12 +246,16 @@ registerDeployMethod('npm', 'node', {
       stringify({
         method: 'node',
         // node is singleton-only for now (parallel-major deferred): the pm2 app
-        // identity lives in the author's ecosystem.config.js. Teardown deletes
+        // identity lives in the author's ecosystem.config.js. Teardown stops
         // exactly the apps that file defined, run from the saved bundle dir.
         slot: deploymentSlot(projectName, version, 'singleton'),
         versioning: 'singleton',
         deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "▸ Service updated; restarting (supervised)..." && sh ./restart.sh "${version}"`,
-        teardownCommand: `pm2 delete ecosystem.config.js`,
+        // Stop (not delete) frees the port in fork mode while keeping the app
+        // registered with pm2, so a rollback can revive it by name (reusing the
+        // absolute script path pm2 recorded at first start). Run from the saved
+        // bundle dir, which holds this exact ecosystem.config.js.
+        teardownCommand: `pm2 stop ecosystem.config.js`,
       }),
     );
   },

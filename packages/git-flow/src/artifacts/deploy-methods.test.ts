@@ -77,7 +77,7 @@ describe('npm.node generateDeployYml', () => {
     expect(m.method).toBe('node');
     expect(m.slot).toBe('org-svc');
     expect(m.versioning).toBe('singleton');
-    expect(m.teardownCommand).toBe('pm2 delete ecosystem.config.js');
+    expect(m.teardownCommand).toBe('pm2 stop ecosystem.config.js');
     expect(String(m.deployCommand)).toContain('restart.sh');
   });
 });
