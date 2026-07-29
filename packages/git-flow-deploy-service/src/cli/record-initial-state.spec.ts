@@ -69,7 +69,7 @@ describe('recordInitialState', () => {
     expect(state.get('cpdevtools-git-flow-deploy-service')).toBeUndefined();
   });
 
-  it('does not clobber existing state for the slot', async () => {
+  it('overwrites existing state for the slot — the CLI just provisioned it', async () => {
     const slot = 'cpdevtools-git-flow-deploy-service';
     const priorBundle = mkdtempSync(join(tmpdir(), 'gfmc-prior-'));
     state.save(
@@ -100,8 +100,10 @@ describe('recordInitialState', () => {
 
     await recordInitialState(extractDir);
 
-    // Existing (compose) record is preserved — CLI does not overwrite it.
-    expect(state.get(slot)?.method).toBe('compose');
+    // Stale state drives the mode-change logic from a method that is no longer
+    // running, so the freshly provisioned mode must win.
+    expect(state.get(slot)?.method).toBe('node');
+    expect(state.get(slot)?.version).toBe('0.4.12');
   });
 
   it('never throws when parsing fails', async () => {

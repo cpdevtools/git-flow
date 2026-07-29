@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,6 +35,7 @@ import { DeployStore } from './deploy-store.js';
 import { DeploymentStateService } from './deployment-state.service.js';
 import type { ConfigService } from './config.service.js';
 import type { ReposConfigService } from './repos-config.service.js';
+import { SUPERVISOR_PLAN_FILE, type SupervisorPlan } from '../supervisor/plan.js';
 
 const fetchMock = fetchDeployBundle as jest.Mock;
 const runMock = runDeploy as jest.Mock;
@@ -46,6 +47,7 @@ const SELF = { name: '@cpdevtools/git-flow-deploy-service', version: '9.9.9' };
 
 describe('DeployController mode-change teardown/rollback', () => {
   let root: string;
+  let cliPath: string;
   let store: DeployStore;
   let state: DeploymentStateService;
   let controller: DeployController;
@@ -53,6 +55,11 @@ describe('DeployController mode-change teardown/rollback', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'gfmc-'));
     process.env['DEPLOY_WORK_DIR'] = root;
+    // Pin the supervisor CLI to a real file so assertions don't depend on the
+    // jest runner's argv and the launcher's existence check is satisfied.
+    cliPath = join(root, 'cli.cjs');
+    writeFileSync(cliPath, '// supervisor cli');
+    process.env['DEPLOY_SUPERVISOR_CLI'] = cliPath;
     serviceInfoMock.mockReturnValue({ ...SELF });
 
     store = new DeployStore();
@@ -85,6 +92,7 @@ describe('DeployController mode-change teardown/rollback', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    delete process.env['DEPLOY_SUPERVISOR_CLI'];
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -137,6 +145,13 @@ describe('DeployController mode-change teardown/rollback', () => {
   function dockerRunArgs(): string[] | undefined {
     const call = spawnSyncMock.mock.calls.find((c) => (c[1] as string[])[0] === 'run');
     return call?.[1] as string[] | undefined;
+  }
+
+  /** The plan handed to the supervisor for a release, read back off disk. */
+  function readPlan(releaseId: number): SupervisorPlan {
+    return JSON.parse(
+      readFileSync(join(root, String(releaseId), SUPERVISOR_PLAN_FILE), 'utf-8'),
+    ) as SupervisorPlan;
   }
 
   /** A manifest for a same-mode compose self deploy. */
@@ -279,8 +294,24 @@ describe('DeployController mode-change teardown/rollback', () => {
     await run(2001);
 
     expect(runMock).not.toHaveBeenCalled(); // nothing run inline
+    // Leaving node: a setsid session on the host escapes pm2's tree and can
+    // still drive docker, so no sibling container is needed.
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(spawnMock.mock.calls[0][0]).toBe('setsid');
+    expect(spawnMock.mock.calls[0][1]).toEqual([
+      process.execPath,
+      cliPath,
+      'supervise',
+      '--plan',
+      join(root, '2001', SUPERVISOR_PLAN_FILE),
+    ]);
+
+    const plan = readPlan(2001);
+    expect(plan.teardown!.command).toBe('pm2 delete');
+    expect(plan.teardown!.cwd).toContain(join('state', slot, 'current'));
+    expect(plan.deploy).toEqual({ cwd: join(root, '2001'), command: 'compose-up' });
+    expect(plan.rollback!.command).toBe('restart.sh'); // back to the node mode
+
     const rec = store.get(2001);
     expect(rec?.selfUpdate).toBe(true);
     expect(rec?.status).toBe('running'); // handed off, not finalized
@@ -288,6 +319,96 @@ describe('DeployController mode-change teardown/rollback', () => {
     expect(existsSync(join(root, 'state', slot, 'state.new.json'))).toBe(true); // staged for commit
     // stop the unref'd tail interval so it can't fire between tests
     store.finish(rec!, 0);
+  });
+
+  it('self mode-change out of a container: refuses BEFORE tearing anything down', async () => {
+    const slot = 'cpdevtools-git-flow-deploy-service';
+    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    mockSelfContainer('container-id-abc', 'ghcr.io/org/svc:1.2.3');
+    currentManifest = (releaseId) => ({
+      name: SELF.name,
+      version: SELF.version,
+      repo: 'owner/repo',
+      releaseId,
+      method: 'node',
+      deployCommand: 'restart.sh',
+      teardownCommand: 'pm2 delete',
+    });
+
+    await run(2002);
+
+    // Nothing may run: no teardown, no supervisor anywhere. A container cannot
+    // start a host pm2 process, so attempting it only takes the service down.
+    expect(runMock).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(dockerRunArgs()).toBeUndefined();
+    expect(existsSync(join(root, '2002', SUPERVISOR_PLAN_FILE))).toBe(false);
+
+    const rec = store.get(2002);
+    expect(rec?.status).toBe('failed');
+    expect(rec?.log.some((l) => l.includes('Unsupported mode change: compose → node'))).toBe(true);
+    expect(rec?.log.some((l) => l.includes('Nothing was torn down'))).toBe(true);
+    expect(state.get(slot)?.method).toBe('compose'); // still running as it was
+  });
+
+  it('self mode-change between containerized modes: uses a sibling supervisor container', async () => {
+    const slot = 'cpdevtools-git-flow-deploy-service';
+    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    mockSelfContainer('container-id-abc', 'ghcr.io/org/svc:1.2.3');
+    currentManifest = (releaseId) => ({
+      name: SELF.name,
+      version: SELF.version,
+      repo: 'owner/repo',
+      releaseId,
+      method: 'swarm',
+      deployCommand: 'stack-deploy',
+      teardownCommand: 'stack-rm',
+    });
+
+    await run(2003);
+
+    expect(runMock).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled(); // setsid would die with our container
+    const args = dockerRunArgs();
+    expect(args).toEqual(expect.arrayContaining(['--volumes-from', 'container-id-abc']));
+    expect(args!.slice(-5)).toEqual([
+      'ghcr.io/org/svc:1.2.3',
+      cliPath,
+      'supervise',
+      '--plan',
+      join(root, '2003', SUPERVISOR_PLAN_FILE),
+    ]);
+
+    const plan = readPlan(2003);
+    expect(plan.teardown!.command).toBe('compose-down');
+    expect(plan.deploy.command).toBe('stack-deploy');
+
+    const rec = store.get(2003);
+    expect(rec?.status).toBe('running');
+    store.finish(rec!, 0);
+  });
+
+  it('self mode-change: refuses rather than tearing down inline when the container is unidentifiable', async () => {
+    const slot = 'cpdevtools-git-flow-deploy-service';
+    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    // Default spawnSync mock reports failure for both `docker ps` and `docker inspect`.
+    currentManifest = (releaseId) => ({
+      name: SELF.name,
+      version: SELF.version,
+      repo: 'owner/repo',
+      releaseId,
+      method: 'swarm',
+      deployCommand: 'stack-deploy',
+      teardownCommand: 'stack-rm',
+    });
+
+    await run(2004);
+
+    expect(runMock).not.toHaveBeenCalled();
+    const rec = store.get(2004);
+    expect(rec?.status).toBe('failed');
+    expect(rec?.log.some((l) => l.includes('Nothing was torn down'))).toBe(true);
+    expect(state.get(slot)?.method).toBe('compose');
   });
 
   it('containerized self deploy: hands off to a sibling supervisor container', async () => {
@@ -304,10 +425,21 @@ describe('DeployController mode-change teardown/rollback', () => {
     // Inherits our mounts (bundle dir, state dir, docker socket) without needing host paths.
     expect(args).toEqual(expect.arrayContaining(['--volumes-from', 'container-id-abc']));
     expect(args).toEqual(expect.arrayContaining(['--detach', '--rm']));
-    // Runs OUR image (always local, already has docker + compose) and our script.
-    expect(args!.slice(-3)).toEqual(['sh', 'ghcr.io/org/svc:1.2.3', join(root, '3001', 'self-redeploy.sh')]);
-    expect(args).toContain('GFSR_DEPLOY_CMD=compose-up');
-    expect(existsSync(join(root, '3001', 'self-redeploy.sh'))).toBe(true);
+    // Runs OUR image (always local, already has node + docker + compose) and our CLI.
+    expect(args).toEqual(expect.arrayContaining(['--entrypoint', 'node']));
+    expect(args!.slice(-5)).toEqual([
+      'ghcr.io/org/svc:1.2.3',
+      cliPath,
+      'supervise',
+      '--plan',
+      join(root, '3001', SUPERVISOR_PLAN_FILE),
+    ]);
+
+    const plan = readPlan(3001);
+    expect(plan.teardown).toBeUndefined(); // same mode — nothing to tear down
+    expect(plan.deploy).toEqual({ cwd: join(root, '3001'), command: 'compose-up' });
+    expect(plan.rollback!.command).toBe('compose-up-old');
+    expect(plan.commit.stateNewFile).toBe(join(root, 'state', slot, 'state.new.json'));
 
     const rec = store.get(3001);
     expect(rec?.selfUpdate).toBe(true);

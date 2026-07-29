@@ -10,8 +10,12 @@ import type { ConfigService } from '../deploy/config.service.js';
  * detect the prior mode and tear it down. Without this, a CLI-bootstrapped mode
  * is invisible to the mode-change teardown and the old mode keeps running.
  *
- * Best-effort: never throws. Only writes when the bundle carries a `method` and
- * no state exists yet for the slot (so it never clobbers webhook-managed state).
+ * Always overwrites: the CLI has just provisioned the slot, so it — not whatever
+ * an earlier deploy recorded — is the truth. Skipping the write left stale state
+ * behind after a CLI re-bootstrap that changed method, which then drove the
+ * mode-change logic from a method that was no longer running.
+ *
+ * Best-effort: never throws. Only writes when the bundle carries a `method`.
  */
 export async function recordInitialState(extractDir: string): Promise<void> {
   try {
@@ -30,11 +34,6 @@ export async function recordInitialState(extractDir: string): Promise<void> {
       process.env['DEPLOY_STATE_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'state');
     const state = new DeploymentStateService({ stateDir } as ConfigService);
 
-    if (state.get(slot)) {
-      // Already tracked (e.g. a prior webhook deploy) — don't overwrite.
-      return;
-    }
-
     state.save(
       {
         slot,
@@ -48,7 +47,7 @@ export async function recordInitialState(extractDir: string): Promise<void> {
       },
       extractDir,
     );
-    console.log(`Recorded initial deployment state for slot "${slot}" (method: ${manifest.method}).`);
+    console.log(`Recorded deployment state for slot "${slot}" (method: ${manifest.method}).`);
   } catch (err) {
     console.warn(`Could not record initial deployment state: ${(err as Error).message}`);
   }
