@@ -19,5 +19,8 @@ export default defineConfig({
   bundle: true,
   external: ['@actions/core', '@actions/github', 'globby', 'semver', 'yaml', 'zx'],
   platform: 'node',
+  // Ship the shell asset that generateDeployYml reads verbatim at runtime next
+  // to the built module so __dirname/import.meta.url resolves it in dist too.
+  onSuccess: 'node -e "require(\'node:fs\').cpSync(\'src/artifacts/restart.sh\',\'dist/artifacts/restart.sh\')"',
 });
 
