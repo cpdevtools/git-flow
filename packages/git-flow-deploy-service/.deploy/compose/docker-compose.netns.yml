@@ -1,0 +1,53 @@
+# Dev-container variant of docker-compose.yml.
+#
+# WHY: when the deploy-service is exercised from inside a dev container, that dev
+# container publishes host :3700 STATICALLY — the binding is held for the dev
+# container's whole lifetime, independent of whether the service is running. So
+# `pm2 stop` frees :3700 inside the dev container's network namespace but NOT on
+# the host, and a sibling compose container can never bind host :3700. That makes
+# a node -> compose mode change fail (or, worse, silently start unpublished), and
+# breaks the action's log reconnect + /health check because the endpoint moves.
+#
+# FIX: don't publish a host port at all — join the dev container's network
+# namespace instead. Host :3700 then reaches whichever process is listening on
+# 3700 in that namespace: the pm2 node service before the switch, this container
+# after it. The external endpoint never changes, so reconnect works.
+#
+# `network_mode: container:<name>` and `ports:` are mutually exclusive, so this is
+# a COMPLETE standalone alternative to docker-compose.yml (not an override merge).
+# Select it by setting COMPOSE_FILE in the environment of the process that runs
+# the deploy (the deploy-service itself), e.g.:
+#
+#   COMPOSE_FILE=docker-compose.netns.yml \
+#   DEPLOY_NETNS_CONTAINER=main_devcontainer-devcontainer-1 \
+#     pm2 restart git-flow-deploy-service --update-env
+#
+# Production is unaffected: with COMPOSE_FILE unset, `docker compose` uses
+# docker-compose.yml and publishes 3700 on the host as normal.
+services:
+  git-flow-deploy-service:
+    image: ghcr.io/cpdevtools/git-flow-deploy-service:latest
+    # Share the dev container's network namespace (no `ports:` allowed here).
+    network_mode: "container:${DEPLOY_NETNS_CONTAINER:?DEPLOY_NETNS_CONTAINER must name the dev container whose network namespace to join}"
+    environment:
+      DEPLOY_WORK_DIR: /var/deploy/work
+      DEPLOY_STATE_DIR: /var/deploy/state
+      SHARED_STORAGE_BASE_DIR: /var/deploy/shared
+      DEPLOY_HMAC_SECRET: "${DEPLOY_HMAC_SECRET:?DEPLOY_HMAC_SECRET must be set in the environment running docker compose}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set in the environment running docker compose}"
+      # Propagate the selection so a later compose -> compose self-deploy (run
+      # from inside THIS container) keeps using this variant instead of falling
+      # back to the port-publishing one.
+      COMPOSE_FILE: docker-compose.netns.yml
+      DEPLOY_NETNS_CONTAINER: "${DEPLOY_NETNS_CONTAINER}"
+    volumes:
+      # Same host paths as docker-compose.yml so an in-flight deploy record/log
+      # survives the node -> compose runtime boundary.
+      - ${HOME}/.git-flow-deploy-service/work:/var/deploy/work
+      - ${HOME}/.git-flow-deploy-service/state:/var/deploy/state
+      - shared:/var/deploy/shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+volumes:
+  shared:
