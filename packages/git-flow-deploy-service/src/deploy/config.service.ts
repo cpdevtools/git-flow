@@ -23,7 +23,15 @@ function requireSecret(name: string): string {
 export class ConfigService {
   readonly hmacSecret: string = requireSecret('DEPLOY_HMAC_SECRET');
   readonly githubToken: string = requireSecret('GITHUB_TOKEN');
-  readonly workDir: string = process.env['DEPLOY_WORK_DIR'] ?? '/tmp/deployments';
+  /**
+   * Where per-release bundles + the durable deploy.log live. Defaults under the
+   * home dir (NOT volatile /tmp) so it can be shared across deploy methods: the
+   * compose/swarm bundles bind-mount this same host path into the container, so
+   * an in-flight deploy record/log survives a mode-change across the runtime
+   * boundary (e.g. node → compose) and the new instance finalizes it on boot.
+   */
+  readonly workDir: string =
+    process.env['DEPLOY_WORK_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'work');
   readonly sharedStorageBaseDir: string | undefined = process.env['SHARED_STORAGE_BASE_DIR'];
   /**
    * Durable directory for per-slot deployment state + a saved copy of each
