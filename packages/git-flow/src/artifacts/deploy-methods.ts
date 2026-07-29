@@ -197,7 +197,19 @@ set -u
 
 VERSION="\${1:-}"
 NPM_PREFIX="\${GITFLOW_NPM_PREFIX:-$HOME/.npm-global}"
-PM2="$NPM_PREFIX/bin/pm2"
+# Resolve the pm2 executable robustly. Prefer an explicit path (phase 1 passes
+# the resolved path to the detached phase 2 via GITFLOW_PM2), then PATH, then
+# common install locations — so the detached restart never dies with
+# "pm2: not found" under a minimal PATH or an unexpected install prefix.
+PM2="\${GITFLOW_PM2:-}"
+if [ -z "$PM2" ]; then
+  PM2=$(command -v pm2 2>/dev/null || true)
+fi
+if [ -z "$PM2" ]; then
+  for _c in "$NPM_PREFIX/bin/pm2" "$HOME/.npm-global/bin/pm2" "$HOME/.local/share/pnpm/pm2" /usr/local/bin/pm2 /usr/bin/pm2; do
+    if [ -x "$_c" ]; then PM2="$_c"; break; fi
+  done
+fi
 PORT="\${PORT:-3700}"
 # The reconnectable, release_id-keyed log. Defaults to ./deploy.log because the
 # deploy command runs with cwd = the release working dir (where the service also
@@ -208,8 +220,8 @@ DEPLOY_LOG="\${GITFLOW_DEPLOY_LOG:-$PWD/deploy.log}"
 # deploy command exits and the service can hand off. This phase's stdout is
 # captured by the service and already lands in deploy.log.
 if [ "\${GITFLOW_RESTART_DETACHED:-}" != "1" ]; then
-  echo "\\u25b8 Restart running in background (survives the restart); output continues in this log."
-  GITFLOW_RESTART_DETACHED=1 GITFLOW_DEPLOY_LOG="$DEPLOY_LOG" setsid sh "$0" "$VERSION" >>"$DEPLOY_LOG" 2>&1 </dev/null &
+  echo "▸ Restart running in background (survives the restart); output continues in this log."
+  GITFLOW_RESTART_DETACHED=1 GITFLOW_DEPLOY_LOG="$DEPLOY_LOG" GITFLOW_PM2="$PM2" setsid sh "$0" "$VERSION" >>"$DEPLOY_LOG" 2>&1 </dev/null &
   exit 0
 fi
 
@@ -224,22 +236,34 @@ sleep 3
 
 # Restart by app name (reuses the running app's absolute script path) when it can
 # be resolved from ecosystem.config.js; otherwise fall back to the config file.
+# Final guard: if the resolved path isn't executable, try a bare PATH lookup,
+# otherwise fail fast with a clear message and terminal EXIT so the tailer stops.
+if [ -z "$PM2" ] || [ ! -x "$PM2" ]; then
+  if command -v pm2 >/dev/null 2>&1; then
+    PM2=pm2
+  else
+    echo "✗ pm2 executable not found (checked GITFLOW_PM2, PATH, $NPM_PREFIX/bin, ~/.local/share/pnpm, /usr/local/bin, /usr/bin)"
+    echo "EXIT:127"
+    exit 127
+  fi
+fi
+
 APP=$(node -e "try{const c=require(process.cwd()+'/ecosystem.config.js');const a=((c&&c.apps)||(c&&c.default&&c.default.apps)||[])[0];process.stdout.write((a&&a.name)||'')}catch(e){}" 2>/dev/null)
 if [ -n "$APP" ]; then
-  echo "\\u25b8 pm2 restart $APP --update-env"
+  echo "▸ pm2 restart $APP --update-env"
   "$PM2" restart "$APP" --update-env
 else
-  echo "\\u25b8 pm2 restart ecosystem.config.js --update-env"
+  echo "▸ pm2 restart ecosystem.config.js --update-env"
   "$PM2" restart ecosystem.config.js --update-env
 fi
 rc=$?
 if [ "$rc" -ne 0 ]; then
-  echo "\\u2717 pm2 restart exited $rc"
+  echo "✗ pm2 restart exited $rc"
   echo "EXIT:$rc"
   exit "$rc"
 fi
 
-echo "\\u25b8 Verifying /health on 127.0.0.1:$PORT ..."
+echo "▸ Verifying /health on 127.0.0.1:$PORT ..."
 code=""
 got=""
 i=0
@@ -250,22 +274,22 @@ while [ "$i" -lt 30 ]; do
   echo "  [$i] health: $body"
   got=$(printf '%s' "$body" | sed -n 's/.*"version"[": ]*"\\([^"]*\\)".*/\\1/p')
   if [ -z "$got" ]; then
-    echo "\\u2713 Service healthy (no version reported by /health)."
+    echo "✓ Service healthy (no version reported by /health)."
     code=0
     break
   fi
   if [ "$got" = "$VERSION" ]; then
-    echo "\\u2713 Restart verified: now running v$got."
+    echo "✓ Restart verified: now running v$got."
     code=0
     break
   fi
-  echo "\\u2717 Version mismatch: /health reports v$got, expected v$VERSION."
+  echo "✗ Version mismatch: /health reports v$got, expected v$VERSION."
   code=1
   break
 done
 
 if [ -z "$code" ]; then
-  echo "\\u26a0 Restart issued but /health did not confirm within timeout."
+  echo "⚠ Restart issued but /health did not confirm within timeout."
   code=0
 fi
 
@@ -301,7 +325,7 @@ registerDeployMethod('npm', 'node', {
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
       stringify({
-        deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "\\u25b8 Service updated; restarting (supervised)..." && sh ./restart.sh "${version}"`,
+        deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "▸ Service updated; restarting (supervised)..." && sh ./restart.sh "${version}"`,
       }),
     );
   },
