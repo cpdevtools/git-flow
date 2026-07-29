@@ -37,7 +37,9 @@ describe('docker.compose generateDeployYml', () => {
     expect(m.method).toBe('compose');
     expect(m.slot).toBe('org-svc');
     expect(m.versioning).toBe('singleton');
-    expect(m.deployCommand).toBe('docker compose -p org-svc pull && docker compose -p org-svc up -d');
+    expect(m.deployCommand).toBe(
+      'docker compose -p org-svc pull && docker compose -p org-svc up -d --force-recreate --remove-orphans',
+    );
     expect(m.teardownCommand).toBe('docker compose -p org-svc down');
   });
 

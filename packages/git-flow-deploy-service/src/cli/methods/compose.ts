@@ -32,11 +32,11 @@ export async function handleCompose(options: ComposeHandlerOptions): Promise<voi
 
   if (!isRunning) {
     console.log('Starting service with docker compose (first-time)...');
-    execSync(`docker compose -f "${composeFile}" up -d`, { stdio: 'inherit', env });
+    execSync(`docker compose -f "${composeFile}" up -d --force-recreate --remove-orphans`, { stdio: 'inherit', env });
   } else {
     console.log('Existing docker compose service detected — pulling and restarting...');
     execSync(`docker compose -f "${composeFile}" pull`, { stdio: 'inherit', env });
-    execSync(`docker compose -f "${composeFile}" up -d`, { stdio: 'inherit', env });
+    execSync(`docker compose -f "${composeFile}" up -d --force-recreate --remove-orphans`, { stdio: 'inherit', env });
   }
 
   console.log('docker compose deployment complete ✓');

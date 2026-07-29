@@ -150,7 +150,13 @@ registerDeployMethod('docker', 'compose', {
         method: 'compose',
         slot,
         versioning: versioning ?? 'singleton',
-        deployCommand: `docker compose -p ${slot} pull && docker compose -p ${slot} up -d`,
+        // --force-recreate: a previous failed `up` (e.g. the port was still held
+        // during a mode change) leaves a container stuck in `Created` state.
+        // A later `up` REUSES that stale container and starts it without its
+        // host port mapping ever being established — the service then runs but
+        // is unreachable, so the deploy "succeeds" while health checks fail.
+        // Recreating unconditionally keeps each deploy deterministic.
+        deployCommand: `docker compose -p ${slot} pull && docker compose -p ${slot} up -d --force-recreate --remove-orphans`,
         teardownCommand: `docker compose -p ${slot} down`,
       }),
     );
@@ -251,10 +257,10 @@ registerDeployMethod('npm', 'node', {
         slot: deploymentSlot(projectName, version, 'singleton'),
         versioning: 'singleton',
         deployCommand: `${prefixExpr} && ${configAuth} && ${installCmd} && echo "▸ Service updated; restarting (supervised)..." && sh ./restart.sh "${version}"`,
-        // Stop (not delete) frees the port in fork mode while keeping the app
-        // registered with pm2, so a rollback can revive it by name (reusing the
-        // absolute script path pm2 recorded at first start). Run from the saved
-        // bundle dir, which holds this exact ecosystem.config.js.
+        // Stop (not delete) so the app stays REGISTERED with pm2: rollback and
+        // the restart supervisor revive it by name, reusing the absolute script
+        // path pm2 recorded at first start (the bundle's ecosystem.config.js only
+        // has a relative path). `pm2 delete` breaks that with "Process not found".
         teardownCommand: `pm2 stop ecosystem.config.js`,
       }),
     );
