@@ -40,11 +40,14 @@ services:
       # back to the port-publishing one.
       COMPOSE_FILE: docker-compose.netns.yml
       DEPLOY_NETNS_CONTAINER: "${DEPLOY_NETNS_CONTAINER}"
+      # Same reason: keep the host bind root pinned across self-deploys instead of
+      # letting it re-resolve against the container's own $HOME.
+      DEPLOY_HOST_ROOT: "${DEPLOY_HOST_ROOT}"
     volumes:
       # Same host paths as docker-compose.yml so an in-flight deploy record/log
       # survives the node -> compose runtime boundary.
-      - ${HOME}/.git-flow-deploy-service/work:/var/deploy/work
-      - ${HOME}/.git-flow-deploy-service/state:/var/deploy/state
+      - ${DEPLOY_HOST_ROOT:?DEPLOY_HOST_ROOT must be the host dir holding work/ and state/ (the CLI defaults it to ~/.git-flow-deploy-service)}/work:/var/deploy/work
+      - ${DEPLOY_HOST_ROOT}/state:/var/deploy/state
       - shared:/var/deploy/shared
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
