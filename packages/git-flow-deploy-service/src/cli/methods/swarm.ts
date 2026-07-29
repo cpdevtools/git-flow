@@ -1,6 +1,8 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { slotStack, deploymentSlot } from '@cpdevtools/git-flow-deploy';
 import { defaultHostRoot } from './compose.js';
+import { bundleSlot } from '../bundle-slot.js';
 
 export interface SwarmHandlerOptions {
   extractDir: string;
@@ -8,17 +10,13 @@ export interface SwarmHandlerOptions {
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
 
-/** Mirrors the safeName() helper in deploy-methods.ts */
-function safeName(name: string): string {
-  return name.replace(/@/g, '').replace(/\//g, '-');
-}
-
 export async function handleSwarm(options: SwarmHandlerOptions): Promise<void> {
   const { extractDir } = options;
   const stackFile = join(extractDir, 'stack.yml');
-  // e.g. "@cpdevtools/git-flow-deploy-service" → "cpdevtools-git-flow-deploy-service"
-  // underscores used for stack name (docker convention)
-  const stackName = safeName(PACKAGE_NAME).replace(/-/g, '_');
+  // Must match the stack name in the bundle's own deployCommand, otherwise a
+  // later webhook deploy updates a different stack and leaves this one running.
+  const slot = (await bundleSlot(extractDir)) ?? deploymentSlot(PACKAGE_NAME, '0.0.0');
+  const stackName = slotStack(slot);
 
   const isDeployed = isStackDeployed(stackName);
 

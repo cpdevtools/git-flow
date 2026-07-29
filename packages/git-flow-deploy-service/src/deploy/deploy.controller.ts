@@ -12,8 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { spawn, spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   fetchDeployBundle,
@@ -30,32 +30,26 @@ import { ReposConfigService } from './repos-config.service.js';
 import { DeploymentStateService, type DeploymentStateInput } from './deployment-state.service.js';
 import type { DeployRecord } from './deploy-record.js';
 import { getServiceInfo } from '../version.js';
+import {
+  CONTAINERIZED_METHODS,
+  launchBare,
+  launchContainer,
+  supervisorPlacement,
+  type ContainerTarget,
+  type SupervisorPlacement,
+} from '../supervisor/launcher.js';
+import { SUPERVISOR_DELAY_MS, SUPERVISOR_PLAN_FILE, type SupervisorPlan } from '../supervisor/plan.js';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 
-/**
- * Deploy methods under which THIS service runs inside a container that its own
- * deploy command replaces. Such a self-deploy cannot be run inline — see
- * `startSelfRedeploy`.
- */
-const CONTAINERIZED_METHODS = new Set(['compose', 'swarm']);
-
-/**
- * Env vars that describe THIS container's runtime rather than the deployment.
- * They must not be forwarded to the supervisor container, whose image has its
- * own interpreter paths and would break if we overwrote them.
- */
-const SUPERVISOR_ENV_BLOCKLIST = new Set([
-  'PATH',
-  'HOME',
-  'HOSTNAME',
-  'PWD',
-  'OLDPWD',
-  'SHLVL',
-  '_',
-  'NODE_VERSION',
-  'YARN_VERSION',
-]);
+/** Outcome of trying to hand a self-replacing deploy to the supervisor. */
+type HandoffOutcome =
+  /** Supervisor is running; it owns the deploy and will append EXIT. */
+  | 'started'
+  /** A sibling container was required but this container is unidentifiable. */
+  | 'no-container'
+  /** The handoff failed and the record has already been finalized. */
+  | 'failed';
 
 @Controller()
 export class DeployController {
@@ -384,10 +378,10 @@ export class DeployController {
 
   /**
    * Hand a self mode-change (the deploy-service switching its own runtime, e.g.
-   * node → compose) to a detached supervisor. Tearing down the current mode
-   * kills this process, so the supervisor (a new session via setsid) performs
-   * teardown-old → bring-up-new → rollback-on-failure and appends the terminal
-   * EXIT to deploy.log, which the restarted/surviving service tails to finalize.
+   * node → compose) to the supervisor. Tearing down the current mode kills this
+   * process, so the supervisor performs teardown-old → bring-up-new →
+   * rollback-on-failure and appends the terminal EXIT to deploy.log, which the
+   * restarted/surviving service tails to finalize.
    */
   private startSelfModeChange(
     record: DeployRecord,
@@ -397,67 +391,88 @@ export class DeployController {
     versioning: 'singleton' | 'major',
     prior: { method: string; bundleDir: string; teardownCommand?: string; deployCommand: string },
   ): void {
+    const from = prior.method;
+    const to = manifest.method ?? 'unknown';
+    const placement = supervisorPlacement(from, to);
+
+    // Refuse BEFORE anything is torn down — the service keeps running as it is.
+    if (placement === 'unsupported') {
+      this.refuseModeChange(record, from, to, manifest.version);
+      return;
+    }
+
     this.store.setSelfUpdate(record, manifest.version);
 
-    const stateNew = this.state.stageState(this.buildState(manifest, slot, versioning));
-    const scriptPath = join(workDir, 'self-mode-change.sh');
-    try {
-      writeFileSync(scriptPath, SELF_MODE_CHANGE_SCRIPT, { mode: 0o755 });
-    } catch (err) {
-      this.store.appendLine(record, `▸ Error: failed to write supervisor script: ${(err as Error).message}`);
-      this.store.finish(record, 1);
-      return;
-    }
-
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      GFMC_LOG: join(workDir, 'deploy.log'),
-      GFMC_FROM: prior.method,
-      GFMC_TO: manifest.method ?? 'unknown',
-      GFMC_TEARDOWN_CWD: prior.bundleDir,
-      GFMC_TEARDOWN_CMD: prior.teardownCommand ?? '',
-      GFMC_ROLLBACK_CMD: prior.deployCommand,
-      GFMC_DEPLOY_CWD: workDir,
-      GFMC_DEPLOY_CMD: manifest.deployCommand,
-      GFMC_CURRENT: this.state.currentBundleDir(slot),
-      GFMC_NEW_BUNDLE: workDir,
-      GFMC_STATE: this.state.stateFile(slot),
-      GFMC_STATE_NEW: stateNew,
+    const plan: SupervisorPlan = {
+      log: join(workDir, 'deploy.log'),
+      slot,
+      version: manifest.version,
+      label: `self mode-change ${from} → ${to} (v${manifest.version})`,
+      delayMs: SUPERVISOR_DELAY_MS,
+      teardown: prior.teardownCommand
+        ? { cwd: prior.bundleDir, command: prior.teardownCommand }
+        : undefined,
+      deploy: { cwd: workDir, command: manifest.deployCommand },
+      rollback: { cwd: prior.bundleDir, command: prior.deployCommand },
+      commit: {
+        currentDir: this.state.currentBundleDir(slot),
+        newBundle: workDir,
+        stateFile: this.state.stateFile(slot),
+        stateNewFile: this.state.stageState(this.buildState(manifest, slot, versioning)),
+      },
     };
 
-    this.store.appendLine(
-      record,
-      `▸ Self mode-change ${prior.method} → ${manifest.method}; handing off to detached supervisor…`,
-    );
+    this.store.appendLine(record, `▸ Self mode-change ${from} → ${to}; handing off to a supervisor…`);
 
-    try {
-      const child = spawn('setsid', ['sh', scriptPath], {
-        cwd: workDir,
-        env,
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.unref();
-    } catch (err) {
-      this.store.appendLine(record, `▸ Error: failed to start supervisor: ${(err as Error).message}`);
+    const outcome = this.startSupervisor(record, workDir, slot, placement, plan);
+    if (outcome === 'no-container') {
+      // Running the teardown inline would SIGKILL us mid-change and leave the
+      // service down with nothing to bring it back. Refuse instead.
+      rmSync(plan.commit.stateNewFile, { force: true });
+      this.store.appendLine(
+        record,
+        "▸ Error: could not identify this service's own container, so no supervisor could be started. " +
+          'Nothing was torn down — set DEPLOY_SELF_CONTAINER and retry.',
+      );
       this.store.finish(record, 1);
       return;
     }
+    if (outcome === 'failed') return;
 
-    this.store.startTail(record);
-    this.logger.log(`Self mode-change handed off to supervisor: slot ${slot} ${prior.method} → ${manifest.method}`);
+    this.logger.log(`Self mode-change handed off to supervisor: slot ${slot} ${from} → ${to}`);
+  }
+
+  /**
+   * Explain why a containerized → host mode change cannot be automated, and
+   * finalize the deploy as failed WITHOUT touching the running deployment.
+   *
+   * The supervisor would have to install and start a process on the Docker host;
+   * a container can create sibling containers but cannot reach outside Docker to
+   * run npm/pm2 on the host. Attempting it tore the old mode down and then died
+   * with it, taking the service offline with no way back.
+   */
+  private refuseModeChange(record: DeployRecord, from: string, to: string, version: string): void {
+    const self = getServiceInfo();
+    for (const line of [
+      `▸ Unsupported mode change: ${from} → ${to}.`,
+      `▸ Switching this service out of a containerized mode cannot be automated: the supervisor`,
+      `  would have to install and start a process on the Docker host, which nothing running`,
+      `  inside a container can do.`,
+      `▸ Nothing was torn down — the service is still running under ${from}.`,
+      `▸ To switch, run this on the deploy host:`,
+      `    npx ${self.name}@${version} --method ${to} --version ${version} \\`,
+      `      --install-dir <dir> --hmac-secret <secret>`,
+      `  then tear the ${from} deployment down.`,
+    ]) {
+      this.store.appendLine(record, line);
+    }
+    this.store.finish(record, 1);
+    this.logger.error(`Deploy refused (unsupported mode change ${from} → ${to})`);
   }
 
   /**
    * Hand a same-mode containerized self deploy (compose/swarm) to a supervisor
    * running in a SIBLING container, which survives the replacement of this one.
-   *
-   * The supervisor inherits our bind mounts via `--volumes-from`, so the bundle
-   * dir, state dir and Docker socket appear at the same paths it already has in
-   * the manifest — no host-path translation needed (the host paths behind our
-   * mounts are not knowable from in here). It runs OUR image, which is
-   * guaranteed to be present locally and already ships the docker CLI + compose
-   * plugin, so the handoff never depends on pulling a helper image.
    *
    * Returns true when the deploy has been handed off (or definitively failed) —
    * i.e. the caller must stop. Returns false when no supervisor could be
@@ -471,70 +486,89 @@ export class DeployController {
     versioning: 'singleton' | 'major',
     prior: { bundleDir: string; deployCommand: string } | undefined,
   ): boolean {
-    const self = this.resolveSelfContainer(slot);
-    if (!self) {
+    const plan: SupervisorPlan = {
+      log: join(workDir, 'deploy.log'),
+      slot,
+      version: manifest.version,
+      label: `self redeploy → v${manifest.version}`,
+      delayMs: SUPERVISOR_DELAY_MS,
+      deploy: { cwd: workDir, command: manifest.deployCommand },
+      rollback: prior ? { cwd: prior.bundleDir, command: prior.deployCommand } : undefined,
+      commit: {
+        currentDir: this.state.currentBundleDir(slot),
+        newBundle: workDir,
+        stateFile: this.state.stateFile(slot),
+        stateNewFile: this.state.stageState(this.buildState(manifest, slot, versioning)),
+      },
+    };
+
+    const outcome = this.startSupervisor(record, workDir, slot, 'container', plan);
+    if (outcome === 'no-container') {
+      rmSync(plan.commit.stateNewFile, { force: true });
       this.store.appendLine(
         record,
-        '▸ Warning: could not identify this service\'s own container; running the deploy inline. ' +
+        "▸ Warning: could not identify this service's own container; running the deploy inline. " +
           'If it replaces this container the deploy will be killed mid-swap — set DEPLOY_SELF_CONTAINER to fix.',
       );
       return false;
     }
+    if (outcome === 'started') {
+      this.logger.log(
+        `Containerized self deploy handed off to supervisor container: slot ${slot} → v${manifest.version}`,
+      );
+    }
+    return true;
+  }
 
-    const stateNew = this.state.stageState(this.buildState(manifest, slot, versioning));
-    const scriptPath = join(workDir, 'self-redeploy.sh');
+  /**
+   * Write the plan and start `gitflow-deploy-service supervise --plan <file>`
+   * in the placement that survives this deploy, then tail deploy.log for the
+   * supervisor's output and terminal EXIT.
+   */
+  private startSupervisor(
+    record: DeployRecord,
+    workDir: string,
+    slot: string,
+    placement: Exclude<SupervisorPlacement, 'unsupported'>,
+    plan: SupervisorPlan,
+  ): HandoffOutcome {
+    let container: ContainerTarget | undefined;
+    if (placement === 'container') {
+      container = this.resolveSelfContainer(slot);
+      if (!container) return 'no-container';
+    }
+
+    const planPath = join(workDir, SUPERVISOR_PLAN_FILE);
     try {
-      writeFileSync(scriptPath, SELF_REDEPLOY_SCRIPT, { mode: 0o755 });
+      writeFileSync(planPath, JSON.stringify(plan, null, 2));
     } catch (err) {
-      this.store.appendLine(record, `▸ Error: failed to write supervisor script: ${(err as Error).message}`);
-      this.store.finish(record, 1);
-      return true;
-    }
-
-    const supervisorEnv: Record<string, string> = {
-      GFSR_LOG: join(workDir, 'deploy.log'),
-      GFSR_VERSION: manifest.version,
-      GFSR_DEPLOY_CWD: workDir,
-      GFSR_DEPLOY_CMD: manifest.deployCommand,
-      GFSR_ROLLBACK_CWD: prior?.bundleDir ?? '',
-      GFSR_ROLLBACK_CMD: prior?.deployCommand ?? '',
-      GFSR_CURRENT: this.state.currentBundleDir(slot),
-      GFSR_NEW_BUNDLE: workDir,
-      GFSR_STATE: this.state.stateFile(slot),
-      GFSR_STATE_NEW: stateNew,
-    };
-
-    // Forward our deployment env (COMPOSE_FILE, DEPLOY_*, GITHUB_TOKEN, …) so the
-    // bundle's ${VAR} interpolation resolves exactly as it would have in here.
-    // Args are passed as an array, never through a shell, so values need no quoting.
-    const args = ['run', '--detach', '--rm', '--volumes-from', self.id, '--workdir', workDir];
-    for (const [key, value] of Object.entries(process.env)) {
-      if (value === undefined || SUPERVISOR_ENV_BLOCKLIST.has(key)) continue;
-      args.push('--env', `${key}=${value}`);
-    }
-    for (const [key, value] of Object.entries(supervisorEnv)) {
-      args.push('--env', `${key}=${value}`);
-    }
-    args.push('--entrypoint', 'sh', self.image, scriptPath);
-
-    this.store.appendLine(
-      record,
-      `▸ Containerized self deploy; handing off to a sibling supervisor container (${self.image})…`,
-    );
-
-    const run = spawnSync('docker', args, { encoding: 'utf-8' });
-    if (run.status !== 0) {
       this.store.appendLine(
         record,
-        `▸ Error: failed to start supervisor container: ${(run.stderr || run.stdout || '').trim()}`,
+        `▸ Error: failed to write the supervisor plan: ${(err as Error).message}`,
       );
       this.store.finish(record, 1);
-      return true;
+      return 'failed';
+    }
+
+    if (container) {
+      this.store.appendLine(
+        record,
+        `▸ Handing off to a sibling supervisor container (${container.image})…`,
+      );
+    }
+
+    const result = container
+      ? launchContainer(planPath, workDir, container)
+      : launchBare(planPath, workDir);
+
+    if (!result.ok) {
+      this.store.appendLine(record, `▸ Error: failed to start the supervisor: ${result.error}`);
+      this.store.finish(record, 1);
+      return 'failed';
     }
 
     this.store.startTail(record);
-    this.logger.log(`Containerized self deploy handed off to supervisor container: slot ${slot} → v${manifest.version}`);
-    return true;
+    return 'started';
   }
 
   /**
@@ -583,75 +617,3 @@ export class DeployController {
     return undefined;
   }
 }
-
-/**
- * Supervisor for a same-mode containerized self deploy. Runs in a sibling
- * container (see startSelfRedeploy) so the replacement of this service's own
- * container cannot kill it. Parameters arrive via GFSR_* env vars to avoid
- * shell quoting. POSIX sh — runs under the image's busybox ash.
- */
-const SELF_REDEPLOY_SCRIPT = `#!/bin/sh
-set -u
-LOG="$GFSR_LOG"
-log() { printf '%s\\n' "$1" >> "$LOG" 2>/dev/null; }
-
-# Let the HTTP response flush and the running record persist before we replace
-# the container the deploy was requested through.
-sleep 3
-log "=== self redeploy $(date -u +%FT%TZ) -> v$GFSR_VERSION ==="
-
-if ( cd "$GFSR_DEPLOY_CWD" && sh -c "$GFSR_DEPLOY_CMD" ) >> "$LOG" 2>&1; then
-  rm -rf "$GFSR_CURRENT.tmp" 2>/dev/null
-  cp -a "$GFSR_NEW_BUNDLE" "$GFSR_CURRENT.tmp" 2>> "$LOG"
-  rm -rf "$GFSR_CURRENT" 2>/dev/null
-  mv "$GFSR_CURRENT.tmp" "$GFSR_CURRENT" 2>> "$LOG"
-  mv "$GFSR_STATE_NEW" "$GFSR_STATE" 2>> "$LOG"
-  log "\u2713 Redeployed to v$GFSR_VERSION."
-  log "EXIT:0"
-else
-  log "\u2717 Redeploy to v$GFSR_VERSION failed."
-  rm -f "$GFSR_STATE_NEW" 2>/dev/null
-  if [ -n "$GFSR_ROLLBACK_CMD" ] && [ -d "$GFSR_ROLLBACK_CWD" ]; then
-    log "\u25b8 Rolling back to the previous release..."
-    ( cd "$GFSR_ROLLBACK_CWD" && sh -c "$GFSR_ROLLBACK_CMD" ) >> "$LOG" 2>&1
-  fi
-  log "EXIT:1"
-fi
-`;
-
-/**
- * Detached supervisor for a self mode-change of the deploy-service. Launched via
- * `setsid` (its own session) so it survives the teardown that kills the parent
- * process. All parameters arrive via GFMC_* env vars to avoid shell quoting.
- * POSIX sh — runs under dash on the target.
- */
-const SELF_MODE_CHANGE_SCRIPT = `#!/bin/sh
-set -u
-LOG="$GFMC_LOG"
-log() { printf '%s\\n' "$1" >> "$LOG" 2>/dev/null; }
-
-# Let the HTTP response flush and the running record persist before we kill self.
-sleep 3
-log "=== self mode-change $(date -u +%FT%TZ): $GFMC_FROM -> $GFMC_TO ==="
-
-log "\u25b8 Tearing down previous mode ($GFMC_FROM)..."
-if [ -n "$GFMC_TEARDOWN_CMD" ]; then
-  ( cd "$GFMC_TEARDOWN_CWD" && sh -c "$GFMC_TEARDOWN_CMD" ) >> "$LOG" 2>&1
-fi
-
-log "\u25b8 Bringing up new mode ($GFMC_TO)..."
-if ( cd "$GFMC_DEPLOY_CWD" && sh -c "$GFMC_DEPLOY_CMD" ) >> "$LOG" 2>&1; then
-  rm -rf "$GFMC_CURRENT.tmp" 2>/dev/null
-  cp -a "$GFMC_NEW_BUNDLE" "$GFMC_CURRENT.tmp" 2>> "$LOG"
-  rm -rf "$GFMC_CURRENT" 2>/dev/null
-  mv "$GFMC_CURRENT.tmp" "$GFMC_CURRENT" 2>> "$LOG"
-  mv "$GFMC_STATE_NEW" "$GFMC_STATE" 2>> "$LOG"
-  log "\u2713 New mode ($GFMC_TO) is up."
-  log "EXIT:0"
-else
-  log "\u2717 New mode ($GFMC_TO) failed to start; rolling back to $GFMC_FROM..."
-  ( cd "$GFMC_TEARDOWN_CWD" && sh -c "$GFMC_ROLLBACK_CMD" ) >> "$LOG" 2>&1
-  rm -f "$GFMC_STATE_NEW" 2>/dev/null
-  log "EXIT:1"
-fi
-`;

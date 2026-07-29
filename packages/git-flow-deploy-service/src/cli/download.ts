@@ -20,7 +20,10 @@ export async function downloadBundle(options: DownloadOptions): Promise<string> 
   const { method, version, owner, repo, token, installDir } = options;
   const assetName = `deploy-${method}.zip`;
   const installBase = installDir ?? DEFAULT_INSTALL_BASE;
-  const extractDir = join(installBase, version);
+  // The method is part of the path: each method ships a DIFFERENT bundle for the
+  // same version (deploy-node.zip vs deploy-compose.zip). Keyed on version alone,
+  // installing method B after method A would silently reuse A's bundle.
+  const extractDir = join(installBase, version, method);
 
   if (existsSync(join(extractDir, 'deploy.yml'))) {
     console.log(`Bundle already extracted at ${extractDir}, skipping download.`);

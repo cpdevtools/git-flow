@@ -1,6 +1,7 @@
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { bundleSlot } from '../bundle-slot.js';
 
 /** Host dir holding work/ and state/, bind-mounted into the container. */
 export function defaultHostRoot(): string {
@@ -13,13 +14,27 @@ export interface ComposeHandlerOptions {
   token: string;
   /** HMAC secret for webhook validation — passed to the container as DEPLOY_HMAC_SECRET. */
   hmacSecret?: string;
+  /** Compose file within the bundle. Defaults to $COMPOSE_FILE, then docker-compose.yml. */
+  composeFile?: string;
 }
 
 export async function handleCompose(options: ComposeHandlerOptions): Promise<void> {
   const { extractDir, token, hmacSecret } = options;
-  const composeFile = join(extractDir, 'docker-compose.yml');
+  // Bundles ship variants (e.g. docker-compose.netns.yml) that the operator
+  // selects; hardcoding docker-compose.yml made them unreachable from the CLI.
+  const composeFile = join(
+    extractDir,
+    options.composeFile ?? process.env['COMPOSE_FILE'] ?? 'docker-compose.yml',
+  );
+  // The project name is the deployment slot, matching the `-p <slot>` that the
+  // bundle's own deployCommand uses. Without it compose derives the project from
+  // the extract-dir basename, so a CLI bootstrap and a later webhook deploy would
+  // manage two DIFFERENT stacks — and the service's own container lookup (by the
+  // com.docker.compose.project label) would not find it.
+  const slot = await bundleSlot(extractDir);
+  const base = ['compose', ...(slot ? ['-p', slot] : []), '-f', composeFile];
 
-  const isRunning = isComposeRunning(composeFile);
+  const isRunning = isComposeRunning(base);
 
   if (!isRunning && !hmacSecret) {
     throw new Error(
@@ -44,24 +59,29 @@ export async function handleCompose(options: ComposeHandlerOptions): Promise<voi
   };
 
   if (!isRunning) {
-    console.log('Starting service with docker compose (first-time)...');
-    execSync(`docker compose -f "${composeFile}" up -d --force-recreate --remove-orphans`, { stdio: 'inherit', env });
+    console.log(`Starting service with docker compose (first-time, project: ${slot ?? 'default'})...`);
   } else {
     console.log('Existing docker compose service detected — pulling and restarting...');
-    execSync(`docker compose -f "${composeFile}" pull`, { stdio: 'inherit', env });
-    execSync(`docker compose -f "${composeFile}" up -d --force-recreate --remove-orphans`, { stdio: 'inherit', env });
+    docker([...base, 'pull'], env);
   }
+  docker([...base, 'up', '-d', '--force-recreate', '--remove-orphans'], env);
 
   console.log('docker compose deployment complete ✓');
 }
 
-function isComposeRunning(composeFile: string): boolean {
+/** Run docker with an argv array — no shell, so no value needs quoting. */
+function docker(args: string[], env: NodeJS.ProcessEnv): void {
+  const res = spawnSync('docker', args, { stdio: 'inherit', env });
+  if (res.status !== 0) {
+    throw new Error(`docker ${args.join(' ')} failed with exit code ${res.status ?? 'unknown'}`);
+  }
+}
+
+function isComposeRunning(base: string[]): boolean {
   try {
-    const result = spawnSync(
-      'docker',
-      ['compose', '-f', composeFile, 'ps', '--services', '--filter', 'status=running'],
-      { encoding: 'utf-8' },
-    );
+    const result = spawnSync('docker', [...base, 'ps', '--services', '--filter', 'status=running'], {
+      encoding: 'utf-8',
+    });
     return (result.stdout?.trim().length ?? 0) > 0;
   } catch {
     return false;
