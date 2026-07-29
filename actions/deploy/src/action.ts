@@ -5,6 +5,12 @@ import { request as httpsRequest } from 'node:https';
 import { request as httpRequest } from 'node:http';
 import { URL } from 'node:url';
 
+/** Strip ANSI escape/color codes so the step summary renders cleanly. */
+function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
+}
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
@@ -310,7 +316,7 @@ async function run(): Promise<void> {
   // 3. Write step summary
   await core.summary
     .addHeading(`Deploy ${repo} @ ${releaseId}`)
-    .addCodeBlock(summaryLines.join('\n'), 'text')
+    .addCodeBlock(stripAnsi(summaryLines.join('\n')), 'text')
     .write();
 
   if (exitCode === null) {
