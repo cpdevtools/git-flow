@@ -12,4 +12,13 @@ export interface DeployRecord {
   log: string[];
   /** Fires 'line' whenever a new line is appended. */
   signal: EventEmitter;
+  /**
+   * True when this deploy is updating the deploy-service itself. Such a deploy
+   * restarts (kills) this process, so completion is handed off to the bundle's
+   * restart supervisor, which appends its output and the terminal EXIT line to
+   * the shared deploy.log. The (restarted) service tails that file to finish.
+   */
+  selfUpdate?: boolean;
+  /** Internal: active tail poller handle while awaiting an external EXIT. */
+  tailTimer?: NodeJS.Timeout;
 }

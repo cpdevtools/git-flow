@@ -192,6 +192,16 @@ export class DeployController {
 
       this.store.appendLine(record, `▸ Running: ${manifest.deployCommand}`);
 
+      // Detect a self-update: this deploy is installing the deploy-service's own
+      // package, so running deployCommand will restart (kill) THIS process. When
+      // that's the case the runDeploy child exits early (it backgrounds a restart
+      // supervisor); completion + the terminal EXIT are owned by that supervisor,
+      // which appends them to the shared deploy.log for the restarted service to tail.
+      const selfUpdate = manifest.name === getServiceInfo().name;
+      if (selfUpdate) {
+        this.store.setSelfUpdate(record);
+      }
+
       let exitCode: number;
       try {
         exitCode = await runDeploy(manifest, workDir, (line) => {
@@ -200,6 +210,19 @@ export class DeployController {
       } catch (err) {
         this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
         exitCode = 1;
+      }
+
+      if (selfUpdate && exitCode === 0) {
+        // Hand off to the restart supervisor: do NOT finish here. The supervisor
+        // appends its restart/health output and the terminal EXIT to deploy.log;
+        // tailing streams it through to any (reconnecting) client until EXIT.
+        this.store.appendLine(
+          record,
+          '▸ Deploy command handed off to restart supervisor; awaiting service restart…',
+        );
+        this.store.startTail(record);
+        this.logger.log(`Deploy handed off to restart supervisor: ${repo} release ${releaseId}`);
+        return;
       }
 
       this.store.finish(record, exitCode);

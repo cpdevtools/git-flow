@@ -188,33 +188,38 @@ registerDeployMethod('docker', 'swarm', {
  * recorded instead of silently reported as success.
  */
 const NODE_RESTART_SCRIPT = `#!/bin/sh
-# Supervised restart for a node (npm + pm2) deploy. Output is never discarded:
-# everything is written to a durable, timestamped log and the new version is
-# verified via /health.
+# Supervised restart for a node (npm + pm2) deploy. Output is NEVER discarded:
+# the detached supervisor appends everything — plus the terminal EXIT line — to
+# the release's deploy.log, the same file the deploy service streams/tails, so a
+# self-update's restart + health verification survive the restart and stay
+# visible in the workflow via the reconnect mechanism.
 set -u
 
 VERSION="\${1:-}"
 NPM_PREFIX="\${GITFLOW_NPM_PREFIX:-$HOME/.npm-global}"
 PM2="$NPM_PREFIX/bin/pm2"
 PORT="\${PORT:-3700}"
-LOG_DIR="\${GITFLOW_RESTART_LOG_DIR:-$HOME/.git-flow-deploy/restart-logs}"
-mkdir -p "$LOG_DIR"
+# The reconnectable, release_id-keyed log. Defaults to ./deploy.log because the
+# deploy command runs with cwd = the release working dir (where the service also
+# created deploy.log). GITFLOW_DEPLOY_LOG overrides it.
+DEPLOY_LOG="\${GITFLOW_DEPLOY_LOG:-$PWD/deploy.log}"
 
-# Phase 1 (attached): launch the detached supervisor, report where the log is,
-# then return promptly so the deploy's own log stream can flush.
+# Phase 1 (attached): launch the detached supervisor, then return promptly so the
+# deploy command exits and the service can hand off. This phase's stdout is
+# captured by the service and already lands in deploy.log.
 if [ "\${GITFLOW_RESTART_DETACHED:-}" != "1" ]; then
-  LOG="$LOG_DIR/restart-$(date -u +%Y%m%dT%H%M%SZ).log"
-  ln -sf "$LOG" "$LOG_DIR/latest.log" 2>/dev/null || true
-  echo "\\u25b8 Restart running in background (survives the restart)."
-  echo "\\u25b8 Full restart log: $LOG"
-  GITFLOW_RESTART_DETACHED=1 setsid sh "$0" "$VERSION" >"$LOG" 2>&1 </dev/null &
+  echo "\\u25b8 Restart running in background (survives the restart); output continues in this log."
+  GITFLOW_RESTART_DETACHED=1 GITFLOW_DEPLOY_LOG="$DEPLOY_LOG" setsid sh "$0" "$VERSION" >>"$DEPLOY_LOG" 2>&1 </dev/null &
   exit 0
 fi
 
-# Phase 2 (detached): perform the restart + verification, all captured to the log.
+# Phase 2 (detached): restart + verify. stdout/stderr are appended to deploy.log
+# (redirected by phase 1), and we append the terminal EXIT:<code> line here so
+# the (restarted) service's tailer finalizes the deploy from the log.
 echo "=== restart $(date -u +%FT%TZ) -> v\${VERSION:-?} ==="
 
-# Give the deploy HTTP response / log stream a moment to flush before we kill it.
+# Give the deploy's HTTP response / log stream a moment to flush and the service
+# to record the handoff before we kill it.
 sleep 3
 
 # Restart by app name (reuses the running app's absolute script path) when it can
@@ -230,10 +235,13 @@ fi
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo "\\u2717 pm2 restart exited $rc"
+  echo "EXIT:$rc"
   exit "$rc"
 fi
 
 echo "\\u25b8 Verifying /health on 127.0.0.1:$PORT ..."
+code=""
+got=""
 i=0
 while [ "$i" -lt 30 ]; do
   i=$((i + 1))
@@ -243,18 +251,26 @@ while [ "$i" -lt 30 ]; do
   got=$(printf '%s' "$body" | sed -n 's/.*"version"[": ]*"\\([^"]*\\)".*/\\1/p')
   if [ -z "$got" ]; then
     echo "\\u2713 Service healthy (no version reported by /health)."
-    exit 0
+    code=0
+    break
   fi
   if [ "$got" = "$VERSION" ]; then
     echo "\\u2713 Restart verified: now running v$got."
-    exit 0
+    code=0
+    break
   fi
   echo "\\u2717 Version mismatch: /health reports v$got, expected v$VERSION."
-  exit 1
+  code=1
+  break
 done
 
-echo "\\u26a0 Restart issued but /health did not confirm within timeout."
-exit 0
+if [ -z "$code" ]; then
+  echo "\\u26a0 Restart issued but /health did not confirm within timeout."
+  code=0
+fi
+
+echo "EXIT:$code"
+exit "$code"
 `;
 
 registerDeployMethod('npm', 'node', {
@@ -278,8 +294,9 @@ registerDeployMethod('npm', 'node', {
     const prefixExpr = `NPM_PREFIX="\${GITFLOW_NPM_PREFIX:-$HOME/.npm-global}"`;
     const installCmd = `npm install -g --prefix "$NPM_PREFIX" ${projectName}@${version}`;
     // restart.sh supervises the pm2 restart: it survives the restart that kills
-    // this process, logs ALL output to a durable file (never /dev/null), and
-    // verifies /health reports the new version.
+    // this process, appends ALL output plus the terminal EXIT line to the
+    // release's deploy.log (never /dev/null), and verifies /health reports the
+    // new version. The service tails that same deploy.log to finalize the deploy.
     await writeFile(join(deployOutputDir, 'restart.sh'), NODE_RESTART_SCRIPT);
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
