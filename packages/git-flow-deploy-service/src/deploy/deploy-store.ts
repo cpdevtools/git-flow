@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import type { DeployRecord, DeployStatus } from './deploy-record.js';
+import { getServiceInfo } from '../version.js';
 
 /**
  * Persisted per-release metadata. The log lines themselves live in the
@@ -24,6 +25,7 @@ interface PersistedMeta {
   startedAt: string;
   completedAt?: string;
   selfUpdate?: boolean;
+  targetVersion?: string;
 }
 
 /** Poll interval for tailing deploy.log for externally-appended lines. */
@@ -68,6 +70,7 @@ export class DeployStore implements OnModuleInit {
         startedAt: record.startedAt.toISOString(),
         completedAt: record.completedAt?.toISOString(),
         selfUpdate: record.selfUpdate,
+        targetVersion: record.targetVersion,
       };
       writeFileSync(this.metaPath(record.releaseId), JSON.stringify(data));
     } catch {
@@ -121,6 +124,7 @@ export class DeployStore implements OnModuleInit {
       log: lines,
       signal: new EventEmitter(),
       selfUpdate: meta.selfUpdate,
+      targetVersion: meta.targetVersion,
     };
     record.signal.setMaxListeners(100);
     this.records.set(releaseId, record);
@@ -137,10 +141,20 @@ export class DeployStore implements OnModuleInit {
     if (meta.status !== 'running') return;
 
     if (meta.selfUpdate) {
-      // A self-update was in flight when we died. The restart supervisor owns the
-      // terminal EXIT and appends it (plus its output) to deploy.log while we were
-      // down — resume tailing so reconnecting clients see it through to completion.
-      this.startTail(record);
+      // A self-update was in flight when we died. If THIS restored instance is
+      // already running the target version, the update demonstrably succeeded
+      // (the newly-installed code is what just booted) — finalize immediately
+      // instead of waiting on the restart supervisor, which pm2 may have killed
+      // before it could append the terminal EXIT line.
+      const running = getServiceInfo().version;
+      if (record.targetVersion && running === record.targetVersion) {
+        this.appendLine(record, `\u2713 Restart verified on boot: service is running v${running}.`);
+        this.finish(record, 0);
+      } else {
+        // Version unknown or not yet the target — fall back to tailing deploy.log
+        // for the supervisor's health-verify output and its terminal EXIT.
+        this.startTail(record);
+      }
     } else {
       // A non-self-update deploy was interrupted by an unexpected restart/crash.
       // We cannot know it succeeded — record a failure rather than a false success.
@@ -183,8 +197,9 @@ export class DeployStore implements OnModuleInit {
    * Mark a record as a self-update (updating the deploy-service itself). Such a
    * deploy hands completion off to the bundle's restart supervisor.
    */
-  setSelfUpdate(record: DeployRecord): void {
+  setSelfUpdate(record: DeployRecord, targetVersion?: string): void {
     record.selfUpdate = true;
+    if (targetVersion) record.targetVersion = targetVersion;
     this.persistMeta(record);
   }
 

@@ -199,7 +199,7 @@ export class DeployController {
       // which appends them to the shared deploy.log for the restarted service to tail.
       const selfUpdate = manifest.name === getServiceInfo().name;
       if (selfUpdate) {
-        this.store.setSelfUpdate(record);
+        this.store.setSelfUpdate(record, manifest.version);
       }
 
       let exitCode: number;
