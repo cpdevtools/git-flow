@@ -620,6 +620,24 @@ export async function cleanupEmptyDraftReleases(
 }
 
 /**
+ * Build the markdown body listing published releases. Shared by the PR comment
+ * and the publish-release step summary so both render identically.
+ */
+export function buildReleaseComment(
+  releases: Array<{ name: string; version: string; url: string; tag: string }>,
+): string {
+  const releaseLinks = releases
+    .map((r) => `- **${r.name}** [${r.version}](${r.url}) - \`${r.tag}\``)
+    .join('\n');
+
+  return `## ✅ Releases Published
+
+${releaseLinks}
+
+All releases have been successfully published and are now available.`;
+}
+
+/**
  * Post a comment on a PR with links to published releases
  */
 export async function postPRReleaseComment(
@@ -631,15 +649,7 @@ export async function postPRReleaseComment(
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
 
-  const releaseLinks = releases
-    .map((r) => `- **${r.name}** [${r.version}](${r.url}) - \`${r.tag}\``)
-    .join('\n');
-
-  const body = `## ✅ Releases Published
-
-${releaseLinks}
-
-All releases have been successfully published and are now available.`;
+  const body = buildReleaseComment(releases);
 
   try {
     await octokit.rest.issues.createComment({
