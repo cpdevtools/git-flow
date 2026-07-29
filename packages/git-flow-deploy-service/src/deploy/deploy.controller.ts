@@ -12,10 +12,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fetchDeployBundle, prepareSharedStorage, runDeploy, deploymentSlot } from '@cpdevtools/git-flow-deploy';
+import {
+  fetchDeployBundle,
+  prepareSharedStorage,
+  runDeploy,
+  deploymentSlot,
+  slotStack,
+} from '@cpdevtools/git-flow-deploy';
 import type { DeployManifest, DeployRequest } from '@cpdevtools/git-flow-deploy';
 import { DeployStore } from './deploy-store.js';
 import { HmacGuard } from './hmac.guard.js';
@@ -26,6 +32,30 @@ import type { DeployRecord } from './deploy-record.js';
 import { getServiceInfo } from '../version.js';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
+
+/**
+ * Deploy methods under which THIS service runs inside a container that its own
+ * deploy command replaces. Such a self-deploy cannot be run inline — see
+ * `startSelfRedeploy`.
+ */
+const CONTAINERIZED_METHODS = new Set(['compose', 'swarm']);
+
+/**
+ * Env vars that describe THIS container's runtime rather than the deployment.
+ * They must not be forwarded to the supervisor container, whose image has its
+ * own interpreter paths and would break if we overwrote them.
+ */
+const SUPERVISOR_ENV_BLOCKLIST = new Set([
+  'PATH',
+  'HOME',
+  'HOSTNAME',
+  'PWD',
+  'OLDPWD',
+  'SHLVL',
+  '_',
+  'NODE_VERSION',
+  'YARN_VERSION',
+]);
 
 @Controller()
 export class DeployController {
@@ -253,6 +283,22 @@ export class DeployController {
         this.store.setSelfUpdate(record, manifest.version);
       }
 
+      // ── Containerized self deploy: hand off to a SIBLING container ─────────
+      // Under compose/swarm the deploy command replaces the very container this
+      // process runs in, and `up --force-recreate` stops the old container
+      // between creating and starting the replacement. Run inline, we are
+      // SIGKILLed in that window and the new container is left in `created`.
+      // A `setsid` supervisor (as used for a mode change) does NOT help here:
+      // it stays in this container's PID namespace and cgroup, so Docker tears
+      // it down with everything else. Only a separate container survives.
+      if (
+        selfUpdate &&
+        CONTAINERIZED_METHODS.has(manifest.method ?? '') &&
+        this.startSelfRedeploy(record, manifest, workDir, slot, versioning, prior)
+      ) {
+        return;
+      }
+
       let exitCode: number;
       try {
         exitCode = await runDeploy(manifest, workDir, (line) => {
@@ -401,7 +447,177 @@ export class DeployController {
     this.store.startTail(record);
     this.logger.log(`Self mode-change handed off to supervisor: slot ${slot} ${prior.method} → ${manifest.method}`);
   }
+
+  /**
+   * Hand a same-mode containerized self deploy (compose/swarm) to a supervisor
+   * running in a SIBLING container, which survives the replacement of this one.
+   *
+   * The supervisor inherits our bind mounts via `--volumes-from`, so the bundle
+   * dir, state dir and Docker socket appear at the same paths it already has in
+   * the manifest — no host-path translation needed (the host paths behind our
+   * mounts are not knowable from in here). It runs OUR image, which is
+   * guaranteed to be present locally and already ships the docker CLI + compose
+   * plugin, so the handoff never depends on pulling a helper image.
+   *
+   * Returns true when the deploy has been handed off (or definitively failed) —
+   * i.e. the caller must stop. Returns false when no supervisor could be
+   * started, leaving the caller to run the deploy inline as a best effort.
+   */
+  private startSelfRedeploy(
+    record: DeployRecord,
+    manifest: DeployManifest,
+    workDir: string,
+    slot: string,
+    versioning: 'singleton' | 'major',
+    prior: { bundleDir: string; deployCommand: string } | undefined,
+  ): boolean {
+    const self = this.resolveSelfContainer(slot);
+    if (!self) {
+      this.store.appendLine(
+        record,
+        '▸ Warning: could not identify this service\'s own container; running the deploy inline. ' +
+          'If it replaces this container the deploy will be killed mid-swap — set DEPLOY_SELF_CONTAINER to fix.',
+      );
+      return false;
+    }
+
+    const stateNew = this.state.stageState(this.buildState(manifest, slot, versioning));
+    const scriptPath = join(workDir, 'self-redeploy.sh');
+    try {
+      writeFileSync(scriptPath, SELF_REDEPLOY_SCRIPT, { mode: 0o755 });
+    } catch (err) {
+      this.store.appendLine(record, `▸ Error: failed to write supervisor script: ${(err as Error).message}`);
+      this.store.finish(record, 1);
+      return true;
+    }
+
+    const supervisorEnv: Record<string, string> = {
+      GFSR_LOG: join(workDir, 'deploy.log'),
+      GFSR_VERSION: manifest.version,
+      GFSR_DEPLOY_CWD: workDir,
+      GFSR_DEPLOY_CMD: manifest.deployCommand,
+      GFSR_ROLLBACK_CWD: prior?.bundleDir ?? '',
+      GFSR_ROLLBACK_CMD: prior?.deployCommand ?? '',
+      GFSR_CURRENT: this.state.currentBundleDir(slot),
+      GFSR_NEW_BUNDLE: workDir,
+      GFSR_STATE: this.state.stateFile(slot),
+      GFSR_STATE_NEW: stateNew,
+    };
+
+    // Forward our deployment env (COMPOSE_FILE, DEPLOY_*, GITHUB_TOKEN, …) so the
+    // bundle's ${VAR} interpolation resolves exactly as it would have in here.
+    // Args are passed as an array, never through a shell, so values need no quoting.
+    const args = ['run', '--detach', '--rm', '--volumes-from', self.id, '--workdir', workDir];
+    for (const [key, value] of Object.entries(process.env)) {
+      if (value === undefined || SUPERVISOR_ENV_BLOCKLIST.has(key)) continue;
+      args.push('--env', `${key}=${value}`);
+    }
+    for (const [key, value] of Object.entries(supervisorEnv)) {
+      args.push('--env', `${key}=${value}`);
+    }
+    args.push('--entrypoint', 'sh', self.image, scriptPath);
+
+    this.store.appendLine(
+      record,
+      `▸ Containerized self deploy; handing off to a sibling supervisor container (${self.image})…`,
+    );
+
+    const run = spawnSync('docker', args, { encoding: 'utf-8' });
+    if (run.status !== 0) {
+      this.store.appendLine(
+        record,
+        `▸ Error: failed to start supervisor container: ${(run.stderr || run.stdout || '').trim()}`,
+      );
+      this.store.finish(record, 1);
+      return true;
+    }
+
+    this.store.startTail(record);
+    this.logger.log(`Containerized self deploy handed off to supervisor container: slot ${slot} → v${manifest.version}`);
+    return true;
+  }
+
+  /**
+   * Identify the container this process runs in, so a supervisor can inherit its
+   * mounts.
+   *
+   * The usual tricks do NOT work here. Under `network_mode: container:<other>`
+   * the UTS namespace and the /etc/{hostname,hosts,resolv.conf} bind mounts all
+   * come from the JOINED container, so `hostname` and /proc/self/mountinfo both
+   * report that container's id instead of ours; cgroup v2 reports a bare `0::/`.
+   * Asking the daemon by deployment-slot label is the only method that stays
+   * correct in every mode we support — compose sets `com.docker.compose.project`
+   * to the slot (we deploy with `-p <slot>`) and swarm sets
+   * `com.docker.stack.namespace` to the slot's stack name.
+   *
+   * Requires a unique running match, so a multi-service bundle falls back rather
+   * than guessing wrong. `DEPLOY_SELF_CONTAINER` overrides the lookup entirely.
+   */
+  private resolveSelfContainer(slot: string): { id: string; image: string } | undefined {
+    const inspect = (ref: string): { id: string; image: string } | undefined => {
+      const res = spawnSync('docker', ['inspect', ref, '--format', '{{.Id}} {{.Config.Image}}'], {
+        encoding: 'utf-8',
+      });
+      if (res.status !== 0) return undefined;
+      const [id, image] = res.stdout.trim().split(' ');
+      return id && image ? { id, image } : undefined;
+    };
+
+    const explicit = process.env['DEPLOY_SELF_CONTAINER'];
+    if (explicit) return inspect(explicit);
+
+    const labels = [
+      `com.docker.compose.project=${slot}`,
+      `com.docker.stack.namespace=${slotStack(slot)}`,
+    ];
+    for (const label of labels) {
+      const res = spawnSync(
+        'docker',
+        ['ps', '--no-trunc', '--filter', 'status=running', '--filter', `label=${label}`, '--format', '{{.ID}}'],
+        { encoding: 'utf-8' },
+      );
+      if (res.status !== 0) continue;
+      const ids = res.stdout.trim().split('\n').filter(Boolean);
+      if (ids.length === 1) return inspect(ids[0]);
+    }
+    return undefined;
+  }
 }
+
+/**
+ * Supervisor for a same-mode containerized self deploy. Runs in a sibling
+ * container (see startSelfRedeploy) so the replacement of this service's own
+ * container cannot kill it. Parameters arrive via GFSR_* env vars to avoid
+ * shell quoting. POSIX sh — runs under the image's busybox ash.
+ */
+const SELF_REDEPLOY_SCRIPT = `#!/bin/sh
+set -u
+LOG="$GFSR_LOG"
+log() { printf '%s\\n' "$1" >> "$LOG" 2>/dev/null; }
+
+# Let the HTTP response flush and the running record persist before we replace
+# the container the deploy was requested through.
+sleep 3
+log "=== self redeploy $(date -u +%FT%TZ) -> v$GFSR_VERSION ==="
+
+if ( cd "$GFSR_DEPLOY_CWD" && sh -c "$GFSR_DEPLOY_CMD" ) >> "$LOG" 2>&1; then
+  rm -rf "$GFSR_CURRENT.tmp" 2>/dev/null
+  cp -a "$GFSR_NEW_BUNDLE" "$GFSR_CURRENT.tmp" 2>> "$LOG"
+  rm -rf "$GFSR_CURRENT" 2>/dev/null
+  mv "$GFSR_CURRENT.tmp" "$GFSR_CURRENT" 2>> "$LOG"
+  mv "$GFSR_STATE_NEW" "$GFSR_STATE" 2>> "$LOG"
+  log "\u2713 Redeployed to v$GFSR_VERSION."
+  log "EXIT:0"
+else
+  log "\u2717 Redeploy to v$GFSR_VERSION failed."
+  rm -f "$GFSR_STATE_NEW" 2>/dev/null
+  if [ -n "$GFSR_ROLLBACK_CMD" ] && [ -d "$GFSR_ROLLBACK_CWD" ]; then
+    log "\u25b8 Rolling back to the previous release..."
+    ( cd "$GFSR_ROLLBACK_CWD" && sh -c "$GFSR_ROLLBACK_CMD" ) >> "$LOG" 2>&1
+  fi
+  log "EXIT:1"
+fi
+`;
 
 /**
  * Detached supervisor for a self mode-change of the deploy-service. Launched via

@@ -7,6 +7,10 @@ services:
       DEPLOY_WORK_DIR: /var/deploy/work
       DEPLOY_STATE_DIR: /var/deploy/state
       SHARED_STORAGE_BASE_DIR: /var/deploy/shared
+      # Propagate the host root so a later swarm -> swarm self-deploy (run from
+      # inside THIS task) mounts the SAME host dirs instead of re-resolving the
+      # bind sources against the container's own $HOME (/root).
+      DEPLOY_HOST_ROOT: "${DEPLOY_HOST_ROOT}"
     secrets:
       - DEPLOY_HMAC_SECRET
       - GITHUB_TOKEN
@@ -14,8 +18,8 @@ services:
       # Work dir + per-slot state live on a HOST path shared with the node method
       # so a mode-change hands the in-flight deploy record/log across the runtime
       # boundary: the new task restores it on boot and finalizes status.
-      - ${HOME}/.git-flow-deploy-service/work:/var/deploy/work
-      - ${HOME}/.git-flow-deploy-service/state:/var/deploy/state
+      - ${DEPLOY_HOST_ROOT:?DEPLOY_HOST_ROOT must be the host dir holding work/ and state/ (the CLI defaults it to ~/.git-flow-deploy-service)}/work:/var/deploy/work
+      - ${DEPLOY_HOST_ROOT}/state:/var/deploy/state
       - shared:/var/deploy/shared
       # Required so the containerized service can run `docker`/`docker stack`
       # deploys against the host Docker engine.

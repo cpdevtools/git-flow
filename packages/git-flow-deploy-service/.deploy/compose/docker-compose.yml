@@ -13,13 +13,18 @@ services:
       # them from --hmac-secret/--token during first-time setup).
       DEPLOY_HMAC_SECRET: "${DEPLOY_HMAC_SECRET:?DEPLOY_HMAC_SECRET must be set in the environment running docker compose}"
       GITHUB_TOKEN: "${GITHUB_TOKEN:?GITHUB_TOKEN must be set in the environment running docker compose}"
+      # Propagate the host root so a later compose -> compose self-deploy (run from
+      # inside THIS container) mounts the SAME host dirs. Without this the bind
+      # sources would re-resolve against the container's own $HOME (/root) and the
+      # replacement would silently come up with empty work/state dirs.
+      DEPLOY_HOST_ROOT: "${DEPLOY_HOST_ROOT}"
     volumes:
       # Work dir + per-slot state live on a HOST path shared with the node method
       # (same ~/.git-flow-deploy-service paths), so a mode-change (e.g. node →
       # compose) hands the in-flight deploy record/log across the runtime boundary:
       # the new container restores it on boot and finalizes status for the client.
-      - ${HOME}/.git-flow-deploy-service/work:/var/deploy/work
-      - ${HOME}/.git-flow-deploy-service/state:/var/deploy/state
+      - ${DEPLOY_HOST_ROOT:?DEPLOY_HOST_ROOT must be the host dir holding work/ and state/ (the CLI defaults it to ~/.git-flow-deploy-service)}/work:/var/deploy/work
+      - ${DEPLOY_HOST_ROOT}/state:/var/deploy/state
       - shared:/var/deploy/shared
       # Required so the containerized service can run `docker compose`/`docker`
       # deploys against the host Docker engine.

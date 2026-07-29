@@ -40,4 +40,25 @@ export class ConfigService {
    */
   readonly stateDir: string =
     process.env['DEPLOY_STATE_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'state');
+
+  /**
+   * Host directory holding `work/` and `state/`, which the compose/swarm bundles
+   * bind-mount into the container as `${DEPLOY_HOST_ROOT}/work` etc.
+   *
+   * It must be an absolute path on the DOCKER HOST, so it cannot be derived
+   * inside a container — `$HOME` there is `/root`, which would silently mount a
+   * fresh empty directory and break the deploy-log handoff. The bundles
+   * therefore require the variable and propagate it into the container env, and
+   * we seed it here (into process.env, so every deploy child process and
+   * supervisor inherits it) for the one case that has no container to inherit
+   * from: a node/pm2 install, where this process runs on the host and its own
+   * home dir IS the right answer.
+   */
+  readonly hostRoot: string = ConfigService.resolveHostRoot();
+
+  private static resolveHostRoot(): string {
+    const root = process.env['DEPLOY_HOST_ROOT'] ?? join(homedir(), '.git-flow-deploy-service');
+    process.env['DEPLOY_HOST_ROOT'] = root;
+    return root;
+  }
 }

@@ -1,5 +1,6 @@
 import { execSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { defaultHostRoot } from './compose.js';
 
 export interface SwarmHandlerOptions {
   extractDir: string;
@@ -27,7 +28,12 @@ export async function handleSwarm(options: SwarmHandlerOptions): Promise<void> {
     console.log(`Updating stack ${stackName}...`);
   }
 
-  execSync(`docker stack deploy -c "${stackFile}" "${stackName}"`, { stdio: 'inherit' });
+  execSync(`docker stack deploy -c "${stackFile}" "${stackName}"`, {
+    stdio: 'inherit',
+    // Pinned for the same reason as compose: a self-deploy runs from inside the
+    // task, where $HOME is /root, so the bind sources must not depend on it.
+    env: { ...process.env, DEPLOY_HOST_ROOT: defaultHostRoot() },
+  });
   console.log(`Stack ${stackName} deployed ✓`);
 }
 

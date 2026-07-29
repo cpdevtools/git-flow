@@ -24,10 +24,11 @@ jest.mock('../version.js', () => ({
 jest.mock('node:child_process', () => ({
   __esModule: true,
   spawn: jest.fn(() => ({ unref: jest.fn() })),
+  spawnSync: jest.fn(),
 }));
 
 import { fetchDeployBundle, runDeploy } from '@cpdevtools/git-flow-deploy';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { getServiceInfo } from '../version.js';
 import { DeployController } from './deploy.controller.js';
 import { DeployStore } from './deploy-store.js';
@@ -38,6 +39,7 @@ import type { ReposConfigService } from './repos-config.service.js';
 const fetchMock = fetchDeployBundle as jest.Mock;
 const runMock = runDeploy as jest.Mock;
 const spawnMock = spawn as unknown as jest.Mock;
+const spawnSyncMock = spawnSync as unknown as jest.Mock;
 const serviceInfoMock = getServiceInfo as jest.Mock;
 
 const SELF = { name: '@cpdevtools/git-flow-deploy-service', version: '9.9.9' };
@@ -76,6 +78,9 @@ describe('DeployController mode-change teardown/rollback', () => {
       Promise.resolve(exitCodes[m.deployCommand] ?? 0),
     );
     spawnMock.mockReturnValue({ unref: jest.fn() });
+    // Default: this process is not identifiable as a container, so containerized
+    // self deploys fall back to running inline (matches a node-mode host).
+    spawnSyncMock.mockReturnValue({ status: 1, stdout: '', stderr: '' });
   });
 
   afterEach(() => {
@@ -117,6 +122,34 @@ describe('DeployController mode-change teardown/rollback', () => {
     await (controller as unknown as {
       runDeployAsync: (r: unknown, repo: string, id: number, b?: string) => Promise<void>;
     }).runDeployAsync(record, 'owner/repo', releaseId, undefined);
+  }
+
+  /** Make `docker ps`/`docker inspect` report a single running container as ours. */
+  function mockSelfContainer(id: string, image: string): void {
+    spawnSyncMock.mockImplementation((_cmd: string, args: string[]) => {
+      if (args[0] === 'ps') return { status: 0, stdout: `${id}\n`, stderr: '' };
+      if (args[0] === 'inspect') return { status: 0, stdout: `${id} ${image}\n`, stderr: '' };
+      return { status: 0, stdout: '', stderr: '' };
+    });
+  }
+
+  /** Args of the `docker run` that launched the supervisor container, if any. */
+  function dockerRunArgs(): string[] | undefined {
+    const call = spawnSyncMock.mock.calls.find((c) => (c[1] as string[])[0] === 'run');
+    return call?.[1] as string[] | undefined;
+  }
+
+  /** A manifest for a same-mode compose self deploy. */
+  function selfComposeManifest(releaseId: number): Record<string, unknown> {
+    return {
+      name: SELF.name,
+      version: SELF.version,
+      repo: 'owner/repo',
+      releaseId,
+      method: 'compose',
+      deployCommand: 'compose-up',
+      teardownCommand: 'compose-down',
+    };
   }
 
   it('mode change: tears down old mode, then brings up new mode, and persists new state', async () => {
@@ -254,6 +287,47 @@ describe('DeployController mode-change teardown/rollback', () => {
     expect(state.get(slot)?.method).toBe('node'); // supervisor (mocked) hasn't committed
     expect(existsSync(join(root, 'state', slot, 'state.new.json'))).toBe(true); // staged for commit
     // stop the unref'd tail interval so it can't fire between tests
+    store.finish(rec!, 0);
+  });
+
+  it('containerized self deploy: hands off to a sibling supervisor container', async () => {
+    const slot = 'cpdevtools-git-flow-deploy-service';
+    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    currentManifest = selfComposeManifest;
+    mockSelfContainer('container-id-abc', 'ghcr.io/org/svc:1.2.3');
+
+    await run(3001);
+
+    expect(runMock).not.toHaveBeenCalled(); // never run inline — that would SIGKILL us mid-swap
+    const args = dockerRunArgs();
+    expect(args).toBeDefined();
+    // Inherits our mounts (bundle dir, state dir, docker socket) without needing host paths.
+    expect(args).toEqual(expect.arrayContaining(['--volumes-from', 'container-id-abc']));
+    expect(args).toEqual(expect.arrayContaining(['--detach', '--rm']));
+    // Runs OUR image (always local, already has docker + compose) and our script.
+    expect(args!.slice(-3)).toEqual(['sh', 'ghcr.io/org/svc:1.2.3', join(root, '3001', 'self-redeploy.sh')]);
+    expect(args).toContain('GFSR_DEPLOY_CMD=compose-up');
+    expect(existsSync(join(root, '3001', 'self-redeploy.sh'))).toBe(true);
+
+    const rec = store.get(3001);
+    expect(rec?.selfUpdate).toBe(true);
+    expect(rec?.status).toBe('running'); // handed off, not finalized
+    expect(state.get(slot)?.version).toBe('1.0.0'); // supervisor commits state, not us
+    expect(existsSync(join(root, 'state', slot, 'state.new.json'))).toBe(true); // staged for commit
+    store.finish(rec!, 0);
+  });
+
+  it('containerized self deploy: falls back to an inline deploy when our container is unidentifiable', async () => {
+    seedPrior('cpdevtools-git-flow-deploy-service', 'compose', { deployCommand: 'compose-up-old' });
+    currentManifest = selfComposeManifest;
+    // Default spawnSync mock reports failure for both `docker ps` and `docker inspect`.
+
+    await run(3002);
+
+    expect(dockerRunArgs()).toBeUndefined();
+    expect(runMock).toHaveBeenCalledTimes(1); // best effort rather than doing nothing
+    const rec = store.get(3002);
+    expect(rec?.log.some((l) => l.includes('could not identify'))).toBe(true);
     store.finish(rec!, 0);
   });
 });
