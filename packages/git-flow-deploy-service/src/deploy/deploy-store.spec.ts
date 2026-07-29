@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DeployStore } from './deploy-store';
+import { getServiceInfo } from '../version';
 
 let workDir: string;
 let store: DeployStore;
@@ -206,6 +207,53 @@ describe('DeployStore', () => {
 
       await waitFor(() => done);
       expect(record.status).toBe('failed');
+    });
+
+    it('self-finalizes a self-update on boot when running the target version', () => {
+      const running = getServiceInfo().version;
+      seed(
+        14,
+        {
+          repo: 'o/r',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          selfUpdate: true,
+          targetVersion: running,
+        },
+        ['handed off; awaiting restart…'],
+      );
+
+      store.onModuleInit();
+
+      const record = store.get(14)!;
+      // The restart supervisor may have been killed by pm2 — the booted service
+      // confirms the update itself because it is already running the target.
+      expect(record.status).toBe('completed');
+      expect(record.log[record.log.length - 1]).toBe('EXIT:0');
+      expect(record.log.some((l) => l.includes('Restart verified on boot'))).toBe(true);
+      expect(record.tailTimer).toBeUndefined();
+      expect(store.isRunning(14)).toBe(false);
+    });
+
+    it('does not self-finalize on boot when the running version differs from the target', () => {
+      seed(
+        15,
+        {
+          repo: 'o/r',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          selfUpdate: true,
+          targetVersion: '0.0.0-not-the-running-version',
+        },
+        ['handed off; awaiting restart…'],
+      );
+
+      store.onModuleInit();
+
+      const record = store.get(15)!;
+      // Version mismatch → fall back to tailing deploy.log for the supervisor EXIT.
+      expect(record.status).toBe('running');
+      store.finish(record, 1); // clean up the tail poller
     });
   });
 });

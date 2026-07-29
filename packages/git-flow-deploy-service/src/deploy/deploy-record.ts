@@ -19,6 +19,13 @@ export interface DeployRecord {
    * the shared deploy.log. The (restarted) service tails that file to finish.
    */
   selfUpdate?: boolean;
+  /**
+   * For a self-update, the version being deployed. Persisted so the restarted
+   * service can confirm on boot that it is running the target version and
+   * finalize the deploy itself — even if the restart supervisor was killed by
+   * pm2 before it could append the terminal EXIT line.
+   */
+  targetVersion?: string;
   /** Internal: active tail poller handle while awaiting an external EXIT. */
   tailTimer?: NodeJS.Timeout;
 }
