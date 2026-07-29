@@ -2,6 +2,7 @@ import { downloadBundle } from './download.js';
 import { handleCompose } from './methods/compose.js';
 import { handleNode } from './methods/node.js';
 import { handleSwarm } from './methods/swarm.js';
+import { recordInitialState } from './record-initial-state.js';
 
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
 const VALID_METHODS = ['node', 'compose', 'swarm'] as const;
@@ -144,6 +145,9 @@ async function main(): Promise<void> {
       await handleSwarm({ extractDir });
       break;
   }
+
+  // Record the provisioned mode so a later mode-change deploy can tear it down.
+  await recordInitialState(extractDir);
 
   console.log('\n✅ Done!');
 }
