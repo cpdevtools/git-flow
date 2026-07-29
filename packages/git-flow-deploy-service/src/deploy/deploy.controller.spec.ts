@@ -1,5 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import request from 'supertest';
 import { signRequest } from '@cpdevtools/git-flow-deploy';
 import { DeployModule } from './deploy.module';
@@ -22,9 +25,12 @@ describe('DeployController', () => {
   let app: INestApplication;
   let store: DeployStore;
   let reposAllowed: jest.Mock;
+  let workDir: string;
 
   beforeEach(async () => {
     reposAllowed = jest.fn().mockReturnValue(true);
+    workDir = mkdtempSync(join(tmpdir(), 'gf-deploy-'));
+    process.env['DEPLOY_WORK_DIR'] = workDir;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [DeployModule],
@@ -33,7 +39,7 @@ describe('DeployController', () => {
       .useValue({
         hmacSecret: HMAC_SECRET,
         githubToken: 'test-token',
-        workDir: '/tmp/test-deploys',
+        workDir,
         sharedStorageBaseDir: undefined,
       })
       .overrideProvider(ReposConfigService)
@@ -47,6 +53,8 @@ describe('DeployController', () => {
 
   afterEach(async () => {
     await app.close();
+    delete process.env['DEPLOY_WORK_DIR'];
+    rmSync(workDir, { recursive: true, force: true });
   });
 
   // ---------------------------------------------------------------------------
