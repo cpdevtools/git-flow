@@ -58,22 +58,38 @@ export interface LaunchResult {
 }
 
 /**
- * Absolute path of the deploy-service CLI.
+ * Candidate locations of the deploy-service CLI, most authoritative first.
  *
  * The CLI ships beside the service entrypoint in every packaging we produce —
  * `dist/main.js` + `dist/cli.cjs` — whether that `dist` is `/app/dist` in the
- * image or the npm global prefix. Deriving it from the running entrypoint keeps
- * it correct in both without depending on $PATH, and a supervisor container runs
- * our own image, so the same path resolves there too.
+ * image or the npm global prefix, and a supervisor container runs our own image,
+ * so the same path resolves there too.
  *
- * Resolved to an ABSOLUTE path: the image starts us as `node dist/main` from
- * WORKDIR /app, so argv[1] is relative — while a supervisor container runs with
- * `--workdir <bundleDir>`, where that relative path would mean nothing.
+ * Anchored on `__dirname` (this module lives at `<dist>/supervisor/launcher.js`)
+ * rather than `process.argv[1]`. argv[1] is NOT ours under pm2: in cluster mode
+ * the child is launched through pm2's own `ProcessContainer.js`, which resolved
+ * to `<nvm>/lib/node_modules/pm2/lib/cli.cjs` on a real deploy host and refused
+ * every node → containerized mode change. It also would have been a *relative*
+ * path in the image (`CMD ["node", "dist/main"]`), which means nothing to a
+ * supervisor container started with `--workdir <bundleDir>`.
  */
+function supervisorCliCandidates(): string[] {
+  return [
+    // Normal nest build: <dist>/supervisor/launcher.js → <dist>/cli.cjs
+    resolve(__dirname, '..', 'cli.cjs'),
+    // If this module is ever bundled directly into <dist>/.
+    resolve(__dirname, 'cli.cjs'),
+    // Last resort for packagings we haven't anticipated.
+    resolve(dirname(process.argv[1] ?? ''), 'cli.cjs'),
+  ];
+}
+
+/** Absolute path of the deploy-service CLI. */
 export function resolveSupervisorCli(): string {
   const explicit = process.env['DEPLOY_SUPERVISOR_CLI'];
   if (explicit) return explicit;
-  return resolve(dirname(process.argv[1] ?? ''), 'cli.cjs');
+  const candidates = supervisorCliCandidates();
+  return candidates.find((c) => existsSync(c)) ?? candidates[0];
 }
 
 /**
@@ -84,9 +100,14 @@ export function resolveSupervisorCli(): string {
 function checkCli(): LaunchResult | undefined {
   const cli = resolveSupervisorCli();
   if (existsSync(cli)) return undefined;
+  const tried = process.env['DEPLOY_SUPERVISOR_CLI']
+    ? [cli]
+    : supervisorCliCandidates();
   return {
     ok: false,
-    error: `supervisor CLI not found at ${cli} — set DEPLOY_SUPERVISOR_CLI to its absolute path`,
+    error:
+      `supervisor CLI not found (tried ${tried.join(', ')}) — ` +
+      'set DEPLOY_SUPERVISOR_CLI to its absolute path',
   };
 }
 
