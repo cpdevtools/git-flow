@@ -43,3 +43,4 @@ jobs:
         with:
           environment: "Deploy Test"
           release_id: ${{ inputs.release_id }}
+          deploy_type: ${{ inputs.deploy_type }}

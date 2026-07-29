@@ -107,4 +107,36 @@ describe('parseDeployYml', () => {
       await expect(parseDeployYml(path)).rejects.toThrow('sharedStorage');
     });
   });
+
+  describe('mode-change fields', () => {
+    it('parses method, slot, versioning and teardownCommand', async () => {
+      const path = await write(
+        VALID_BASE +
+          'method: compose\n' +
+          'slot: my-service-v1\n' +
+          'versioning: major\n' +
+          'teardownCommand: docker compose -p my-service-v1 down\n',
+      );
+      const manifest = await parseDeployYml(path);
+      expect(manifest.method).toBe('compose');
+      expect(manifest.slot).toBe('my-service-v1');
+      expect(manifest.versioning).toBe('major');
+      expect(manifest.teardownCommand).toBe('docker compose -p my-service-v1 down');
+    });
+
+    it('leaves the new fields undefined when absent (legacy bundle)', async () => {
+      const path = await write(VALID_BASE);
+      const manifest = await parseDeployYml(path);
+      expect(manifest.method).toBeUndefined();
+      expect(manifest.slot).toBeUndefined();
+      expect(manifest.versioning).toBeUndefined();
+      expect(manifest.teardownCommand).toBeUndefined();
+    });
+
+    it('ignores an unknown versioning value', async () => {
+      const path = await write(VALID_BASE + 'versioning: weekly\n');
+      const manifest = await parseDeployYml(path);
+      expect(manifest.versioning).toBeUndefined();
+    });
+  });
 });
