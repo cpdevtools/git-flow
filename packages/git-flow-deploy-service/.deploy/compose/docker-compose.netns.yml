@@ -16,14 +16,37 @@
 # `network_mode: container:<name>` and `ports:` are mutually exclusive, so this is
 # a COMPLETE standalone alternative to docker-compose.yml (not an override merge).
 # Select it by setting COMPOSE_FILE in the environment of the process that runs
-# the deploy (the deploy-service itself), e.g.:
+# the deploy (the deploy-service itself).
+#
+# SECOND, SEPARATE dev-container trap — the FILESYSTEM.
+# Fixing the port is not enough. This container is a SIBLING on the Docker host,
+# so every bind source below resolves in the HOST's filesystem, while the pm2
+# node service resolves its DEPLOY_WORK_DIR in the DEV CONTAINER's filesystem.
+# With both left at the default ~/.git-flow-deploy-service the two paths spell
+# the same string but are different directories, so the container boots with an
+# empty work/ and cannot restore the in-flight deploy record. The mode change
+# still SUCCEEDS (deploy.log gets its EXIT:0 in the dev container), but the
+# client's reconnect gets 404 from the new instance and eventually fails with
+# "Log stream ended without EXIT marker".
+#
+# FIX: route both sides through a directory that IS bind-mounted into the dev
+# container, and set the host-side and container-side paths separately —
+# DEPLOY_HOST_ROOT is the path on the DOCKER HOST, DEPLOY_WORK_DIR /
+# DEPLOY_STATE_DIR are the paths inside the dev container:
 #
 #   COMPOSE_FILE=docker-compose.netns.yml \
 #   DEPLOY_NETNS_CONTAINER=main_devcontainer-devcontainer-1 \
+#   DEPLOY_HOST_ROOT=<host source of the dev container's bind>/.git-flow-deploy-service \
+#   DEPLOY_WORK_DIR=<container dest of that bind>/.git-flow-deploy-service/work \
+#   DEPLOY_STATE_DIR=<container dest of that bind>/.git-flow-deploy-service/state \
 #     pm2 restart git-flow-deploy-service --update-env
 #
-# Production is unaffected: with COMPOSE_FILE unset, `docker compose` uses
-# docker-compose.yml and publishes 3700 on the host as normal.
+# (`docker inspect $(cat /etc/hostname) --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'`
+#  from inside the dev container lists the candidates.)
+#
+# Production is unaffected by BOTH traps: the service runs directly on the Docker
+# host, so host and local paths are identical and, with COMPOSE_FILE unset,
+# `docker compose` uses docker-compose.yml and publishes 3700 on the host.
 services:
   git-flow-deploy-service:
     image: ghcr.io/cpdevtools/git-flow-deploy-service:${DEPLOY_IMAGE_TAG:?DEPLOY_IMAGE_TAG must be set (gitflow writes it into the bundle .env as the release version)}
