@@ -138,8 +138,12 @@ describe('runSupervisor', () => {
     ).toBe('old');
 
     const lines = logLines(plan);
-    expect(lines.some((l) => l.includes('Rolled back'))).toBe(true);
-    expect(lines[lines.length - 1]).toBe('EXIT:1');
+    // EXIT:1 is written BEFORE rollback so the booting service finds it on disk
+    // even if pm2 restarts during the rollback step.
+    const exitIdx = lines.indexOf('EXIT:1');
+    const rolledBackIdx = lines.findIndex((l) => l.includes('Rolled back'));
+    expect(exitIdx).toBeGreaterThan(-1);
+    expect(rolledBackIdx).toBeGreaterThan(exitIdx); // rollback output follows EXIT:1
   });
 
   it('continues to the deploy when teardown fails — rollback is the safety net', async () => {
