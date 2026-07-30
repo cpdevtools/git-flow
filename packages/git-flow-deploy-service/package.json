@@ -88,6 +88,9 @@
   "wireit": {
     "build": {
       "command": "nest build && tsup --config tsup.config.cli.ts",
+      "dependencies": [
+        "../git-flow-deploy:build"
+      ],
       "files": [
         "src/**/*.ts",
         "tsconfig.json",
