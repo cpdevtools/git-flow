@@ -37,6 +37,7 @@ jobs:
       DEPLOY_HMAC_SECRET: ${{ secrets.DEPLOY_HMAC_SECRET || '' }}
       DEPLOY_TYPE_DEFAULT: ${{ vars.DEPLOY_TYPE_DEFAULT || '' }}
       DEPLOY_ENV: ${{ vars.DEPLOY_ENV || '' }}
+      DEPLOY_ALLOWED_METHODS: ${{ vars.DEPLOY_ALLOWED_METHODS || '' }}
     steps:
       - name: Checkout git-flow (for action)
         uses: actions/checkout@v4
@@ -53,3 +54,4 @@ jobs:
           deploy_env: |
             ${{ env.DEPLOY_ENV }}
             ${{ inputs.deploy_env }}
+          allowed_methods: ${{ env.DEPLOY_ALLOWED_METHODS }}

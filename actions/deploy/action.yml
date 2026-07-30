@@ -52,6 +52,16 @@ inputs:
     required: false
     default: ''
 
+  allowed_methods:
+    description: |
+      Newline-separated list of deploy methods permitted in this environment
+      (e.g. "compose\nswarm"). When set, the action fails immediately if the
+      resolved deploy method is not in the list. Leave empty to allow all methods.
+      Set via the DEPLOY_ALLOWED_METHODS GitHub Environment variable — do not
+      expose as a workflow_dispatch input (that would allow callers to bypass it).
+    required: false
+    default: ''
+
   token:
     description: 'GitHub token for registry auth and API access (defaults to GITHUB_TOKEN)'
     required: false
@@ -95,4 +105,5 @@ runs:
         INPUT_DEPLOY_TYPE: ${{ inputs.deploy_type }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_DEPLOY_ENV: ${{ inputs.deploy_env }}
+        INPUT_ALLOWED_METHODS: ${{ inputs.allowed_methods }}
         GITHUB_TOKEN: ${{ inputs.token }}
