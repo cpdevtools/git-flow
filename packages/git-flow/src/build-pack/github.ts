@@ -12,18 +12,21 @@ import type { BuildPackContext, ProjectConfig } from './types.js';
  * Add published:false to all artifacts in YAML metadata
  */
 function addPublishedFlagsToMetadata(artifactYaml: string): string {
+  return setPublishedInMetadata(artifactYaml, false);
+}
+
+/**
+ * Set published flag on all artifacts in YAML metadata.
+ */
+function setPublishedInMetadata(artifactYaml: string, value: boolean): string {
   const doc = parseDocument(artifactYaml);
 
-  // Add published:false to each artifact
+  // Add/update published flag on each artifact
   const artifacts = doc.get('artifacts') as any;
   if (artifacts && Array.isArray(artifacts.items)) {
     for (const artifactNode of artifacts.items) {
-      if (
-        artifactNode &&
-        typeof artifactNode.set === 'function' &&
-        !artifactNode.has('published')
-      ) {
-        artifactNode.set('published', false);
+      if (artifactNode && typeof artifactNode.set === 'function') {
+        artifactNode.set('published', value);
       }
     }
   }
@@ -121,6 +124,32 @@ export async function createDraftRelease(
     upload_url: release.upload_url,
     html_url: release.html_url,
   };
+}
+
+/**
+ * Mark all artifacts in a release as published:true.
+ * Called after all assets are uploaded so the CLI knows the release is fully
+ * ready to deploy (not mid-publish).
+ */
+export async function markReleasePublished(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  releaseId: number,
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+  const { data: release } = await octokit.rest.repos.getRelease({ owner, repo, release_id: releaseId });
+  if (!release.body) return;
+
+  const yamlMatch = release.body.match(/(## Artifact Metadata\s*```yaml\s*\n)([\s\S]*?)(\n\s*```)/m);
+  if (!yamlMatch) return;
+
+  const updatedYaml = setPublishedInMetadata(yamlMatch[2], true);
+  const updatedBody = release.body.replace(
+    /## Artifact Metadata\s*```yaml\s*\n[\s\S]*?\n\s*```/m,
+    `## Artifact Metadata\n\`\`\`yaml\n${updatedYaml}\n\`\`\``,
+  );
+  await updateDraftReleaseBody(githubToken, owner, repo, releaseId, updatedBody);
 }
 
 /**
