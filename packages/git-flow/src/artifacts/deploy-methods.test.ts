@@ -74,7 +74,7 @@ describe('docker.swarm generateDeployYml', () => {
     const m = await readDeployYml();
     expect(m.method).toBe('swarm');
     expect(m.slot).toBe('org-svc');
-    expect(m.deployCommand).toBe('docker stack deploy -c stack.yml org_svc');
+    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml org_svc');
     expect(m.teardownCommand).toBe('docker stack rm org_svc');
   });
 
@@ -82,7 +82,7 @@ describe('docker.swarm generateDeployYml', () => {
     await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
     const m = await readDeployYml();
     expect(m.slot).toBe('org-svc-v2');
-    expect(m.deployCommand).toBe('docker stack deploy -c stack.yml org_svc_v2');
+    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml org_svc_v2');
     expect(m.teardownCommand).toBe('docker stack rm org_svc_v2');
   });
 
