@@ -30,6 +30,7 @@ import {
   groupByPackage,
   resolveVersionKeyword,
   buildVersionChoices,
+  LOAD_MORE,
   isDeployable,
   releaseDeployMethods,
   defaultMethod,
@@ -421,14 +422,18 @@ export default class Deploy extends Command {
           this.error(`No release found for ${pkg} matching version "${flags.version}".`);
         }
       } else {
-        const r = await prompts({
-          type: 'select',
-          name: 'release',
-          message: `Select version for ${pkg}:`,
-          choices: buildVersionChoices(pkgReleases),
-        });
-        if (!r.release) process.exit(0);
-        selected = r.release as GHRelease;
+        let showAllVersions = false;
+        while (!selected) {
+          const r = await prompts({
+            type: 'select',
+            name: 'release',
+            message: `Select version for ${pkg}:`,
+            choices: buildVersionChoices(pkgReleases, showAllVersions),
+          });
+          if (!r.release) process.exit(0);
+          if (r.release === LOAD_MORE) { showAllVersions = true; continue; }
+          selected = r.release as GHRelease;
+        }
       }
 
       const release = selected!;
