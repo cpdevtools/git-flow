@@ -90,6 +90,13 @@ export async function runSupervisor(planPath: string): Promise<number> {
   log(`✗ Deploy of v${plan.version} failed (exit ${code}).`);
   rmSync(plan.commit.stateNewFile, { force: true });
 
+  // Write EXIT:1 BEFORE starting rollback. The rollback may restart the service
+  // (pm2 restart), and the new instance will read this log on boot. If EXIT:1 is
+  // already here, restoreRecord finds it and marks the deploy failed — even if
+  // the version numbers match (same version, different mode). Without this, the
+  // boot-restore logic races ahead and declares success.
+  log('EXIT:1');
+
   if (plan.rollback && existsSync(plan.rollback.cwd)) {
     log(`▸ Rolling back: ${plan.rollback.command}`);
     const rollbackCode = await runFiltered(plan.rollback);
@@ -100,7 +107,6 @@ export async function runSupervisor(planPath: string): Promise<number> {
     );
   }
 
-  log('EXIT:1');
   return 1;
 }
 
