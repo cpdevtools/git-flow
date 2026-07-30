@@ -42,9 +42,10 @@ function getCurrentBranch(): string {
   }).trim();
 }
 
-function buildSelectChoices(
-  options: BumpOption[],
-): { choices: Array<{ title: string; value: BumpOption; disabled?: boolean }>; initial: number } {
+function buildSelectChoices(options: BumpOption[]): {
+  choices: Array<{ title: string; value: BumpOption; disabled?: boolean }>;
+  initial: number;
+} {
   const choices: Array<{ title: string; value: BumpOption; disabled?: boolean }> = [];
 
   for (const group of GROUP_ORDER) {
@@ -60,8 +61,7 @@ function buildSelectChoices(
 
   // Default to 'next' (same channel, next number); fall back to first selectable.
   const advanceIdx = choices.findIndex((c) => !c.disabled && c.value.id === 'next');
-  const initial =
-    advanceIdx !== -1 ? advanceIdx : choices.findIndex((c) => !c.disabled);
+  const initial = advanceIdx !== -1 ? advanceIdx : choices.findIndex((c) => !c.disabled);
 
   return { choices, initial: Math.max(0, initial) };
 }

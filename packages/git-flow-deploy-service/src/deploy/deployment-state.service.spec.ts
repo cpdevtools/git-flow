@@ -1,14 +1,25 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DeploymentStateService, type DeploymentStateInput } from './deployment-state.service';
+import {
+  DeploymentStateService,
+  type DeploymentStateInput,
+} from './deployment-state.service';
 import type { ConfigService } from './config.service';
 
 let stateDir: string;
 let bundleSrc: string;
 let svc: DeploymentStateService;
 
-function makeInput(overrides: Partial<DeploymentStateInput> = {}): DeploymentStateInput {
+function makeInput(
+  overrides: Partial<DeploymentStateInput> = {},
+): DeploymentStateInput {
   return {
     slot: 'org-svc',
     name: '@org/svc',
@@ -57,7 +68,9 @@ describe('DeploymentStateService', () => {
     writeFileSync(join(bundleSrc, 'new.txt'), 'x');
     svc.save(makeInput({ releaseId: 6, version: '1.3.0' }), bundleSrc);
 
-    expect(existsSync(join(stateDir, 'org-svc', 'current', 'new.txt'))).toBe(true);
+    expect(existsSync(join(stateDir, 'org-svc', 'current', 'new.txt'))).toBe(
+      true,
+    );
     expect(svc.get('org-svc')?.releaseId).toBe(6);
   });
 

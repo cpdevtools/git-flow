@@ -55,7 +55,9 @@ describe('prepareSharedStorage', () => {
 
   it('is idempotent — no error when dirs already exist', async () => {
     await prepareSharedStorage({ ...manifest, sharedStorage: ['data'] }, baseDir);
-    await expect(prepareSharedStorage({ ...manifest, sharedStorage: ['data'] }, baseDir)).resolves.not.toThrow();
+    await expect(
+      prepareSharedStorage({ ...manifest, sharedStorage: ['data'] }, baseDir),
+    ).resolves.not.toThrow();
   });
 
   it('throws for an absolute path entry', async () => {

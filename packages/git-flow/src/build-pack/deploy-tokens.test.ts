@@ -32,7 +32,7 @@ describe('deployTokens', () => {
     const t = deployTokens('@org/my-svc', '2.5.0', 'major');
     expect(t['SERVICE']).toBe('org-my-svc');
     expect(t['SERVICE_ID']).toBe('org-my-svc-v2');
-    expect(t['STACK']).toBe('org_my_svc_v2');   // default: slotStack(SERVICE_ID)
+    expect(t['STACK']).toBe('org_my_svc_v2'); // default: slotStack(SERVICE_ID)
     expect(t['MAJOR']).toBe('2');
   });
 
@@ -49,7 +49,10 @@ describe('deployTokens', () => {
 
 describe('substituteDeployTokens', () => {
   it('replaces tokens in text files', async () => {
-    await writeFile(join(dir, 'stack.yml'), 'services:\n  __SERVICE_ID__:\n    image: app:${DEPLOY_IMAGE_TAG}\n');
+    await writeFile(
+      join(dir, 'stack.yml'),
+      'services:\n  __SERVICE_ID__:\n    image: app:${DEPLOY_IMAGE_TAG}\n',
+    );
     await substituteDeployTokens(dir, { SERVICE_ID: 'my-svc-v2' });
     const result = await readFile(join(dir, 'stack.yml'), 'utf-8');
     expect(result).toBe('services:\n  my-svc-v2:\n    image: app:${DEPLOY_IMAGE_TAG}\n');
@@ -63,7 +66,10 @@ describe('substituteDeployTokens', () => {
   });
 
   it('replaces multiple tokens in a single file', async () => {
-    await writeFile(join(dir, 'deploy.yml'), 'deployCommand: docker stack deploy -c stack.yml __STACK__\nteardownCommand: docker stack rm __STACK__\nservice: __SERVICE_ID__\n');
+    await writeFile(
+      join(dir, 'deploy.yml'),
+      'deployCommand: docker stack deploy -c stack.yml __STACK__\nteardownCommand: docker stack rm __STACK__\nservice: __SERVICE_ID__\n',
+    );
     await substituteDeployTokens(dir, { STACK: 'my_stack', SERVICE_ID: 'my-svc-v1' });
     const result = await readFile(join(dir, 'deploy.yml'), 'utf-8');
     expect(result).toContain('docker stack deploy -c stack.yml my_stack');

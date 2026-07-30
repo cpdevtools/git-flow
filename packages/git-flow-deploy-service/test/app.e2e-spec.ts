@@ -10,7 +10,10 @@ process.env['DEPLOY_HMAC_SECRET'] = TEST_HMAC_SECRET;
 process.env['GITHUB_TOKEN'] = 'ghs_fake_token_for_e2e_tests';
 process.env['DEPLOY_WORK_DIR'] = '/tmp/e2e-deploy-test';
 
-function signedHeaders(body: string, overrides?: { ts?: string; sig?: string }): Record<string, string> {
+function signedHeaders(
+  body: string,
+  overrides?: { ts?: string; sig?: string },
+): Record<string, string> {
   const ts = overrides?.ts ?? String(Math.floor(Date.now() / 1000));
   const sig = overrides?.sig ?? signRequest(TEST_HMAC_SECRET, ts, body);
   return {
@@ -57,7 +60,10 @@ describe('Deploy Service (e2e)', () => {
   // ---------------------------------------------------------------------------
 
   describe('POST /deploy — authentication', () => {
-    const body = JSON.stringify({ repo: 'cpdevtools/test-git-flow', release_id: 1 });
+    const body = JSON.stringify({
+      repo: 'cpdevtools/test-git-flow',
+      release_id: 1,
+    });
 
     it('rejects requests with no auth headers → 401', async () => {
       await request(app.getHttpServer())
@@ -79,7 +85,11 @@ describe('Deploy Service (e2e)', () => {
     it('rejects requests with an invalid HMAC signature → 401', async () => {
       await request(app.getHttpServer())
         .post('/deploy')
-        .set(signedHeaders(body, { sig: 'sha256=0000000000000000000000000000000000000000000000000000000000000000' }))
+        .set(
+          signedHeaders(body, {
+            sig: 'sha256=0000000000000000000000000000000000000000000000000000000000000000',
+          }),
+        )
         .send(body)
         .expect(401);
     });
@@ -115,7 +125,10 @@ describe('Deploy Service (e2e)', () => {
 
   describe('POST /deploy — accepted', () => {
     const releaseId = 9001;
-    const body = JSON.stringify({ repo: 'cpdevtools/test-git-flow', release_id: releaseId });
+    const body = JSON.stringify({
+      repo: 'cpdevtools/test-git-flow',
+      release_id: releaseId,
+    });
 
     it('accepts a valid signed request → 202', async () => {
       await request(app.getHttpServer())
@@ -144,7 +157,10 @@ describe('Deploy Service (e2e)', () => {
     const releaseId = 9010;
 
     beforeAll(async () => {
-      const body = JSON.stringify({ repo: 'cpdevtools/test-git-flow', release_id: releaseId });
+      const body = JSON.stringify({
+        repo: 'cpdevtools/test-git-flow',
+        release_id: releaseId,
+      });
       await request(app.getHttpServer())
         .post('/deploy')
         .set(signedHeaders(body))
@@ -153,7 +169,9 @@ describe('Deploy Service (e2e)', () => {
     });
 
     it('returns running status for an in-progress deploy', async () => {
-      const res = await request(app.getHttpServer()).get(`/deploy/${releaseId}`).expect(200);
+      const res = await request(app.getHttpServer())
+        .get(`/deploy/${releaseId}`)
+        .expect(200);
       expect(res.body).toMatchObject({
         release_id: releaseId,
         repo: 'cpdevtools/test-git-flow',
@@ -180,7 +198,10 @@ describe('Deploy Service (e2e)', () => {
 
     beforeAll(async () => {
       // Trigger a deploy so we have a log record to stream
-      const body = JSON.stringify({ repo: 'cpdevtools/test-git-flow', release_id: releaseId });
+      const body = JSON.stringify({
+        repo: 'cpdevtools/test-git-flow',
+        release_id: releaseId,
+      });
       await request(app.getHttpServer())
         .post('/deploy')
         .set(signedHeaders(body))
@@ -198,9 +219,7 @@ describe('Deploy Service (e2e)', () => {
     });
 
     it('returns 404 for an unknown release_id', async () => {
-      await request(app.getHttpServer())
-        .get('/deploy/99999/logs')
-        .expect(404);
+      await request(app.getHttpServer()).get('/deploy/99999/logs').expect(404);
     });
 
     it('returns 404 for a non-numeric id', async () => {

@@ -12,7 +12,10 @@ import type { DeployManifest } from './types.js';
  * Path traversal protection: entries must be relative, must not contain '..', and
  * the resolved path must remain within `baseDir/{name}/`.
  */
-export async function prepareSharedStorage(manifest: DeployManifest, baseDir: string): Promise<void> {
+export async function prepareSharedStorage(
+  manifest: DeployManifest,
+  baseDir: string,
+): Promise<void> {
   if (!manifest.sharedStorage) return;
 
   const serviceDir = join(baseDir, manifest.name);

@@ -18,13 +18,17 @@ export class HmacGuard implements CanActivate {
   constructor(private readonly config: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<Request & { rawBody?: Buffer }>();
+    const req = context
+      .switchToHttp()
+      .getRequest<Request & { rawBody?: Buffer }>();
 
     const signature = req.headers['x-deploy-signature-256'];
     const ts = req.headers['x-deploy-timestamp'];
 
     if (typeof signature !== 'string' || typeof ts !== 'string') {
-      throw new UnauthorizedException('Missing X-Deploy-Signature-256 or X-Deploy-Timestamp');
+      throw new UnauthorizedException(
+        'Missing X-Deploy-Signature-256 or X-Deploy-Timestamp',
+      );
     }
 
     if (!validateTimestamp(ts)) {

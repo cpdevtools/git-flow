@@ -1,5 +1,11 @@
 import { execSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,13 +26,19 @@ function defaultNpmPrefix(): string {
 function withGlobalBinInPath(prefix: string): NodeJS.ProcessEnv {
   const bins = [join(prefix, 'bin')];
   try {
-    const globalBin = join(execSync('npm prefix -g', { encoding: 'utf-8' }).trim(), 'bin');
+    const globalBin = join(
+      execSync('npm prefix -g', { encoding: 'utf-8' }).trim(),
+      'bin',
+    );
     if (globalBin !== bins[0]) bins.push(globalBin);
   } catch {
     // npm prefix -g may fail in minimal environments — the custom prefix bin is enough
   }
   const currentPath = process.env['PATH'] ?? '';
-  return { ...process.env, PATH: [...bins, currentPath].filter(Boolean).join(':') };
+  return {
+    ...process.env,
+    PATH: [...bins, currentPath].filter(Boolean).join(':'),
+  };
 }
 
 export interface NodeHandlerOptions {
@@ -65,7 +77,16 @@ function pm2Bin(prefix: string): string {
 }
 
 export async function handleNode(options: NodeHandlerOptions): Promise<void> {
-  const { extractDir, version, token, npmPrefix, hmacSecret, port, host, enableBoot } = options;
+  const {
+    extractDir,
+    version,
+    token,
+    npmPrefix,
+    hmacSecret,
+    port,
+    host,
+    enableBoot,
+  } = options;
 
   // Resolve the npm prefix once (defaults to a home-based, user-writable prefix)
   // and ensure it exists so every global install below targets the same location.
@@ -75,23 +96,54 @@ export async function handleNode(options: NodeHandlerOptions): Promise<void> {
   const isRunning = isPm2AppRunning(prefix);
 
   if (!isRunning) {
-    await firstTimeSetup(extractDir, version, token, prefix, hmacSecret, port, host, enableBoot);
+    await firstTimeSetup(
+      extractDir,
+      version,
+      token,
+      prefix,
+      hmacSecret,
+      port,
+      host,
+      enableBoot,
+    );
   } else {
-    await updateExisting(extractDir, version, token, prefix, port, host, enableBoot);
+    await updateExisting(
+      extractDir,
+      version,
+      token,
+      prefix,
+      port,
+      host,
+      enableBoot,
+    );
   }
 }
 
-async function firstTimeSetup(extractDir: string, version: string, token: string, npmPrefix: string, hmacSecret?: string, port?: string, host?: string, enableBoot?: boolean): Promise<void> {
+async function firstTimeSetup(
+  extractDir: string,
+  version: string,
+  token: string,
+  npmPrefix: string,
+  hmacSecret?: string,
+  port?: string,
+  host?: string,
+  enableBoot?: boolean,
+): Promise<void> {
   console.log('First-time setup detected...\n');
 
   if (!hmacSecret) {
-    throw new Error('--hmac-secret is required for first-time setup (used as DEPLOY_HMAC_SECRET)');
+    throw new Error(
+      '--hmac-secret is required for first-time setup (used as DEPLOY_HMAC_SECRET)',
+    );
   }
 
   // Ensure pm2 is installed under the same (writable) prefix as the service
   if (!isPm2Available(npmPrefix)) {
     console.log(`Installing pm2 (prefix: ${npmPrefix})...`);
-    execSync(`npm install -g --prefix "${npmPrefix}" pm2`, { stdio: 'inherit', env: withGlobalBinInPath(npmPrefix) });
+    execSync(`npm install -g --prefix "${npmPrefix}" pm2`, {
+      stdio: 'inherit',
+      env: withGlobalBinInPath(npmPrefix),
+    });
   } else {
     console.log('pm2 already installed ✓');
   }
@@ -115,7 +167,10 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   console.log('\nStarting service with pm2...');
   const pm2 = pm2Bin(npmPrefix);
   const pathEnv = withGlobalBinInPath(npmPrefix);
-  execSync(`"${pm2}" start "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync(`"${pm2}" start "${ecoPath}" --update-env`, {
+    stdio: 'inherit',
+    env: pathEnv,
+  });
   execSync(`"${pm2}" save`, { stdio: 'inherit', env: pathEnv });
 
   // Configure boot persistence for the operator when opted in, otherwise just
@@ -127,7 +182,15 @@ async function firstTimeSetup(extractDir: string, version: string, token: string
   }
 }
 
-async function updateExisting(extractDir: string, version: string, token: string, npmPrefix: string, port?: string, host?: string, enableBoot?: boolean): Promise<void> {
+async function updateExisting(
+  extractDir: string,
+  version: string,
+  token: string,
+  npmPrefix: string,
+  port?: string,
+  host?: string,
+  enableBoot?: boolean,
+): Promise<void> {
   console.log('Existing pm2 process detected — running update...\n');
 
   installGlobally(version, token, npmPrefix);
@@ -147,7 +210,10 @@ async function updateExisting(extractDir: string, version: string, token: string
   console.log('\nReloading pm2 process...');
   const pm2 = pm2Bin(npmPrefix);
   const pathEnv = withGlobalBinInPath(npmPrefix);
-  execSync(`"${pm2}" restart "${ecoPath}" --update-env`, { stdio: 'inherit', env: pathEnv });
+  execSync(`"${pm2}" restart "${ecoPath}" --update-env`, {
+    stdio: 'inherit',
+    env: pathEnv,
+  });
   execSync(`"${pm2}" save`, { stdio: 'inherit', env: pathEnv });
 
   if (enableBoot) {
@@ -157,8 +223,14 @@ async function updateExisting(extractDir: string, version: string, token: string
   console.log(`\n✓ Updated ${PACKAGE_NAME} to v${version}`);
 }
 
-function installGlobally(version: string, token: string, npmPrefix: string): void {
-  console.log(`\nInstalling ${PACKAGE_NAME}@${version} (prefix: ${npmPrefix}) from ${NPM_REGISTRY}...`);
+function installGlobally(
+  version: string,
+  token: string,
+  npmPrefix: string,
+): void {
+  console.log(
+    `\nInstalling ${PACKAGE_NAME}@${version} (prefix: ${npmPrefix}) from ${NPM_REGISTRY}...`,
+  );
 
   // Write a scoped .npmrc so only @cpdevtools resolves via GitHub Packages;
   // passing --registry would override the registry for ALL deps (including @nestjs/*)
@@ -170,12 +242,22 @@ function installGlobally(version: string, token: string, npmPrefix: string): voi
   );
 
   try {
-    execSync(`npm install -g --prefix "${npmPrefix}" "${PACKAGE_NAME}@${version}"`, {
-      stdio: 'inherit',
-      env: { ...withGlobalBinInPath(npmPrefix), NPM_CONFIG_USERCONFIG: npmrcPath },
-    });
+    execSync(
+      `npm install -g --prefix "${npmPrefix}" "${PACKAGE_NAME}@${version}"`,
+      {
+        stdio: 'inherit',
+        env: {
+          ...withGlobalBinInPath(npmPrefix),
+          NPM_CONFIG_USERCONFIG: npmrcPath,
+        },
+      },
+    );
   } finally {
-    try { execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
+    try {
+      execSync(`rm -f "${npmrcPath}"`, { stdio: 'pipe' });
+    } catch {
+      /* ignore */
+    }
   }
 
   console.log('Install complete ✓');
@@ -185,7 +267,10 @@ function isPm2AppRunning(prefix: string): boolean {
   try {
     const env = withGlobalBinInPath(prefix);
     // pm2 describe exits 0 if the app is known to pm2, non-zero if not
-    const result = spawnSync(pm2Bin(prefix), ['describe', PM2_APP_NAME], { encoding: 'utf-8', env });
+    const result = spawnSync(pm2Bin(prefix), ['describe', PM2_APP_NAME], {
+      encoding: 'utf-8',
+      env,
+    });
     return result.status === 0 && result.stdout.includes(PM2_APP_NAME);
   } catch {
     return false;
@@ -194,7 +279,10 @@ function isPm2AppRunning(prefix: string): boolean {
 
 function isPm2Available(prefix: string): boolean {
   try {
-    execSync(`"${pm2Bin(prefix)}" --version`, { stdio: 'pipe', env: withGlobalBinInPath(prefix) });
+    execSync(`"${pm2Bin(prefix)}" --version`, {
+      stdio: 'pipe',
+      env: withGlobalBinInPath(prefix),
+    });
     return true;
   } catch {
     return false;
@@ -203,7 +291,9 @@ function isPm2Available(prefix: string): boolean {
 
 function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
   if (!existsSync(ecoPath)) {
-    console.warn(`Warning: ecosystem.config.js not found at ${ecoPath} — skipping script patch`);
+    console.warn(
+      `Warning: ecosystem.config.js not found at ${ecoPath} — skipping script patch`,
+    );
     return;
   }
 
@@ -221,14 +311,19 @@ function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
     const fallback = join(modulesRoot, PACKAGE_NAME, 'dist', 'src', 'main.js');
     scriptPath = existsSync(primary) ? primary : fallback;
   } catch {
-    console.warn('Warning: could not resolve install root — ecosystem script path may be incorrect');
+    console.warn(
+      'Warning: could not resolve install root — ecosystem script path may be incorrect',
+    );
     return;
   }
 
   let content = readFileSync(ecoPath, 'utf-8');
 
   // Already patched to the correct absolute path — nothing to do
-  if (content.includes(`'${scriptPath}'`) || content.includes(`"${scriptPath}"`)) {
+  if (
+    content.includes(`'${scriptPath}'`) ||
+    content.includes(`"${scriptPath}"`)
+  ) {
     console.log('ecosystem.config.js script already correct ✓');
     return;
   }
@@ -240,14 +335,19 @@ function patchEcosystemScript(ecoPath: string, npmPrefix?: string): void {
   );
 
   if (patched === content) {
-    console.warn('Warning: could not find script path in ecosystem.config.js to patch');
+    console.warn(
+      'Warning: could not find script path in ecosystem.config.js to patch',
+    );
   } else {
     writeFileSync(ecoPath, patched);
     console.log(`Patched ecosystem.config.js: script → ${scriptPath}`);
   }
 }
 
-function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void {
+function patchEcosystemEnv(
+  ecoPath: string,
+  vars: Record<string, string>,
+): void {
   if (!existsSync(ecoPath)) return;
 
   let content = readFileSync(ecoPath, 'utf-8');
@@ -255,7 +355,10 @@ function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void 
   for (const [key, value] of Object.entries(vars)) {
     const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     // Match existing key with either a quoted string or a bare number value
-    const existing = new RegExp(`([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`, 'g');
+    const existing = new RegExp(
+      `([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`,
+      'g',
+    );
     if (existing.test(content)) {
       content = content.replace(
         new RegExp(`([ \\t]+)${key}:\\s*(?:'[^']*'|"[^"]*"|\\d+)`, 'g'),
@@ -271,7 +374,9 @@ function patchEcosystemEnv(ecoPath: string, vars: Record<string, string>): void 
   }
 
   writeFileSync(ecoPath, content);
-  console.log(`Patched ecosystem.config.js: env vars → ${Object.keys(vars).join(', ')}`);
+  console.log(
+    `Patched ecosystem.config.js: env vars → ${Object.keys(vars).join(', ')}`,
+  );
 }
 
 function printStartupHint(pm2: string): void {
@@ -280,7 +385,9 @@ function printStartupHint(pm2: string): void {
   console.log('');
   console.log(`   ${pm2} startup`);
   console.log('');
-  console.log('   Then copy and run the command it prints (requires root/sudo).');
+  console.log(
+    '   Then copy and run the command it prints (requires root/sudo).',
+  );
   console.log('─'.repeat(70) + '\n');
 }
 
@@ -304,9 +411,13 @@ function configureBootStartup(pm2: string, npmPrefix: string): void {
   if (!isRoot) console.log('  (sudo may prompt for your password)');
   try {
     execSync(cmd, { stdio: 'inherit', env: withGlobalBinInPath(npmPrefix) });
-    console.log('✓ Boot startup configured — the service will resurrect on reboot.');
+    console.log(
+      '✓ Boot startup configured — the service will resurrect on reboot.',
+    );
   } catch {
-    console.warn('⚠ Could not configure boot startup automatically. Run this manually:');
+    console.warn(
+      '⚠ Could not configure boot startup automatically. Run this manually:',
+    );
     console.warn(`   ${cmd}`);
   }
 }

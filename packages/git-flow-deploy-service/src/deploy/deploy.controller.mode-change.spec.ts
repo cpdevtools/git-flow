@@ -1,4 +1,11 @@
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,7 +42,10 @@ import { DeployStore } from './deploy-store.js';
 import { DeploymentStateService } from './deployment-state.service.js';
 import type { ConfigService } from './config.service.js';
 import type { ReposConfigService } from './repos-config.service.js';
-import { SUPERVISOR_PLAN_FILE, type SupervisorPlan } from '../supervisor/plan.js';
+import {
+  SUPERVISOR_PLAN_FILE,
+  type SupervisorPlan,
+} from '../supervisor/plan.js';
 
 const fetchMock = fetchDeployBundle as jest.Mock;
 const runMock = runDeploy as jest.Mock;
@@ -63,7 +73,9 @@ describe('DeployController mode-change teardown/rollback', () => {
     serviceInfoMock.mockReturnValue({ ...SELF });
 
     store = new DeployStore();
-    state = new DeploymentStateService({ stateDir: join(root, 'state') } as ConfigService);
+    state = new DeploymentStateService({
+      stateDir: join(root, 'state'),
+    } as ConfigService);
     const config = {
       workDir: root,
       githubToken: 'token',
@@ -74,7 +86,12 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     // fetchDeployBundle: create the release work dir + a bundle file, return manifest.
     fetchMock.mockImplementation(
-      async (_token: string, _repo: string, releaseId: number, destDir: string) => {
+      async (
+        _token: string,
+        _repo: string,
+        releaseId: number,
+        destDir: string,
+      ) => {
         mkdirSync(destDir, { recursive: true });
         writeFileSync(join(destDir, 'deploy.yml'), 'bundle');
         return currentManifest(releaseId);
@@ -106,7 +123,11 @@ describe('DeployController mode-change teardown/rollback', () => {
   });
 
   /** Seed a prior deployment state for `slot`, backed by a real bundle dir. */
-  function seedPrior(slot: string, method: string, opts: Partial<Record<string, unknown>> = {}) {
+  function seedPrior(
+    slot: string,
+    method: string,
+    opts: Partial<Record<string, unknown>> = {},
+  ) {
     const bundleSrc = mkdtempSync(join(tmpdir(), 'gfmc-prior-'));
     writeFileSync(join(bundleSrc, 'old-bundle'), method);
     state.save(
@@ -117,7 +138,8 @@ describe('DeployController mode-change teardown/rollback', () => {
         version: '1.0.0',
         releaseId: 900,
         versioning: 'singleton',
-        teardownCommand: (opts['teardownCommand'] as string) ?? `teardown-${method}`,
+        teardownCommand:
+          (opts['teardownCommand'] as string) ?? `teardown-${method}`,
         deployCommand: (opts['deployCommand'] as string) ?? `deploy-${method}`,
       },
       bundleSrc,
@@ -127,30 +149,43 @@ describe('DeployController mode-change teardown/rollback', () => {
 
   async function run(releaseId: number): Promise<void> {
     const record = store.start(releaseId, 'owner/repo');
-    await (controller as unknown as {
-      runDeployAsync: (r: unknown, repo: string, id: number, b?: string) => Promise<void>;
-    }).runDeployAsync(record, 'owner/repo', releaseId, undefined);
+    await (
+      controller as unknown as {
+        runDeployAsync: (
+          r: unknown,
+          repo: string,
+          id: number,
+          b?: string,
+        ) => Promise<void>;
+      }
+    ).runDeployAsync(record, 'owner/repo', releaseId, undefined);
   }
 
   /** Make `docker ps`/`docker inspect` report a single running container as ours. */
   function mockSelfContainer(id: string, image: string): void {
     spawnSyncMock.mockImplementation((_cmd: string, args: string[]) => {
       if (args[0] === 'ps') return { status: 0, stdout: `${id}\n`, stderr: '' };
-      if (args[0] === 'inspect') return { status: 0, stdout: `${id} ${image}\n`, stderr: '' };
+      if (args[0] === 'inspect')
+        return { status: 0, stdout: `${id} ${image}\n`, stderr: '' };
       return { status: 0, stdout: '', stderr: '' };
     });
   }
 
   /** Args of the `docker run` that launched the supervisor container, if any. */
   function dockerRunArgs(): string[] | undefined {
-    const call = spawnSyncMock.mock.calls.find((c) => (c[1] as string[])[0] === 'run');
+    const call = spawnSyncMock.mock.calls.find(
+      (c) => (c[1] as string[])[0] === 'run',
+    );
     return call?.[1] as string[] | undefined;
   }
 
   /** The plan handed to the supervisor for a release, read back off disk. */
   function readPlan(releaseId: number): SupervisorPlan {
     return JSON.parse(
-      readFileSync(join(root, String(releaseId), SUPERVISOR_PLAN_FILE), 'utf-8'),
+      readFileSync(
+        join(root, String(releaseId), SUPERVISOR_PLAN_FILE),
+        'utf-8',
+      ),
     ) as SupervisorPlan;
   }
 
@@ -168,7 +203,10 @@ describe('DeployController mode-change teardown/rollback', () => {
   }
 
   it('mode change: tears down old mode, then brings up new mode, and persists new state', async () => {
-    seedPrior('org-app', 'node', { teardownCommand: 'pm2 delete', deployCommand: 'restart.sh' });
+    seedPrior('org-app', 'node', {
+      teardownCommand: 'pm2 delete',
+      deployCommand: 'restart.sh',
+    });
     currentManifest = (releaseId) => ({
       name: '@org/app',
       version: '2.0.0',
@@ -181,10 +219,14 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     await run(1001);
 
-    const cmds = runMock.mock.calls.map((c) => (c[0] as { deployCommand: string }).deployCommand);
+    const cmds = runMock.mock.calls.map(
+      (c) => (c[0] as { deployCommand: string }).deployCommand,
+    );
     expect(cmds).toEqual(['pm2 delete', 'compose-up']);
     // teardown ran in the OLD bundle dir
-    expect(runMock.mock.calls[0][1]).toContain(join('state', 'org-app', 'current'));
+    expect(runMock.mock.calls[0][1]).toContain(
+      join('state', 'org-app', 'current'),
+    );
 
     const saved = state.get('org-app');
     expect(saved?.method).toBe('compose');
@@ -193,7 +235,10 @@ describe('DeployController mode-change teardown/rollback', () => {
   });
 
   it('mode change: aborts (no rollback of prior) when teardown of old mode fails', async () => {
-    seedPrior('org-app', 'node', { teardownCommand: 'pm2 delete', deployCommand: 'restart.sh' });
+    seedPrior('org-app', 'node', {
+      teardownCommand: 'pm2 delete',
+      deployCommand: 'restart.sh',
+    });
     exitCodes['pm2 delete'] = 1;
     currentManifest = (releaseId) => ({
       name: '@org/app',
@@ -207,14 +252,19 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     await run(1002);
 
-    const cmds = runMock.mock.calls.map((c) => (c[0] as { deployCommand: string }).deployCommand);
+    const cmds = runMock.mock.calls.map(
+      (c) => (c[0] as { deployCommand: string }).deployCommand,
+    );
     expect(cmds).toEqual(['pm2 delete']); // new mode never attempted
     expect(state.get('org-app')?.method).toBe('node'); // unchanged
     expect(store.get(1002)?.status).toBe('failed');
   });
 
   it('mode change: rolls back to old mode when the new mode fails to come up', async () => {
-    seedPrior('org-app', 'node', { teardownCommand: 'pm2 delete', deployCommand: 'restart.sh' });
+    seedPrior('org-app', 'node', {
+      teardownCommand: 'pm2 delete',
+      deployCommand: 'restart.sh',
+    });
     exitCodes['compose-up'] = 1; // new mode fails
     currentManifest = (releaseId) => ({
       name: '@org/app',
@@ -228,15 +278,22 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     await run(1003);
 
-    const cmds = runMock.mock.calls.map((c) => (c[0] as { deployCommand: string }).deployCommand);
+    const cmds = runMock.mock.calls.map(
+      (c) => (c[0] as { deployCommand: string }).deployCommand,
+    );
     expect(cmds).toEqual(['pm2 delete', 'compose-up', 'restart.sh']); // teardown, deploy, rollback
-    expect(runMock.mock.calls[2][1]).toContain(join('state', 'org-app', 'current')); // rollback in old bundle
+    expect(runMock.mock.calls[2][1]).toContain(
+      join('state', 'org-app', 'current'),
+    ); // rollback in old bundle
     expect(state.get('org-app')?.method).toBe('node'); // still old mode
     expect(store.get(1003)?.status).toBe('failed');
   });
 
   it('same method: no teardown, just deploys and updates state', async () => {
-    seedPrior('org-app', 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up' });
+    seedPrior('org-app', 'compose', {
+      teardownCommand: 'compose-down',
+      deployCommand: 'compose-up',
+    });
     currentManifest = (releaseId) => ({
       name: '@org/app',
       version: '2.1.0',
@@ -249,14 +306,19 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     await run(1004);
 
-    const cmds = runMock.mock.calls.map((c) => (c[0] as { deployCommand: string }).deployCommand);
+    const cmds = runMock.mock.calls.map(
+      (c) => (c[0] as { deployCommand: string }).deployCommand,
+    );
     expect(cmds).toEqual(['compose-up']); // no teardown for same method
     expect(state.get('org-app')?.releaseId).toBe(1004);
     expect(store.get(1004)?.status).toBe('completed');
   });
 
   it('different major: deploys into a separate slot without touching the other major', async () => {
-    seedPrior('org-app-v1', 'compose', { teardownCommand: 'compose-down -p app-v1', deployCommand: 'up -p app-v1' });
+    seedPrior('org-app-v1', 'compose', {
+      teardownCommand: 'compose-down -p app-v1',
+      deployCommand: 'up -p app-v1',
+    });
     currentManifest = (releaseId) => ({
       name: '@org/app',
       version: '2.0.0',
@@ -271,7 +333,9 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     await run(1005);
 
-    const cmds = runMock.mock.calls.map((c) => (c[0] as { deployCommand: string }).deployCommand);
+    const cmds = runMock.mock.calls.map(
+      (c) => (c[0] as { deployCommand: string }).deployCommand,
+    );
     expect(cmds).toEqual(['up -p app-v2']); // v1 untouched
     expect(state.get('org-app-v1')?.method).toBe('compose'); // v1 slot intact
     expect(state.get('org-app-v2')?.releaseId).toBe(1005); // v2 slot created
@@ -280,7 +344,10 @@ describe('DeployController mode-change teardown/rollback', () => {
 
   it('self mode-change: hands off to a detached supervisor instead of tearing down inline', async () => {
     const slot = 'cpdevtools-git-flow-deploy-service';
-    seedPrior(slot, 'node', { teardownCommand: 'pm2 delete', deployCommand: 'restart.sh' });
+    seedPrior(slot, 'node', {
+      teardownCommand: 'pm2 delete',
+      deployCommand: 'restart.sh',
+    });
     currentManifest = (releaseId) => ({
       name: SELF.name,
       version: SELF.version,
@@ -309,7 +376,10 @@ describe('DeployController mode-change teardown/rollback', () => {
     const plan = readPlan(2001);
     expect(plan.teardown!.command).toBe('pm2 delete');
     expect(plan.teardown!.cwd).toContain(join('state', slot, 'current'));
-    expect(plan.deploy).toEqual({ cwd: join(root, '2001'), command: 'compose-up' });
+    expect(plan.deploy).toEqual({
+      cwd: join(root, '2001'),
+      command: 'compose-up',
+    });
     expect(plan.rollback!.command).toBe('restart.sh'); // back to the node mode
 
     const rec = store.get(2001);
@@ -323,7 +393,10 @@ describe('DeployController mode-change teardown/rollback', () => {
 
   it('self mode-change out of a container: refuses BEFORE tearing anything down', async () => {
     const slot = 'cpdevtools-git-flow-deploy-service';
-    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    seedPrior(slot, 'compose', {
+      teardownCommand: 'compose-down',
+      deployCommand: 'compose-up-old',
+    });
     mockSelfContainer('container-id-abc', 'ghcr.io/org/svc:1.2.3');
     currentManifest = (releaseId) => ({
       name: SELF.name,
@@ -346,14 +419,23 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     const rec = store.get(2002);
     expect(rec?.status).toBe('failed');
-    expect(rec?.log.some((l) => l.includes('Unsupported mode change: compose → node'))).toBe(true);
-    expect(rec?.log.some((l) => l.includes('Nothing was torn down'))).toBe(true);
+    expect(
+      rec?.log.some((l) =>
+        l.includes('Unsupported mode change: compose → node'),
+      ),
+    ).toBe(true);
+    expect(rec?.log.some((l) => l.includes('Nothing was torn down'))).toBe(
+      true,
+    );
     expect(state.get(slot)?.method).toBe('compose'); // still running as it was
   });
 
   it('self mode-change between containerized modes: uses a sibling supervisor container', async () => {
     const slot = 'cpdevtools-git-flow-deploy-service';
-    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    seedPrior(slot, 'compose', {
+      teardownCommand: 'compose-down',
+      deployCommand: 'compose-up-old',
+    });
     mockSelfContainer('container-id-abc', 'ghcr.io/org/svc:1.2.3');
     currentManifest = (releaseId) => ({
       name: SELF.name,
@@ -370,7 +452,9 @@ describe('DeployController mode-change teardown/rollback', () => {
     expect(runMock).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled(); // setsid would die with our container
     const args = dockerRunArgs();
-    expect(args).toEqual(expect.arrayContaining(['--volumes-from', 'container-id-abc']));
+    expect(args).toEqual(
+      expect.arrayContaining(['--volumes-from', 'container-id-abc']),
+    );
     expect(args!.slice(-5)).toEqual([
       'ghcr.io/org/svc:1.2.3',
       cliPath,
@@ -390,7 +474,10 @@ describe('DeployController mode-change teardown/rollback', () => {
 
   it('self mode-change: refuses rather than tearing down inline when the container is unidentifiable', async () => {
     const slot = 'cpdevtools-git-flow-deploy-service';
-    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    seedPrior(slot, 'compose', {
+      teardownCommand: 'compose-down',
+      deployCommand: 'compose-up-old',
+    });
     // Default spawnSync mock reports failure for both `docker ps` and `docker inspect`.
     currentManifest = (releaseId) => ({
       name: SELF.name,
@@ -407,13 +494,18 @@ describe('DeployController mode-change teardown/rollback', () => {
     expect(runMock).not.toHaveBeenCalled();
     const rec = store.get(2004);
     expect(rec?.status).toBe('failed');
-    expect(rec?.log.some((l) => l.includes('Nothing was torn down'))).toBe(true);
+    expect(rec?.log.some((l) => l.includes('Nothing was torn down'))).toBe(
+      true,
+    );
     expect(state.get(slot)?.method).toBe('compose');
   });
 
   it('containerized self deploy: hands off to a sibling supervisor container', async () => {
     const slot = 'cpdevtools-git-flow-deploy-service';
-    seedPrior(slot, 'compose', { teardownCommand: 'compose-down', deployCommand: 'compose-up-old' });
+    seedPrior(slot, 'compose', {
+      teardownCommand: 'compose-down',
+      deployCommand: 'compose-up-old',
+    });
     currentManifest = selfComposeManifest;
     mockSelfContainer('container-id-abc', 'ghcr.io/org/svc:1.2.3');
 
@@ -423,7 +515,9 @@ describe('DeployController mode-change teardown/rollback', () => {
     const args = dockerRunArgs();
     expect(args).toBeDefined();
     // Inherits our mounts (bundle dir, state dir, docker socket) without needing host paths.
-    expect(args).toEqual(expect.arrayContaining(['--volumes-from', 'container-id-abc']));
+    expect(args).toEqual(
+      expect.arrayContaining(['--volumes-from', 'container-id-abc']),
+    );
     expect(args).toEqual(expect.arrayContaining(['--detach', '--rm']));
     // Runs OUR image (always local, already has node + docker + compose) and our CLI.
     expect(args).toEqual(expect.arrayContaining(['--entrypoint', 'node']));
@@ -437,9 +531,14 @@ describe('DeployController mode-change teardown/rollback', () => {
 
     const plan = readPlan(3001);
     expect(plan.teardown).toBeUndefined(); // same mode — nothing to tear down
-    expect(plan.deploy).toEqual({ cwd: join(root, '3001'), command: 'compose-up' });
+    expect(plan.deploy).toEqual({
+      cwd: join(root, '3001'),
+      command: 'compose-up',
+    });
     expect(plan.rollback!.command).toBe('compose-up-old');
-    expect(plan.commit.stateNewFile).toBe(join(root, 'state', slot, 'state.new.json'));
+    expect(plan.commit.stateNewFile).toBe(
+      join(root, 'state', slot, 'state.new.json'),
+    );
 
     const rec = store.get(3001);
     expect(rec?.selfUpdate).toBe(true);
@@ -450,7 +549,9 @@ describe('DeployController mode-change teardown/rollback', () => {
   });
 
   it('containerized self deploy: falls back to an inline deploy when our container is unidentifiable', async () => {
-    seedPrior('cpdevtools-git-flow-deploy-service', 'compose', { deployCommand: 'compose-up-old' });
+    seedPrior('cpdevtools-git-flow-deploy-service', 'compose', {
+      deployCommand: 'compose-up-old',
+    });
     currentManifest = selfComposeManifest;
     // Default spawnSync mock reports failure for both `docker ps` and `docker inspect`.
 

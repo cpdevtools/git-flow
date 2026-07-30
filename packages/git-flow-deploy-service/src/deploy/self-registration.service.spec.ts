@@ -73,7 +73,11 @@ describe('SelfRegistrationService', () => {
   });
 
   it('does not register when the manifest is a different app', async () => {
-    parseMock.mockResolvedValue({ ...nodeManifest(), name: '@other/app', slot: 'other-app' });
+    parseMock.mockResolvedValue({
+      ...nodeManifest(),
+      name: '@other/app',
+      slot: 'other-app',
+    });
 
     await svc.onApplicationBootstrap();
 

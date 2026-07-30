@@ -81,12 +81,16 @@ describe('parseDeployYml', () => {
 
   describe('releaseId validation', () => {
     it('throws when releaseId is zero', async () => {
-      const path = await write(`name: svc\nversion: 1.0.0\nrepo: o/r\nreleaseId: 0\ndeployCommand: run\n`);
+      const path = await write(
+        `name: svc\nversion: 1.0.0\nrepo: o/r\nreleaseId: 0\ndeployCommand: run\n`,
+      );
       await expect(parseDeployYml(path)).rejects.toThrow('releaseId');
     });
 
     it('throws when releaseId is negative', async () => {
-      const path = await write(`name: svc\nversion: 1.0.0\nrepo: o/r\nreleaseId: -5\ndeployCommand: run\n`);
+      const path = await write(
+        `name: svc\nversion: 1.0.0\nrepo: o/r\nreleaseId: -5\ndeployCommand: run\n`,
+      );
       await expect(parseDeployYml(path)).rejects.toThrow('releaseId');
     });
   });

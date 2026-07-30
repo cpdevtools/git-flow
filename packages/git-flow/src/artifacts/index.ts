@@ -230,7 +230,8 @@ const docker: ArtifactType<DockerArtifact> = {
     // one KEEPS the flattened scope (`cpdevtools-git-flow-deploy-service`)
     // because local tags share a flat namespace across the workspace and must
     // match what the project's own `build:docker` script tagged.
-    const source = (artifact as { localTag?: string }).localTag ?? `${safeName(ctx.projectName)}:latest`;
+    const source =
+      (artifact as { localTag?: string }).localTag ?? `${safeName(ctx.projectName)}:latest`;
     const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
     const archiveName = `${safeName(artifact.name)}.image.tar.gz`;
     const archivePath = join(ctx.artifactOutputDir, archiveName);

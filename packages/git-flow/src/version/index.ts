@@ -19,8 +19,4 @@ export {
   filterExistingTags,
   type BumpOption,
 } from './bumps.js';
-export {
-  findVersionsFile,
-  readVersionsFile,
-  writeVersionsFile,
-} from './versions-file.js';
+export { findVersionsFile, readVersionsFile, writeVersionsFile } from './versions-file.js';

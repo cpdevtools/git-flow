@@ -18,7 +18,12 @@ export function signRequest(secret: string, ts: string, rawBody: string): string
  * Validate an incoming X-Deploy-Signature-256 value against the raw body.
  * Uses timing-safe comparison to prevent timing attacks.
  */
-export function validateHmac(secret: string, signature: string, ts: string, rawBody: string): boolean {
+export function validateHmac(
+  secret: string,
+  signature: string,
+  ts: string,
+  rawBody: string,
+): boolean {
   const expected = computeHmac(secret, ts, rawBody);
   const expectedBuf = Buffer.from(expected);
   const actualBuf = Buffer.from(signature);

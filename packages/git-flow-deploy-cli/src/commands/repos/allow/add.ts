@@ -5,7 +5,10 @@ export default class ReposAllowAdd extends Command {
   static override description = 'Add a glob pattern to the allow list';
   static override examples = ['<%= config.bin %> repos allow add "cpdevtools/*"'];
   static override args = {
-    pattern: Args.string({ description: 'Glob pattern (e.g. owner/repo or owner/*)', required: true }),
+    pattern: Args.string({
+      description: 'Glob pattern (e.g. owner/repo or owner/*)',
+      required: true,
+    }),
   };
 
   async run(): Promise<void> {

@@ -16,7 +16,9 @@ export interface DownloadOptions {
 const PACKAGE_NAME = '@cpdevtools/git-flow-deploy-service';
 const DEFAULT_INSTALL_BASE = join(homedir(), 'git-flow-deploy-service');
 
-export async function downloadBundle(options: DownloadOptions): Promise<string> {
+export async function downloadBundle(
+  options: DownloadOptions,
+): Promise<string> {
   const { method, version, owner, repo, token, installDir } = options;
   const assetName = `deploy-${method}.zip`;
   const installBase = installDir ?? DEFAULT_INSTALL_BASE;
@@ -26,21 +28,28 @@ export async function downloadBundle(options: DownloadOptions): Promise<string> 
   const extractDir = join(installBase, version, method);
 
   if (existsSync(join(extractDir, 'deploy.yml'))) {
-    console.log(`Bundle already extracted at ${extractDir}, skipping download.`);
+    console.log(
+      `Bundle already extracted at ${extractDir}, skipping download.`,
+    );
     return extractDir;
   }
 
   // Find the release matching this package + version
   console.log(`Fetching release list from ${owner}/${repo}...`);
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'gitflow-deploy-service-cli',
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'User-Agent': 'gitflow-deploy-service-cli',
+      },
     },
-  });
+  );
   if (!res.ok) {
-    throw new Error(`Failed to list releases: ${res.status} ${await res.text()}`);
+    throw new Error(
+      `Failed to list releases: ${res.status} ${await res.text()}`,
+    );
   }
 
   const releases = (await res.json()) as Array<{
@@ -49,14 +58,14 @@ export async function downloadBundle(options: DownloadOptions): Promise<string> 
   }>;
 
   const tag = `v${version}/${PACKAGE_NAME}`;
-  const release = releases.find(r => r.tag_name === tag);
+  const release = releases.find((r) => r.tag_name === tag);
   if (!release) {
     throw new Error(`Release not found for tag: ${tag}`);
   }
 
-  const asset = release.assets.find(a => a.name === assetName);
+  const asset = release.assets.find((a) => a.name === assetName);
   if (!asset) {
-    const available = release.assets.map(a => a.name).join(', ');
+    const available = release.assets.map((a) => a.name).join(', ');
     throw new Error(
       `Asset "${assetName}" not found in release ${tag}. Available assets: ${available || '(none)'}`,
     );
@@ -72,7 +81,9 @@ export async function downloadBundle(options: DownloadOptions): Promise<string> 
     },
   });
   if (!dlRes.ok) {
-    throw new Error(`Failed to download asset: ${dlRes.status} ${await dlRes.text()}`);
+    throw new Error(
+      `Failed to download asset: ${dlRes.status} ${await dlRes.text()}`,
+    );
   }
 
   const buf = await dlRes.arrayBuffer();

@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from './config.service.js';
 
@@ -36,7 +44,10 @@ export interface DeploymentState {
 }
 
 /** Fields the caller supplies; bundleDir + updatedAt are filled by save(). */
-export type DeploymentStateInput = Omit<DeploymentState, 'bundleDir' | 'updatedAt'>;
+export type DeploymentStateInput = Omit<
+  DeploymentState,
+  'bundleDir' | 'updatedAt'
+>;
 
 @Injectable()
 export class DeploymentStateService {

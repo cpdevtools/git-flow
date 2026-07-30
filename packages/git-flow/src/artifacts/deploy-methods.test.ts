@@ -74,7 +74,9 @@ describe('docker.swarm generateDeployYml', () => {
     const m = await readDeployYml();
     expect(m.method).toBe('swarm');
     expect(m.slot).toBe('org-svc');
-    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__');
+    expect(m.deployCommand).toBe(
+      'set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__',
+    );
     expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });
 
@@ -83,7 +85,9 @@ describe('docker.swarm generateDeployYml', () => {
     const m = await readDeployYml();
     expect(m.slot).toBe('org-svc-v2');
     // __STACK__ is resolved to slotStack(slot) by substituteDeployTokens at pack time
-    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__');
+    expect(m.deployCommand).toBe(
+      'set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__',
+    );
     expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });
 

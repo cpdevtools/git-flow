@@ -44,7 +44,9 @@ export class ReposConfigService implements OnModuleInit {
         allow: Array.isArray(parsed.allow) ? parsed.allow : [],
         deny: Array.isArray(parsed.deny) ? parsed.deny : [],
       };
-      this.logger.log(`Loaded repos config (allow: ${this.config.allow.length}, deny: ${this.config.deny.length})`);
+      this.logger.log(
+        `Loaded repos config (allow: ${this.config.allow.length}, deny: ${this.config.deny.length})`,
+      );
     } catch {
       // File not present on first start — allow all
       this.config = { allow: [], deny: [] };

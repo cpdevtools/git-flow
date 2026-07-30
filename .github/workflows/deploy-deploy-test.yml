@@ -9,19 +9,19 @@ on:
   workflow_dispatch:
     inputs:
       release_id:
-        description: "GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)"
+        description: 'GitHub Release ID (numeric) or tag (e.g. v1.2.3/@cpdevtools/my-pkg)'
         required: true
         type: string
       deploy_type:
-        description: "Deploy type (node, compose, swarm). Leave blank for environment default."
+        description: 'Deploy type (node, compose, swarm). Leave blank for environment default.'
         required: false
         type: string
-        default: ""
+        default: ''
       deploy_env:
-        description: "Per-run deploy env overrides as KEY=VAL lines (highest priority)."
+        description: 'Per-run deploy env overrides as KEY=VAL lines (highest priority).'
         required: false
         type: string
-        default: ""
+        default: ''
 
 permissions:
   contents: read
@@ -31,7 +31,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: "Deploy Test"
+    environment: 'Deploy Test'
     env:
       DEPLOY_URL: ${{ vars.DEPLOY_URL || '' }}
       DEPLOY_HMAC_SECRET: ${{ secrets.DEPLOY_HMAC_SECRET || '' }}
@@ -40,7 +40,7 @@ jobs:
       DEPLOY_ALLOWED_METHODS: ${{ vars.DEPLOY_ALLOWED_METHODS || '' }}
     steps:
       - name: Checkout git-flow (for action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: cpdevtools/git-flow
           path: .git-flow-action
@@ -48,7 +48,7 @@ jobs:
       - name: Deploy via gateway
         uses: ./.git-flow-action/actions/deploy
         with:
-          environment: "Deploy Test"
+          environment: 'Deploy Test'
           release_id: ${{ inputs.release_id }}
           deploy_type: ${{ inputs.deploy_type }}
           deploy_env: |

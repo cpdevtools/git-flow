@@ -28,10 +28,13 @@ export async function recordInitialState(extractDir: string): Promise<void> {
     }
 
     const versioning = manifest.versioning ?? 'singleton';
-    const slot = manifest.slot ?? deploymentSlot(manifest.name, manifest.version, versioning);
+    const slot =
+      manifest.slot ??
+      deploymentSlot(manifest.name, manifest.version, versioning);
 
     const stateDir =
-      process.env['DEPLOY_STATE_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'state');
+      process.env['DEPLOY_STATE_DIR'] ??
+      join(homedir(), '.git-flow-deploy-service', 'state');
     const state = new DeploymentStateService({ stateDir } as ConfigService);
 
     state.save(
@@ -47,8 +50,12 @@ export async function recordInitialState(extractDir: string): Promise<void> {
       },
       extractDir,
     );
-    console.log(`Recorded deployment state for slot "${slot}" (method: ${manifest.method}).`);
+    console.log(
+      `Recorded deployment state for slot "${slot}" (method: ${manifest.method}).`,
+    );
   } catch (err) {
-    console.warn(`Could not record initial deployment state: ${(err as Error).message}`);
+    console.warn(
+      `Could not record initial deployment state: ${(err as Error).message}`,
+    );
   }
 }

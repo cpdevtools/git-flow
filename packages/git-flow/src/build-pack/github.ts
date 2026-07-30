@@ -138,10 +138,16 @@ export async function markReleasePublished(
   releaseId: number,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
-  const { data: release } = await octokit.rest.repos.getRelease({ owner, repo, release_id: releaseId });
+  const { data: release } = await octokit.rest.repos.getRelease({
+    owner,
+    repo,
+    release_id: releaseId,
+  });
   if (!release.body) return;
 
-  const yamlMatch = release.body.match(/(## Artifact Metadata\s*```yaml\s*\n)([\s\S]*?)(\n\s*```)/m);
+  const yamlMatch = release.body.match(
+    /(## Artifact Metadata\s*```yaml\s*\n)([\s\S]*?)(\n\s*```)/m,
+  );
   if (!yamlMatch) return;
 
   const updatedYaml = setPublishedInMetadata(yamlMatch[2], true);

@@ -44,7 +44,9 @@ export class SelfRegistrationService implements OnApplicationBootstrap {
       if (!manifest.method) return;
 
       const versioning = manifest.versioning ?? 'singleton';
-      const slot = manifest.slot ?? deploymentSlot(manifest.name, manifest.version, versioning);
+      const slot =
+        manifest.slot ??
+        deploymentSlot(manifest.name, manifest.version, versioning);
 
       if (this.state.get(slot)) return; // already tracked — don't overwrite.
 
@@ -66,7 +68,9 @@ export class SelfRegistrationService implements OnApplicationBootstrap {
           'mode-change teardown is now armed.',
       );
     } catch (err) {
-      this.logger.warn(`Could not self-register deployment state: ${(err as Error).message}`);
+      this.logger.warn(
+        `Could not self-register deployment state: ${(err as Error).message}`,
+      );
     }
   }
 

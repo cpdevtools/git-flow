@@ -52,7 +52,9 @@ describe('recordInitialState', () => {
     expect(saved?.method).toBe('node');
     expect(saved?.teardownCommand).toBe('pm2 delete ecosystem.config.js');
     expect(saved?.deployCommand).toBe('bash restart.sh');
-    expect(saved?.bundleDir).toContain(join('cpdevtools-git-flow-deploy-service', 'current'));
+    expect(saved?.bundleDir).toContain(
+      join('cpdevtools-git-flow-deploy-service', 'current'),
+    );
   });
 
   it('skips recording when the bundle has no method', async () => {

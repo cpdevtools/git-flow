@@ -101,7 +101,8 @@ describe('DeployController', () => {
         .post('/deploy')
         .set({
           'Content-Type': 'application/json',
-          'X-Deploy-Signature-256': 'sha256=0000000000000000000000000000000000000000000000000000000000000000',
+          'X-Deploy-Signature-256':
+            'sha256=0000000000000000000000000000000000000000000000000000000000000000',
           'X-Deploy-Timestamp': String(Math.floor(Date.now() / 1000)),
         })
         .send({ repo: 'owner/repo', release_id: 1003 })
@@ -156,7 +157,9 @@ describe('DeployController', () => {
 
     it('returns status JSON for a known running deploy', async () => {
       store.start(2001, 'owner/repo');
-      const res = await request(app.getHttpServer()).get('/deploy/2001').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/deploy/2001')
+        .expect(200);
       expect(res.body).toMatchObject({
         release_id: 2001,
         repo: 'owner/repo',
@@ -168,7 +171,9 @@ describe('DeployController', () => {
     it('returns completed status after deploy finishes', async () => {
       const record = store.start(2002, 'owner/repo');
       store.finish(record, 0);
-      const res = await request(app.getHttpServer()).get('/deploy/2002').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/deploy/2002')
+        .expect(200);
       expect(res.body.status).toBe('completed');
       expect(res.body.completedAt).toBeDefined();
     });
@@ -176,7 +181,9 @@ describe('DeployController', () => {
     it('returns failed status after deploy exits non-zero', async () => {
       const record = store.start(2003, 'owner/repo');
       store.finish(record, 1);
-      const res = await request(app.getHttpServer()).get('/deploy/2003').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/deploy/2003')
+        .expect(200);
       expect(res.body.status).toBe('failed');
     });
   });
