@@ -42,7 +42,7 @@ export async function runSupervisor(planPath: string): Promise<number> {
     }
   };
   const run = (step: SupervisorStep): Promise<number> =>
-    runDeploy({ deployCommand: step.command }, step.cwd, log).catch(
+    runDeploy({ deployCommand: step.command }, step.cwd, log, plan.env).catch(
       (err: Error) => {
         log(`▸ Error: ${err.message}`);
         return 1;

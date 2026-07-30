@@ -19,6 +19,7 @@
 
 import { Command, Flags } from '@oclif/core';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import prompts from 'prompts';
 import {
   type GHRelease,
@@ -195,6 +196,7 @@ async function dispatchWorkflow(
   branch: string,
   releaseId: number,
   method?: string,
+  deployEnv?: string,
 ): Promise<string> {
   await gh(
     token,
@@ -207,6 +209,7 @@ async function dispatchWorkflow(
         inputs: {
           release_id: String(releaseId),
           ...(method ? { deploy_type: method } : {}),
+          ...(deployEnv ? { deploy_env: deployEnv } : {}),
         },
       }),
     },
@@ -255,6 +258,16 @@ export default class Deploy extends Command {
       char: 'm',
       description:
         'Deploy method (e.g. node, compose, swarm). Must be advertised by the release. Skips method prompt.',
+    }),
+    set: Flags.string({
+      char: 's',
+      description: 'Per-run deploy env override as KEY=VAL (e.g. --set COMPOSE_FILE=docker-compose.netns.yml). Repeatable.',
+      multiple: true,
+    }),
+    'env-file': Flags.string({
+      char: 'e',
+      description: 'File of KEY=VAL lines to merge as deploy env. Repeatable; later files override earlier ones.',
+      multiple: true,
     }),
     yes: Flags.boolean({
       char: 'y',
@@ -418,6 +431,19 @@ export default class Deploy extends Command {
     }
 
     // ── 9. Dispatch ──────────────────────────────────────────────────────────
+    // Build the deploy env string: files first (lower priority), --set last (higher).
+    const envFileParts: string[] = [];
+    for (const f of flags['env-file'] ?? []) {
+      try {
+        envFileParts.push(readFileSync(f, 'utf-8').trim());
+      } catch (err) {
+        this.error(`Cannot read env file "${f}": ${(err as Error).message}`);
+      }
+    }
+    const setParts = flags.set ?? [];
+    const allParts = [...envFileParts, ...setParts];
+    const deployEnv = allParts.length ? allParts.join('\n') : undefined;
+
     for (const d of dispatches) {
       const url = await dispatchWorkflow(
         token,
@@ -427,6 +453,7 @@ export default class Deploy extends Command {
         branch,
         d.release.id,
         d.method,
+        deployEnv,
       );
       this.log(
         `✅ Dispatched: ${d.pkg} ${versionFromTag(d.release.tag_name)} [${d.method}] → ${target.environment}`,

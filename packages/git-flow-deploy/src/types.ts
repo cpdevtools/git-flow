@@ -36,4 +36,6 @@ export interface DeployRequest {
   repo: string;
   release_id: number;
   bundle?: string;
+  /** Extra environment variables merged into the deploy process for this run only. */
+  env?: Record<string, string>;
 }

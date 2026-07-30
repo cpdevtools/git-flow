@@ -41,6 +41,17 @@ inputs:
     required: false
     default: ''
 
+  deploy_env:
+    description: |
+      Extra environment variables for this specific deploy, as KEY=VAL lines.
+      Merged on top of the service's own environment for the duration of the
+      deploy command (and every supervisor step — teardown, deploy, rollback).
+      Example:
+        COMPOSE_FILE=docker-compose.netns.yml
+        DEPLOY_NETNS_CONTAINER=main_devcontainer-devcontainer-1
+    required: false
+    default: ''
+
   token:
     description: 'GitHub token for registry auth and API access (defaults to GITHUB_TOKEN)'
     required: false
@@ -83,4 +94,5 @@ runs:
         INPUT_BUNDLE: ${{ inputs.bundle }}
         INPUT_DEPLOY_TYPE: ${{ inputs.deploy_type }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_DEPLOY_ENV: ${{ inputs.deploy_env }}
         GITHUB_TOKEN: ${{ inputs.token }}

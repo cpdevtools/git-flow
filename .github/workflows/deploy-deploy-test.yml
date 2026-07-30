@@ -17,6 +17,11 @@ on:
         required: false
         type: string
         default: ""
+      deploy_env:
+        description: "Per-run deploy env overrides as KEY=VAL lines (highest priority)."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -28,9 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: "Deploy Test"
     env:
-      DEPLOY_URL: ${{ vars.DEPLOY_URL }}
-      DEPLOY_HMAC_SECRET: ${{ secrets.DEPLOY_HMAC_SECRET }}
-      DEPLOY_TYPE_DEFAULT: ${{ vars.DEPLOY_TYPE_DEFAULT }}
+      DEPLOY_URL: ${{ vars.DEPLOY_URL || '' }}
+      DEPLOY_HMAC_SECRET: ${{ secrets.DEPLOY_HMAC_SECRET || '' }}
+      DEPLOY_TYPE_DEFAULT: ${{ vars.DEPLOY_TYPE_DEFAULT || '' }}
+      DEPLOY_ENV: ${{ vars.DEPLOY_ENV || '' }}
     steps:
       - name: Checkout git-flow (for action)
         uses: actions/checkout@v4
@@ -44,3 +50,6 @@ jobs:
           environment: "Deploy Test"
           release_id: ${{ inputs.release_id }}
           deploy_type: ${{ inputs.deploy_type }}
+          deploy_env: |
+            ${{ env.DEPLOY_ENV }}
+            ${{ inputs.deploy_env }}

@@ -10,12 +10,14 @@ export function runDeploy(
   manifest: Pick<DeployManifest, 'deployCommand'>,
   workDir: string,
   onLine: (line: string) => void,
+  env?: Record<string, string>,
 ): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(manifest.deployCommand, {
       cwd: workDir,
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...(env ? { env: { ...process.env, ...env } } : {}),
     });
 
     let pending = '';

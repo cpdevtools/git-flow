@@ -91,7 +91,7 @@ export class DeployController {
 
     this.logger.log(`Deploy triggered: ${repo} release ${releaseId} bundle=${body.bundle ?? 'default'}`);
     const record = this.store.start(releaseId, repo);
-    void this.runDeployAsync(record, repo, releaseId, body.bundle);
+    void this.runDeployAsync(record, repo, releaseId, body.bundle, body.env);
     res.status(202).end();
   }
 
@@ -186,7 +186,7 @@ export class DeployController {
     };
   }
 
-  private runDeployAsync(record: DeployRecord, repo: string, releaseId: number, bundle?: string): Promise<void> {
+  private runDeployAsync(record: DeployRecord, repo: string, releaseId: number, bundle?: string, env?: Record<string, string>): Promise<void> {
     return (async () => {
       const workDir = join(this.config.workDir, String(releaseId));
       const assetName = bundle ?? 'deploy.zip';
@@ -237,7 +237,7 @@ export class DeployController {
       // Tearing down our own current mode kills this process, so a detached
       // supervisor performs teardown → new mode → rollback and appends EXIT.
       if (isSelf && modeChange && prior) {
-        this.startSelfModeChange(record, manifest, workDir, slot, versioning, prior);
+        this.startSelfModeChange(record, manifest, workDir, slot, versioning, prior, env);
         return;
       }
 
@@ -249,7 +249,7 @@ export class DeployController {
             `▸ Mode change ${prior.method} → ${manifest.method}; tearing down previous mode…`,
           );
           this.store.appendLine(record, `▸ Running: ${prior.teardownCommand}`);
-          const teardownCode = await this.runShell(record, prior.teardownCommand, prior.bundleDir);
+          const teardownCode = await this.runShell(record, prior.teardownCommand, prior.bundleDir, env);
           if (teardownCode !== 0) {
             this.store.appendLine(
               record,
@@ -288,7 +288,7 @@ export class DeployController {
       if (
         selfUpdate &&
         CONTAINERIZED_METHODS.has(manifest.method ?? '') &&
-        this.startSelfRedeploy(record, manifest, workDir, slot, versioning, prior)
+        this.startSelfRedeploy(record, manifest, workDir, slot, versioning, prior, env)
       ) {
         return;
       }
@@ -297,7 +297,7 @@ export class DeployController {
       try {
         exitCode = await runDeploy(manifest, workDir, (line) => {
           this.store.appendLine(record, line);
-        });
+        }, env);
       } catch (err) {
         this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
         exitCode = 1;
@@ -322,7 +322,7 @@ export class DeployController {
           `▸ New mode failed (exit ${exitCode}); rolling back to ${prior.method}…`,
         );
         this.store.appendLine(record, `▸ Running: ${prior.deployCommand}`);
-        const rollbackCode = await this.runShell(record, prior.deployCommand, prior.bundleDir);
+        const rollbackCode = await this.runShell(record, prior.deployCommand, prior.bundleDir, env);
         this.store.appendLine(
           record,
           rollbackCode === 0
@@ -354,8 +354,8 @@ export class DeployController {
   }
 
   /** Run a shell command from a bundle dir, streaming output into the record's log. */
-  private runShell(record: DeployRecord, command: string, cwd: string): Promise<number> {
-    return runDeploy({ deployCommand: command }, cwd, (line) => this.store.appendLine(record, line));
+  private runShell(record: DeployRecord, command: string, cwd: string, env?: Record<string, string>): Promise<number> {
+    return runDeploy({ deployCommand: command }, cwd, (line) => this.store.appendLine(record, line), env);
   }
 
   /** Build the durable state to persist for a successful deploy. */
@@ -390,6 +390,7 @@ export class DeployController {
     slot: string,
     versioning: 'singleton' | 'major',
     prior: { method: string; bundleDir: string; teardownCommand?: string; deployCommand: string },
+    env?: Record<string, string>,
   ): void {
     const from = prior.method;
     const to = manifest.method ?? 'unknown';
@@ -420,6 +421,7 @@ export class DeployController {
         stateFile: this.state.stateFile(slot),
         stateNewFile: this.state.stageState(this.buildState(manifest, slot, versioning)),
       },
+      env,
     };
 
     this.store.appendLine(record, `▸ Self mode-change ${from} → ${to}; handing off to a supervisor…`);
@@ -485,6 +487,7 @@ export class DeployController {
     slot: string,
     versioning: 'singleton' | 'major',
     prior: { bundleDir: string; deployCommand: string } | undefined,
+    env?: Record<string, string>,
   ): boolean {
     const plan: SupervisorPlan = {
       log: join(workDir, 'deploy.log'),
@@ -500,6 +503,7 @@ export class DeployController {
         stateFile: this.state.stateFile(slot),
         stateNewFile: this.state.stageState(this.buildState(manifest, slot, versioning)),
       },
+      env,
     };
 
     const outcome = this.startSupervisor(record, workDir, slot, 'container', plan);

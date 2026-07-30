@@ -54,6 +54,8 @@ export interface SupervisorPlan {
   rollback?: SupervisorStep;
   /** State to commit once `deploy` succeeds. */
   commit: SupervisorCommit;
+  /** Extra environment variables merged into every step (teardown, deploy, rollback). */
+  env?: Record<string, string>;
 }
 
 /** File name the plan is written under, inside the release work dir. */
