@@ -91,15 +91,14 @@ projects:
 
     // Log summary
     const repoUrl = `https://github.com/${owner}/${repo}`;
-    const prLink = !isManualDispatch ? `[PR #${prNumber}](${repoUrl}/pull/${prNumber})` : '_manual dispatch_';
+    const prLink = !isManualDispatch ? `<a href="${repoUrl}/pull/${prNumber}">PR #${prNumber}</a>` : '<em>manual dispatch</em>';
 
     core.summary.addHeading('Build & Pack Results');
 
     if (result.releases.length > 0) {
       core.summary.addHeading('Draft Releases', 3);
-      core.summary.addRaw(
-        result.releases.map((r) => `- **${r.name}** [${r.version}](${r.url})`).join('\n') + '\n',
-        true,
+      core.summary.addList(
+        result.releases.map((r) => `<strong>${r.name}</strong> <a href="${r.url}">${r.version}</a>`),
       );
     }
 
@@ -112,7 +111,7 @@ projects:
         ['Skipped', result.skipped.length.toString()],
         ['Failed', result.failed.length.toString()],
       ])
-      .addRaw(`\n**Triggered by:** ${prLink}\n`, true);
+      .addRaw(`<p><strong>Triggered by:</strong> ${prLink}</p>\n`, true);
 
     if (result.failed.length > 0) {
       core.summary.addHeading('Failed Projects', 3);
