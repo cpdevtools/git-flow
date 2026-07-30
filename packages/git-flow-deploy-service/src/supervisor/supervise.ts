@@ -49,6 +49,20 @@ export async function runSupervisor(planPath: string): Promise<number> {
       },
     );
 
+  // Like run(), but suppresses EXIT: lines so a nested supervisor script (e.g.
+  // restart.sh invoked during rollback) cannot write EXIT:0 and mislead the
+  // action into reporting success before this supervisor appends EXIT:1.
+  const runFiltered = (step: SupervisorStep): Promise<number> =>
+    runDeploy(
+      { deployCommand: step.command },
+      step.cwd,
+      (line) => { if (!line.startsWith('EXIT:')) log(line); },
+      plan.env,
+    ).catch((err: Error) => {
+      log(`▸ Error: ${err.message}`);
+      return 1;
+    });
+
   // The request that triggered this deploy is still being answered by the
   // process we are about to replace; let it flush and persist its record.
   if (plan.delayMs > 0) await new Promise((r) => setTimeout(r, plan.delayMs));
@@ -78,7 +92,7 @@ export async function runSupervisor(planPath: string): Promise<number> {
 
   if (plan.rollback && existsSync(plan.rollback.cwd)) {
     log(`▸ Rolling back: ${plan.rollback.command}`);
-    const rollbackCode = await run(plan.rollback);
+    const rollbackCode = await runFiltered(plan.rollback);
     log(
       rollbackCode === 0
         ? '▸ Rolled back to the previous deployment.'
