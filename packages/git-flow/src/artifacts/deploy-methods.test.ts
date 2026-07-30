@@ -42,7 +42,7 @@ describe('docker.compose generateDeployYml', () => {
     expect(m.slot).toBe('org-svc');
     expect(m.versioning).toBe('singleton');
     expect(m.deployCommand).toBe(
-      'docker compose -p org-svc pull && docker compose -p org-svc up -d --force-recreate --remove-orphans',
+      'echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker compose -p org-svc pull && docker compose -p org-svc up -d --force-recreate --remove-orphans',
     );
     expect(m.teardownCommand).toBe('docker compose -p org-svc down');
   });
