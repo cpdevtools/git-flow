@@ -88,6 +88,44 @@ function getRepoFromRemote(): string {
 
 // ─── GitHub queries ───────────────────────────────────────────────────────────
 
+interface EnvironmentConfig {
+  /** Allowed deploy methods (from DEPLOY_ALLOWED_METHODS env var). Empty = all allowed. */
+  allowedMethods: string[];
+  /** Default deploy method (from DEPLOY_TYPE_DEFAULT env var). */
+  defaultMethod: string | undefined;
+}
+
+/**
+ * Read deployment configuration from the GitHub Environment's variables.
+ * Best-effort: returns empty config (no restrictions) when the API call fails
+ * (e.g. the token lacks permission to read env vars or none are set).
+ */
+async function fetchEnvironmentConfig(
+  token: string,
+  owner: string,
+  repo: string,
+  environment: string,
+): Promise<EnvironmentConfig> {
+  try {
+    const res = await gh<{ variables?: { name: string; value: string }[] }>(
+      token,
+      `/repos/${owner}/${repo}/environments/${encodeURIComponent(environment)}/variables?per_page=100`,
+    );
+    const vars = Object.fromEntries(
+      (res?.variables ?? []).map(({ name, value }) => [name, value]),
+    );
+    const allowedMethods = (vars['DEPLOY_ALLOWED_METHODS'] ?? '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const defMethod = vars['DEPLOY_TYPE_DEFAULT']?.trim() || undefined;
+    return { allowedMethods, defaultMethod: defMethod };
+  } catch {
+    // Missing permission or no variables set — apply no restrictions.
+    return { allowedMethods: [], defaultMethod: undefined };
+  }
+}
+
 async function discoverReleaseBranch(
   token: string,
   owner: string,
@@ -325,8 +363,15 @@ export default class Deploy extends Command {
     }
 
     // ── 5. List deployable releases ──────────────────────────────────────────
+    // Fetch releases and environment config in parallel — independent reads.
     this.log('Fetching releases...');
-    const releases = await listDeployableReleases(token, owner, repoName);
+    const [releases, envConfig] = await Promise.all([
+      listDeployableReleases(token, owner, repoName),
+      fetchEnvironmentConfig(token, owner, repoName, target.environment),
+    ]);
+    if (envConfig.allowedMethods.length > 0) {
+      this.log(`Allowed methods in "${target.environment}": ${envConfig.allowedMethods.join(', ')}`);
+    }
     if (releases.length === 0) {
       this.error('No deployable releases found (no published releases advertising a deploy method).');
     }
@@ -382,20 +427,41 @@ export default class Deploy extends Command {
       }
 
       const release = selected!;
-      const methods = releaseDeployMethods(release);
+      const releaseMethods = releaseDeployMethods(release);
+      // Intersect with the environment allowlist if one is configured.
+      const methods = envConfig.allowedMethods.length > 0
+        ? releaseMethods.filter((m) => envConfig.allowedMethods.includes(m))
+        : releaseMethods;
+      if (methods.length === 0) {
+        this.warn(
+          `No allowed deploy methods for ${pkg} ${versionFromTag(release.tag_name)} ` +
+            `in "${target.environment}". ` +
+            `Release advertises: ${releaseMethods.join(', ')}. ` +
+            `Allowed: ${envConfig.allowedMethods.join(', ')}. Skipping.`,
+        );
+        continue;
+      }
       let method: string;
 
       if (flags.method) {
-        if (!methods.includes(flags.method)) {
+        if (!releaseMethods.includes(flags.method)) {
           this.error(
-            `Method "${flags.method}" not available for ${pkg} ${versionFromTag(release.tag_name)}. Available: ${methods.join(', ')}.`,
+            `Method "${flags.method}" not available for ${pkg} ${versionFromTag(release.tag_name)}. Available: ${releaseMethods.join(', ')}.`,
+          );
+        }
+        if (envConfig.allowedMethods.length > 0 && !envConfig.allowedMethods.includes(flags.method)) {
+          this.error(
+            `Method "${flags.method}" is not allowed in environment "${target.environment}". Allowed: ${envConfig.allowedMethods.join(', ')}.`,
           );
         }
         method = flags.method;
       } else if (methods.length === 1) {
         method = methods[0];
       } else {
-        const dflt = defaultMethod(methods);
+        // Pre-select: environment DEPLOY_TYPE_DEFAULT > first advertised method
+        const dflt = (envConfig.defaultMethod && methods.includes(envConfig.defaultMethod))
+          ? envConfig.defaultMethod
+          : defaultMethod(methods);
         const r = await prompts({
           type: 'select',
           name: 'method',
