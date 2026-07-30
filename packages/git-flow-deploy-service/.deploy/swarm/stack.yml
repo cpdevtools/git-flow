@@ -1,5 +1,5 @@
 services:
-  git-flow-deploy-service:
+  __SERVICE_ID__:
     image: ghcr.io/cpdevtools/git-flow-deploy-service:${DEPLOY_IMAGE_TAG:?DEPLOY_IMAGE_TAG must be set (gitflow writes it into the bundle .env as the release version)}
     ports:
       - "3700:3700"
