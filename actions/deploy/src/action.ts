@@ -30,6 +30,25 @@ const environment = process.env['INPUT_ENVIRONMENT'] ?? '';
 const githubRepository = process.env['GITHUB_REPOSITORY'] ?? '';
 const githubSha = process.env['GITHUB_SHA'] ?? '';
 
+/**
+ * Parse KEY=VAL lines into a plain object. Empty lines and lines without '='
+ * are silently skipped so indented YAML blocks and trailing newlines are safe.
+ */
+function parseEnvLines(raw: string): Record<string, string> | undefined {
+  const result: Record<string, string> = {};
+  let any = false;
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.includes('=')) continue;
+    const eq = trimmed.indexOf('=');
+    result[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
+    any = true;
+  }
+  return any ? result : undefined;
+}
+
+const deployEnv = parseEnvLines(process.env['INPUT_DEPLOY_ENV'] ?? '');
+
 if (!repo || !releaseIdRaw || !deployUrl || !deployToken) {
   core.setFailed('Missing required inputs: repo, release_id, deploy_url, hmac_secret');
   process.exit(1);
@@ -249,7 +268,7 @@ async function run(): Promise<void> {
   if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'in_progress');
 
   // 1. POST /deploy
-  const rawBody = JSON.stringify({ repo, release_id: releaseId, bundle });
+  const rawBody = JSON.stringify({ repo, release_id: releaseId, bundle, ...(deployEnv ? { env: deployEnv } : {}) });
   const ts = String(Math.floor(Date.now() / 1000));
   const signature = signRequest(deployToken, ts, rawBody);
 

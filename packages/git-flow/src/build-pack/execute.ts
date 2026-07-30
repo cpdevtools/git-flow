@@ -4,7 +4,7 @@
 
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse, parseDocument, stringify } from 'yaml';
 import { $ } from 'zx';
@@ -16,7 +16,7 @@ import {
   type DeployMethodContext,
   type UploadContext,
 } from '../artifacts/index.js';
-import { deploymentSlot, type VersioningStrategy } from '../artifacts/slot.js';
+import { deploymentSlot, safeName, slotStack, majorVersion, type VersioningStrategy } from '../artifacts/slot.js';
 import { findOrCreateDraftRelease, uploadArtifact } from './github.js';
 import { generateArtifactDescriptor, loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
@@ -200,7 +200,60 @@ export async function executePack(
 }
 
 /**
- * Execute pack-deploy for a project.
+ * Replace __TOKEN__ placeholders in every text file under `dir`.
+ *
+ * Runs at pack time — after all source files are in the deploy output dir and
+ * deploy.yml has been generated — so baked-in values like __SERVICE_ID__ work
+ * in places where runtime env interpolation doesn't (e.g. YAML map keys).
+ */
+export async function substituteDeployTokens(
+  dir: string,
+  tokens: Record<string, string>,
+): Promise<void> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await substituteDeployTokens(fullPath, tokens);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    let content: string;
+    try {
+      content = await readFile(fullPath, 'utf-8');
+      if (content.includes('\0')) continue; // binary file
+    } catch {
+      continue;
+    }
+    let result = content;
+    for (const [key, value] of Object.entries(tokens)) {
+      result = result.replaceAll(`__${key}__`, value);
+    }
+    if (result !== content) await writeFile(fullPath, result, 'utf-8');
+  }
+}
+
+/**
+ * Build the token map for deploy template substitution.
+ */
+export function deployTokens(
+  projectName: string,
+  version: string,
+  versioning: VersioningStrategy,
+  stackOverride?: string,
+): Record<string, string> {
+  const serviceId = deploymentSlot(projectName, version, versioning);
+  const service = safeName(projectName);
+  return {
+    SERVICE: service,
+    SERVICE_ID: serviceId,
+    STACK: stackOverride ?? slotStack(serviceId),
+    VERSION: version,
+    MAJOR: String(majorVersion(version)),
+  };
+}
+
+/**
  *
  * Resolution chain per (artifact, method) pair — first match wins:
  *   1. .deploy/{method}/ folder   — copy files; fall through to handler.generateDeployYml
@@ -347,6 +400,14 @@ async function executePackDeploy(
             repo: `https://github.com/${process.env.GITHUB_REPOSITORY ?? ''}`,
             releaseId: uploadCtx.releaseId,
           }),
+        );
+
+        // Substitute __TOKEN__ placeholders in all text files (including
+        // deploy.yml itself) so baked-in values work in YAML keys and anywhere
+        // else runtime env interpolation can't reach.
+        await substituteDeployTokens(
+          deployOutputDir,
+          deployTokens(project.name, project.version, versioning),
         );
 
         // Zip the deploy output dir and upload directly

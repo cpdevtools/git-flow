@@ -27,12 +27,10 @@ import { deploymentSlot, slotStack, type VersioningStrategy } from './slot.js';
 /**
  * Upsert variables into the bundle's `.env`.
  *
- * `docker compose` and `docker stack deploy` both auto-load `.env` from the
- * project directory — which is the bundle extraction dir, since runDeploy spawns
- * deployCommand with cwd set there. That makes `.env` the transport for the
- * release version without any runtime plumbing, and it applies to every command
- * in a chained deployCommand (an inline `VAR=x cmd` prefix would only cover the
- * first).
+ * `docker compose` auto-loads `.env` from the project directory — which is the
+ * bundle extraction dir, since runDeploy spawns deployCommand with cwd set there.
+ * `docker stack deploy` does NOT auto-load `.env`, so the swarm deployCommand
+ * explicitly sources it with `. ./.env` first.
  *
  * Existing keys are replaced and unrelated lines preserved, so a project shipping
  * its own `.env` in a .deploy/{method}/ override folder isn't clobbered.
@@ -220,8 +218,12 @@ registerDeployMethod('docker', 'swarm', {
         method: 'swarm',
         slot: deploymentSlot(projectName, version, versioning),
         versioning: versioning ?? 'singleton',
-        deployCommand: `docker stack deploy -c stack.yml ${stackName}`,
-        teardownCommand: `docker stack rm ${stackName}`,
+        // __SERVICE_ID__ and __STACK__ are substituted at pack time by
+        // substituteDeployTokens — they resolve correctly in YAML map keys
+        // (where runtime ${VAR} interpolation does not work) and let
+        // projects use them in stack.yml service names too.
+        deployCommand: `set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__`,
+        teardownCommand: `docker stack rm __STACK__`,
       }),
     );
   },
