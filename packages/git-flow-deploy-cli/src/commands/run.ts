@@ -6,9 +6,7 @@ export default class Run extends Command {
   static override description =
     'Execute deployCommand from an already-extracted deploy bundle. Streams stdout/stderr. Exits 0/1.';
 
-  static override examples = [
-    '<%= config.bin %> run --work-dir /tmp/deploy-gateway/123456789',
-  ];
+  static override examples = ['<%= config.bin %> run --work-dir /tmp/deploy-gateway/123456789'];
 
   static override flags = {
     'work-dir': Flags.string({

@@ -3,7 +3,9 @@ import { safeName, majorVersion, deploymentSlot, slotStack } from './slot.js';
 
 describe('safeName', () => {
   it('strips @ and replaces / with -', () => {
-    expect(safeName('@cpdevtools/git-flow-deploy-service')).toBe('cpdevtools-git-flow-deploy-service');
+    expect(safeName('@cpdevtools/git-flow-deploy-service')).toBe(
+      'cpdevtools-git-flow-deploy-service',
+    );
   });
 
   it('leaves an unscoped name mostly intact', () => {
@@ -44,7 +46,9 @@ describe('deploymentSlot', () => {
   });
 
   it('major shares a slot across patches/minors of the same major', () => {
-    expect(deploymentSlot('@org/svc', '1.2.4', 'major')).toBe(deploymentSlot('@org/svc', '1.5.0', 'major'));
+    expect(deploymentSlot('@org/svc', '1.2.4', 'major')).toBe(
+      deploymentSlot('@org/svc', '1.5.0', 'major'),
+    );
   });
 });
 

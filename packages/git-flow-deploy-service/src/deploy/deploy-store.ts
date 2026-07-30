@@ -44,7 +44,8 @@ export class DeployStore implements OnModuleInit {
   // Must match ConfigService.workDir so boot-restore reads the same durable
   // deploy.log the running service wrote (shared across methods via bind mount).
   private readonly workDir: string =
-    process.env['DEPLOY_WORK_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'work');
+    process.env['DEPLOY_WORK_DIR'] ??
+    join(homedir(), '.git-flow-deploy-service', 'work');
 
   onModuleInit(): void {
     this.loadPersistedRecords();
@@ -152,7 +153,10 @@ export class DeployStore implements OnModuleInit {
       // before it could append the terminal EXIT line.
       const running = getServiceInfo().version;
       if (record.targetVersion && running === record.targetVersion) {
-        this.appendLine(record, `\u2713 Restart verified on boot: service is running v${running}.`);
+        this.appendLine(
+          record,
+          `\u2713 Restart verified on boot: service is running v${running}.`,
+        );
         this.finish(record, 0);
       } else {
         // Version unknown or not yet the target — fall back to tailing deploy.log
@@ -162,7 +166,10 @@ export class DeployStore implements OnModuleInit {
     } else {
       // A non-self-update deploy was interrupted by an unexpected restart/crash.
       // We cannot know it succeeded — record a failure rather than a false success.
-      this.appendLine(record, '\u25b8 Service restarted unexpectedly during deploy — marking failed');
+      this.appendLine(
+        record,
+        '\u25b8 Service restarted unexpectedly during deploy — marking failed',
+      );
       this.finish(record, 1);
     }
   }

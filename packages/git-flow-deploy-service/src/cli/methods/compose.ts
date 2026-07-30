@@ -5,7 +5,10 @@ import { bundleSlot } from '../bundle-slot.js';
 
 /** Host dir holding work/ and state/, bind-mounted into the container. */
 export function defaultHostRoot(): string {
-  return process.env['DEPLOY_HOST_ROOT'] ?? join(homedir(), '.git-flow-deploy-service');
+  return (
+    process.env['DEPLOY_HOST_ROOT'] ??
+    join(homedir(), '.git-flow-deploy-service')
+  );
 }
 
 export interface ComposeHandlerOptions {
@@ -18,7 +21,9 @@ export interface ComposeHandlerOptions {
   composeFile?: string;
 }
 
-export async function handleCompose(options: ComposeHandlerOptions): Promise<void> {
+export async function handleCompose(
+  options: ComposeHandlerOptions,
+): Promise<void> {
   const { extractDir, token, hmacSecret } = options;
   // Bundles ship variants (e.g. docker-compose.netns.yml) that the operator
   // selects; hardcoding docker-compose.yml made them unreachable from the CLI.
@@ -59,9 +64,13 @@ export async function handleCompose(options: ComposeHandlerOptions): Promise<voi
   };
 
   if (!isRunning) {
-    console.log(`Starting service with docker compose (first-time, project: ${slot ?? 'default'})...`);
+    console.log(
+      `Starting service with docker compose (first-time, project: ${slot ?? 'default'})...`,
+    );
   } else {
-    console.log('Existing docker compose service detected — pulling and restarting...');
+    console.log(
+      'Existing docker compose service detected — pulling and restarting...',
+    );
     docker([...base, 'pull'], env);
   }
   docker([...base, 'up', '-d', '--force-recreate', '--remove-orphans'], env);
@@ -73,15 +82,21 @@ export async function handleCompose(options: ComposeHandlerOptions): Promise<voi
 function docker(args: string[], env: NodeJS.ProcessEnv): void {
   const res = spawnSync('docker', args, { stdio: 'inherit', env });
   if (res.status !== 0) {
-    throw new Error(`docker ${args.join(' ')} failed with exit code ${res.status ?? 'unknown'}`);
+    throw new Error(
+      `docker ${args.join(' ')} failed with exit code ${res.status ?? 'unknown'}`,
+    );
   }
 }
 
 function isComposeRunning(base: string[]): boolean {
   try {
-    const result = spawnSync('docker', [...base, 'ps', '--services', '--filter', 'status=running'], {
-      encoding: 'utf-8',
-    });
+    const result = spawnSync(
+      'docker',
+      [...base, 'ps', '--services', '--filter', 'status=running'],
+      {
+        encoding: 'utf-8',
+      },
+    );
     return (result.stdout?.trim().length ?? 0) > 0;
   } catch {
     return false;

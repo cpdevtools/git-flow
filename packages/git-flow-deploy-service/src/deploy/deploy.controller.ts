@@ -22,12 +22,18 @@ import {
   deploymentSlot,
   slotStack,
 } from '@cpdevtools/git-flow-deploy';
-import type { DeployManifest, DeployRequest } from '@cpdevtools/git-flow-deploy';
+import type {
+  DeployManifest,
+  DeployRequest,
+} from '@cpdevtools/git-flow-deploy';
 import { DeployStore } from './deploy-store.js';
 import { HmacGuard } from './hmac.guard.js';
 import { ConfigService } from './config.service.js';
 import { ReposConfigService } from './repos-config.service.js';
-import { DeploymentStateService, type DeploymentStateInput } from './deployment-state.service.js';
+import {
+  DeploymentStateService,
+  type DeploymentStateInput,
+} from './deployment-state.service.js';
 import type { DeployRecord } from './deploy-record.js';
 import { getServiceInfo } from '../version.js';
 import {
@@ -38,7 +44,11 @@ import {
   type ContainerTarget,
   type SupervisorPlacement,
 } from '../supervisor/launcher.js';
-import { SUPERVISOR_DELAY_MS, SUPERVISOR_PLAN_FILE, type SupervisorPlan } from '../supervisor/plan.js';
+import {
+  SUPERVISOR_DELAY_MS,
+  SUPERVISOR_PLAN_FILE,
+  type SupervisorPlan,
+} from '../supervisor/plan.js';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 
@@ -84,12 +94,16 @@ export class DeployController {
     }
 
     if (this.store.isRunning(releaseId)) {
-      this.logger.log(`Deploy already running for release ${releaseId} — attaching observer`);
+      this.logger.log(
+        `Deploy already running for release ${releaseId} — attaching observer`,
+      );
       res.status(200).end();
       return;
     }
 
-    this.logger.log(`Deploy triggered: ${repo} release ${releaseId} bundle=${body.bundle ?? 'default'}`);
+    this.logger.log(
+      `Deploy triggered: ${repo} release ${releaseId} bundle=${body.bundle ?? 'default'}`,
+    );
     const record = this.store.start(releaseId, repo);
     void this.runDeployAsync(record, repo, releaseId, body.bundle, body.env);
     res.status(202).end();
@@ -113,7 +127,11 @@ export class DeployController {
       from = 0;
     } else {
       const parsed = parseInt(fromParam, 10);
-      from = isNaN(parsed) ? 0 : parsed < 0 ? Math.max(0, totalLines + parsed) : parsed;
+      from = isNaN(parsed)
+        ? 0
+        : parsed < 0
+          ? Math.max(0, totalLines + parsed)
+          : parsed;
     }
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -186,20 +204,37 @@ export class DeployController {
     };
   }
 
-  private runDeployAsync(record: DeployRecord, repo: string, releaseId: number, bundle?: string, env?: Record<string, string>): Promise<void> {
+  private runDeployAsync(
+    record: DeployRecord,
+    repo: string,
+    releaseId: number,
+    bundle?: string,
+    env?: Record<string, string>,
+  ): Promise<void> {
     return (async () => {
       const workDir = join(this.config.workDir, String(releaseId));
       const assetName = bundle ?? 'deploy.zip';
 
-      this.store.appendLine(record, `▸ Fetching ${assetName} from release ${releaseId}...`);
+      this.store.appendLine(
+        record,
+        `▸ Fetching ${assetName} from release ${releaseId}...`,
+      );
 
       let manifest;
       try {
-        manifest = await fetchDeployBundle(this.config.githubToken, repo, releaseId, workDir, assetName);
+        manifest = await fetchDeployBundle(
+          this.config.githubToken,
+          repo,
+          releaseId,
+          workDir,
+          assetName,
+        );
       } catch (err) {
         this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
         this.store.finish(record, 1);
-        this.logger.error(`Deploy failed (fetch): ${repo} release ${releaseId} — ${(err as Error).message}`);
+        this.logger.error(
+          `Deploy failed (fetch): ${repo} release ${releaseId} — ${(err as Error).message}`,
+        );
         return;
       }
 
@@ -209,11 +244,16 @@ export class DeployController {
           `▸ Preparing shared storage: ${this.config.sharedStorageBaseDir}/${manifest.name}/`,
         );
         try {
-          await prepareSharedStorage(manifest, this.config.sharedStorageBaseDir);
+          await prepareSharedStorage(
+            manifest,
+            this.config.sharedStorageBaseDir,
+          );
         } catch (err) {
           this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
           this.store.finish(record, 1);
-          this.logger.error(`Deploy failed (storage): ${repo} release ${releaseId} — ${(err as Error).message}`);
+          this.logger.error(
+            `Deploy failed (storage): ${repo} release ${releaseId} — ${(err as Error).message}`,
+          );
           return;
         }
       }
@@ -221,7 +261,9 @@ export class DeployController {
       // ── Resolve the deployment slot + detect a mode change ─────────────────
       const self = getServiceInfo();
       const versioning = manifest.versioning ?? 'singleton';
-      const slot = manifest.slot ?? deploymentSlot(manifest.name, manifest.version, versioning);
+      const slot =
+        manifest.slot ??
+        deploymentSlot(manifest.name, manifest.version, versioning);
       const selfSlot = deploymentSlot(self.name, self.version, versioning);
       // A deploy replaces THIS process only when it targets our own slot (same
       // name AND, for major-versioned apps, the same major). A different major
@@ -230,14 +272,25 @@ export class DeployController {
 
       const prior = this.state.get(slot);
       const modeChange = Boolean(
-        prior && prior.method && manifest.method && prior.method !== manifest.method,
+        prior &&
+        prior.method &&
+        manifest.method &&
+        prior.method !== manifest.method,
       );
 
       // ── Self mode-change: hand off to a detached supervisor ────────────────
       // Tearing down our own current mode kills this process, so a detached
       // supervisor performs teardown → new mode → rollback and appends EXIT.
       if (isSelf && modeChange && prior) {
-        this.startSelfModeChange(record, manifest, workDir, slot, versioning, prior, env);
+        this.startSelfModeChange(
+          record,
+          manifest,
+          workDir,
+          slot,
+          versioning,
+          prior,
+          env,
+        );
         return;
       }
 
@@ -249,14 +302,21 @@ export class DeployController {
             `▸ Mode change ${prior.method} → ${manifest.method}; tearing down previous mode…`,
           );
           this.store.appendLine(record, `▸ Running: ${prior.teardownCommand}`);
-          const teardownCode = await this.runShell(record, prior.teardownCommand, prior.bundleDir, env);
+          const teardownCode = await this.runShell(
+            record,
+            prior.teardownCommand,
+            prior.bundleDir,
+            env,
+          );
           if (teardownCode !== 0) {
             this.store.appendLine(
               record,
               `▸ Teardown of previous mode failed (exit ${teardownCode}); aborting to avoid running two modes.`,
             );
             this.store.finish(record, 1);
-            this.logger.error(`Deploy aborted (teardown failed): ${repo} release ${releaseId}`);
+            this.logger.error(
+              `Deploy aborted (teardown failed): ${repo} release ${releaseId}`,
+            );
             return;
           }
         } else {
@@ -288,16 +348,29 @@ export class DeployController {
       if (
         selfUpdate &&
         CONTAINERIZED_METHODS.has(manifest.method ?? '') &&
-        this.startSelfRedeploy(record, manifest, workDir, slot, versioning, prior, env)
+        this.startSelfRedeploy(
+          record,
+          manifest,
+          workDir,
+          slot,
+          versioning,
+          prior,
+          env,
+        )
       ) {
         return;
       }
 
       let exitCode: number;
       try {
-        exitCode = await runDeploy(manifest, workDir, (line) => {
-          this.store.appendLine(record, line);
-        }, env);
+        exitCode = await runDeploy(
+          manifest,
+          workDir,
+          (line) => {
+            this.store.appendLine(record, line);
+          },
+          env,
+        );
       } catch (err) {
         this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
         exitCode = 1;
@@ -322,7 +395,12 @@ export class DeployController {
           `▸ New mode failed (exit ${exitCode}); rolling back to ${prior.method}…`,
         );
         this.store.appendLine(record, `▸ Running: ${prior.deployCommand}`);
-        const rollbackCode = await this.runShell(record, prior.deployCommand, prior.bundleDir, env);
+        const rollbackCode = await this.runShell(
+          record,
+          prior.deployCommand,
+          prior.bundleDir,
+          env,
+        );
         this.store.appendLine(
           record,
           rollbackCode === 0
@@ -340,7 +418,9 @@ export class DeployController {
           '▸ Deploy command handed off to restart supervisor; awaiting service restart…',
         );
         this.store.startTail(record);
-        this.logger.log(`Deploy handed off to restart supervisor: ${repo} release ${releaseId}`);
+        this.logger.log(
+          `Deploy handed off to restart supervisor: ${repo} release ${releaseId}`,
+        );
         return;
       }
 
@@ -348,14 +428,26 @@ export class DeployController {
       if (exitCode === 0) {
         this.logger.log(`Deploy completed: ${repo} release ${releaseId}`);
       } else {
-        this.logger.error(`Deploy failed: ${repo} release ${releaseId} (exit ${exitCode})`);
+        this.logger.error(
+          `Deploy failed: ${repo} release ${releaseId} (exit ${exitCode})`,
+        );
       }
     })();
   }
 
   /** Run a shell command from a bundle dir, streaming output into the record's log. */
-  private runShell(record: DeployRecord, command: string, cwd: string, env?: Record<string, string>): Promise<number> {
-    return runDeploy({ deployCommand: command }, cwd, (line) => this.store.appendLine(record, line), env);
+  private runShell(
+    record: DeployRecord,
+    command: string,
+    cwd: string,
+    env?: Record<string, string>,
+  ): Promise<number> {
+    return runDeploy(
+      { deployCommand: command },
+      cwd,
+      (line) => this.store.appendLine(record, line),
+      env,
+    );
   }
 
   /** Build the durable state to persist for a successful deploy. */
@@ -389,7 +481,12 @@ export class DeployController {
     workDir: string,
     slot: string,
     versioning: 'singleton' | 'major',
-    prior: { method: string; bundleDir: string; teardownCommand?: string; deployCommand: string },
+    prior: {
+      method: string;
+      bundleDir: string;
+      teardownCommand?: string;
+      deployCommand: string;
+    },
     env?: Record<string, string>,
   ): void {
     const from = prior.method;
@@ -419,14 +516,25 @@ export class DeployController {
         currentDir: this.state.currentBundleDir(slot),
         newBundle: workDir,
         stateFile: this.state.stateFile(slot),
-        stateNewFile: this.state.stageState(this.buildState(manifest, slot, versioning)),
+        stateNewFile: this.state.stageState(
+          this.buildState(manifest, slot, versioning),
+        ),
       },
       env,
     };
 
-    this.store.appendLine(record, `▸ Self mode-change ${from} → ${to}; handing off to a supervisor…`);
+    this.store.appendLine(
+      record,
+      `▸ Self mode-change ${from} → ${to}; handing off to a supervisor…`,
+    );
 
-    const outcome = this.startSupervisor(record, workDir, slot, placement, plan);
+    const outcome = this.startSupervisor(
+      record,
+      workDir,
+      slot,
+      placement,
+      plan,
+    );
     if (outcome === 'no-container') {
       // Running the teardown inline would SIGKILL us mid-change and leave the
       // service down with nothing to bring it back. Refuse instead.
@@ -441,7 +549,9 @@ export class DeployController {
     }
     if (outcome === 'failed') return;
 
-    this.logger.log(`Self mode-change handed off to supervisor: slot ${slot} ${from} → ${to}`);
+    this.logger.log(
+      `Self mode-change handed off to supervisor: slot ${slot} ${from} → ${to}`,
+    );
   }
 
   /**
@@ -453,7 +563,12 @@ export class DeployController {
    * run npm/pm2 on the host. Attempting it tore the old mode down and then died
    * with it, taking the service offline with no way back.
    */
-  private refuseModeChange(record: DeployRecord, from: string, to: string, version: string): void {
+  private refuseModeChange(
+    record: DeployRecord,
+    from: string,
+    to: string,
+    version: string,
+  ): void {
     const self = getServiceInfo();
     for (const line of [
       `▸ Unsupported mode change: ${from} → ${to}.`,
@@ -469,7 +584,9 @@ export class DeployController {
       this.store.appendLine(record, line);
     }
     this.store.finish(record, 1);
-    this.logger.error(`Deploy refused (unsupported mode change ${from} → ${to})`);
+    this.logger.error(
+      `Deploy refused (unsupported mode change ${from} → ${to})`,
+    );
   }
 
   /**
@@ -496,17 +613,27 @@ export class DeployController {
       label: `self redeploy → v${manifest.version}`,
       delayMs: SUPERVISOR_DELAY_MS,
       deploy: { cwd: workDir, command: manifest.deployCommand },
-      rollback: prior ? { cwd: prior.bundleDir, command: prior.deployCommand } : undefined,
+      rollback: prior
+        ? { cwd: prior.bundleDir, command: prior.deployCommand }
+        : undefined,
       commit: {
         currentDir: this.state.currentBundleDir(slot),
         newBundle: workDir,
         stateFile: this.state.stateFile(slot),
-        stateNewFile: this.state.stageState(this.buildState(manifest, slot, versioning)),
+        stateNewFile: this.state.stageState(
+          this.buildState(manifest, slot, versioning),
+        ),
       },
       env,
     };
 
-    const outcome = this.startSupervisor(record, workDir, slot, 'container', plan);
+    const outcome = this.startSupervisor(
+      record,
+      workDir,
+      slot,
+      'container',
+      plan,
+    );
     if (outcome === 'no-container') {
       rmSync(plan.commit.stateNewFile, { force: true });
       this.store.appendLine(
@@ -566,7 +693,10 @@ export class DeployController {
       : launchBare(planPath, workDir);
 
     if (!result.ok) {
-      this.store.appendLine(record, `▸ Error: failed to start the supervisor: ${result.error}`);
+      this.store.appendLine(
+        record,
+        `▸ Error: failed to start the supervisor: ${result.error}`,
+      );
       this.store.finish(record, 1);
       return 'failed';
     }
@@ -591,11 +721,19 @@ export class DeployController {
    * Requires a unique running match, so a multi-service bundle falls back rather
    * than guessing wrong. `DEPLOY_SELF_CONTAINER` overrides the lookup entirely.
    */
-  private resolveSelfContainer(slot: string): { id: string; image: string } | undefined {
-    const inspect = (ref: string): { id: string; image: string } | undefined => {
-      const res = spawnSync('docker', ['inspect', ref, '--format', '{{.Id}} {{.Config.Image}}'], {
-        encoding: 'utf-8',
-      });
+  private resolveSelfContainer(
+    slot: string,
+  ): { id: string; image: string } | undefined {
+    const inspect = (
+      ref: string,
+    ): { id: string; image: string } | undefined => {
+      const res = spawnSync(
+        'docker',
+        ['inspect', ref, '--format', '{{.Id}} {{.Config.Image}}'],
+        {
+          encoding: 'utf-8',
+        },
+      );
       if (res.status !== 0) return undefined;
       const [id, image] = res.stdout.trim().split(' ');
       return id && image ? { id, image } : undefined;
@@ -611,7 +749,16 @@ export class DeployController {
     for (const label of labels) {
       const res = spawnSync(
         'docker',
-        ['ps', '--no-trunc', '--filter', 'status=running', '--filter', `label=${label}`, '--format', '{{.ID}}'],
+        [
+          'ps',
+          '--no-trunc',
+          '--filter',
+          'status=running',
+          '--filter',
+          `label=${label}`,
+          '--format',
+          '{{.ID}}',
+        ],
         { encoding: 'utf-8' },
       );
       if (res.status !== 0) continue;

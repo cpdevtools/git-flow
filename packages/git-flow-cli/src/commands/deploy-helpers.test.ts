@@ -18,11 +18,15 @@ import {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a release body with an Artifact Metadata block for the given methods per artifact. */
-function bodyWithDeploy(artifacts: Array<{ type: string; name: string; deploy?: string[]; published?: boolean }>): string {
+function bodyWithDeploy(
+  artifacts: Array<{ type: string; name: string; deploy?: string[]; published?: boolean }>,
+): string {
   const lines = artifacts
     .map((a) => {
       const pub = `\n    published: ${a.published ?? true}`;
-      const deploy = a.deploy ? `\n    deploy:\n${a.deploy.map((m) => `      - ${m}`).join('\n')}` : '';
+      const deploy = a.deploy
+        ? `\n    deploy:\n${a.deploy.map((m) => `      - ${m}`).join('\n')}`
+        : '';
       return `  - type: ${a.type}\n    name: '${a.name}'${pub}${deploy}`;
     })
     .join('\n');
@@ -47,7 +51,12 @@ function assetsFromBody(body: string): { name: string }[] {
 function release(
   id: number,
   tag: string,
-  opts: { prerelease?: boolean; draft?: boolean; body?: string | null; assets?: { name: string }[] } = {},
+  opts: {
+    prerelease?: boolean;
+    draft?: boolean;
+    body?: string | null;
+    assets?: { name: string }[];
+  } = {},
 ): GHRelease {
   const body = opts.body ?? bodyWithDeploy([{ type: 'npm', name: '@org/svc', deploy: ['node'] }]);
   return {
@@ -308,7 +317,9 @@ describe('releaseDeployMethods', () => {
 
   it('returns [] when artifacts have published:false (release mid-publish)', () => {
     const r = release(1, 'v1.0.0/@org/svc', {
-      body: bodyWithDeploy([{ type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'], published: false }]),
+      body: bodyWithDeploy([
+        { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'], published: false },
+      ]),
     });
     expect(releaseDeployMethods(r)).toEqual([]);
   });
@@ -349,7 +360,12 @@ describe('defaultMethod', () => {
 
 describe('parseWorkflowEnvironment', () => {
   it('reads a string jobs.deploy.environment', () => {
-    const yml = ['jobs:', '  deploy:', '    runs-on: ubuntu-latest', '    environment: "Deploy Test"'].join('\n');
+    const yml = [
+      'jobs:',
+      '  deploy:',
+      '    runs-on: ubuntu-latest',
+      '    environment: "Deploy Test"',
+    ].join('\n');
     expect(parseWorkflowEnvironment(yml)).toBe('Deploy Test');
   });
 

@@ -8,10 +8,10 @@
   "scripts": {
     "build": "tsup",
     "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit",
     "github.actions.build": "pnpm build",
-    "github.actions.pack": "gitflow pack"
+    "github.actions.pack": "gitflow pack",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cpdevtools/git-flow-deploy": "workspace:*",

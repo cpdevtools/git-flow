@@ -15,7 +15,8 @@ export async function handleSwarm(options: SwarmHandlerOptions): Promise<void> {
   const stackFile = join(extractDir, 'stack.yml');
   // Must match the stack name in the bundle's own deployCommand, otherwise a
   // later webhook deploy updates a different stack and leaves this one running.
-  const slot = (await bundleSlot(extractDir)) ?? deploymentSlot(PACKAGE_NAME, '0.0.0');
+  const slot =
+    (await bundleSlot(extractDir)) ?? deploymentSlot(PACKAGE_NAME, '0.0.0');
   const stackName = slotStack(slot);
 
   const isDeployed = isStackDeployed(stackName);
@@ -37,7 +38,9 @@ export async function handleSwarm(options: SwarmHandlerOptions): Promise<void> {
 
 function isStackDeployed(stackName: string): boolean {
   try {
-    const result = spawnSync('docker', ['stack', 'services', stackName], { encoding: 'utf-8' });
+    const result = spawnSync('docker', ['stack', 'services', stackName], {
+      encoding: 'utf-8',
+    });
     return result.status === 0;
   } catch {
     return false;

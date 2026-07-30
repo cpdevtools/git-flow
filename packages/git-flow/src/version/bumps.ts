@@ -43,9 +43,7 @@ function advancePrerelease(prerelease: string[]): string[] {
 }
 
 function changeChannel(prerelease: string[], newChannel: Channel): string[] {
-  const idx = prerelease.findIndex((p) =>
-    CHANNEL_ORDER.includes(p.toLowerCase() as Channel),
-  );
+  const idx = prerelease.findIndex((p) => CHANNEL_ORDER.includes(p.toLowerCase() as Channel));
   if (idx === -1) return [newChannel, '0'];
   const result = prerelease.slice(0, idx + 1);
   result[idx] = newChannel;

@@ -56,9 +56,10 @@ export default class PackDeploy extends Command {
     }),
     'artifact-type': Flags.string({
       char: 't',
-      description: "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker')",
+      description:
+        "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker')",
     }),
-    'version': Flags.string({
+    version: Flags.string({
       char: 'v',
       description: 'Package version (overrides PROJECT_VERSION env var)',
     }),
@@ -80,7 +81,9 @@ export default class PackDeploy extends Command {
     // Orchestrator sets ARTIFACT_TYPE before running project scripts; default to 'docker'
     const artifactType = artifactTypeFlag ?? 'docker';
     if (!artifactTypeFlag) {
-      this.warn(`ARTIFACT_TYPE not set; defaulting to 'docker'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`);
+      this.warn(
+        `ARTIFACT_TYPE not set; defaulting to 'docker'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`,
+      );
     }
 
     await mkdir(deployOutputDir, { recursive: true });
@@ -109,4 +112,3 @@ export default class PackDeploy extends Command {
     this.log(`\u2713 pack-deploy-${method} complete`);
   }
 }
-

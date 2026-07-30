@@ -31,15 +31,18 @@ export class ConfigService {
    * boundary (e.g. node → compose) and the new instance finalizes it on boot.
    */
   readonly workDir: string =
-    process.env['DEPLOY_WORK_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'work');
-  readonly sharedStorageBaseDir: string | undefined = process.env['SHARED_STORAGE_BASE_DIR'];
+    process.env['DEPLOY_WORK_DIR'] ??
+    join(homedir(), '.git-flow-deploy-service', 'work');
+  readonly sharedStorageBaseDir: string | undefined =
+    process.env['SHARED_STORAGE_BASE_DIR'];
   /**
    * Durable directory for per-slot deployment state + a saved copy of each
    * slot's currently-running bundle (used to tear down the old mode on a mode
    * change). Defaults under the home dir — NOT the volatile workDir (/tmp).
    */
   readonly stateDir: string =
-    process.env['DEPLOY_STATE_DIR'] ?? join(homedir(), '.git-flow-deploy-service', 'state');
+    process.env['DEPLOY_STATE_DIR'] ??
+    join(homedir(), '.git-flow-deploy-service', 'state');
 
   /**
    * Host directory holding `work/` and `state/`, which the compose/swarm bundles
@@ -57,7 +60,9 @@ export class ConfigService {
   readonly hostRoot: string = ConfigService.resolveHostRoot();
 
   private static resolveHostRoot(): string {
-    const root = process.env['DEPLOY_HOST_ROOT'] ?? join(homedir(), '.git-flow-deploy-service');
+    const root =
+      process.env['DEPLOY_HOST_ROOT'] ??
+      join(homedir(), '.git-flow-deploy-service');
     process.env['DEPLOY_HOST_ROOT'] = root;
     return root;
   }

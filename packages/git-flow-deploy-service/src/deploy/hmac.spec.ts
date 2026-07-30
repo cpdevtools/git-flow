@@ -1,4 +1,8 @@
-import { signRequest, validateHmac, validateTimestamp } from '@cpdevtools/git-flow-deploy';
+import {
+  signRequest,
+  validateHmac,
+  validateTimestamp,
+} from '@cpdevtools/git-flow-deploy';
 
 describe('HMAC helpers', () => {
   const secret = 'test-secret-key';
@@ -25,7 +29,9 @@ describe('HMAC helpers', () => {
   it('validateHmac rejects tampered body', () => {
     const ts = String(Math.floor(Date.now() / 1000));
     const sig = signRequest(secret, ts, body);
-    expect(validateHmac(secret, sig, ts, '{"repo":"evil/repo","release_id":999}')).toBe(false);
+    expect(
+      validateHmac(secret, sig, ts, '{"repo":"evil/repo","release_id":999}'),
+    ).toBe(false);
   });
 
   it('validateHmac rejects tampered timestamp', () => {

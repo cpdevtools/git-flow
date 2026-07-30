@@ -5,11 +5,11 @@
   "description": "Git-based versioning and release workflow automation",
   "scripts": {
     "build": "wireit",
-    "gitflow": "gitflow",
     "check": "wireit",
     "clean": "git clean -dfX && pnpm install && pnpm build && ln -sf ../../packages/git-flow-cli/dist/bin.js node_modules/.bin/gitflow",
     "fix": "wireit",
     "format": "wireit",
+    "gitflow": "gitflow",
     "lint": "pnpm -r lint",
     "prepare": "husky || true",
     "reset": "git reset --hard && pnpm install && pnpm build && ln -sf ../../packages/git-flow-cli/dist/bin.js node_modules/.bin/gitflow",

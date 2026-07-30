@@ -10,7 +10,9 @@ let cached: { name: string; version: string } | undefined;
 export function getServiceInfo(): { name: string; version: string } {
   if (cached) return cached;
   try {
-    const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')) as {
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'),
+    ) as {
       name?: string;
       version?: string;
     };

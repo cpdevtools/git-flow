@@ -46,7 +46,11 @@ interface DeployTarget {
 
 // ─── GitHub API helper ────────────────────────────────────────────────────────
 
-async function gh<T = unknown>(token: string, path: string, options?: RequestInit): Promise<T | null> {
+async function gh<T = unknown>(
+  token: string,
+  path: string,
+  options?: RequestInit,
+): Promise<T | null> {
   const res = await fetch(`https://api.github.com${path}`, {
     ...options,
     headers: {
@@ -111,9 +115,7 @@ async function fetchEnvironmentConfig(
       token,
       `/repos/${owner}/${repo}/environments/${encodeURIComponent(environment)}/variables?per_page=100`,
     );
-    const vars = Object.fromEntries(
-      (res?.variables ?? []).map(({ name, value }) => [name, value]),
-    );
+    const vars = Object.fromEntries((res?.variables ?? []).map(({ name, value }) => [name, value]));
     const allowedMethods = (vars['DEPLOY_ALLOWED_METHODS'] ?? '')
       .split('\n')
       .map((s) => s.trim())
@@ -126,11 +128,7 @@ async function fetchEnvironmentConfig(
   }
 }
 
-async function discoverReleaseBranch(
-  token: string,
-  owner: string,
-  repo: string,
-): Promise<string> {
+async function discoverReleaseBranch(token: string, owner: string, repo: string): Promise<string> {
   const current = getCurrentBranch();
   if (current.startsWith('release/')) return current;
 
@@ -192,7 +190,10 @@ async function discoverDeployTargets(
           `/repos/${owner}/${repo}/contents/.github/workflows/${f.name}?ref=${encodeURIComponent(branch)}`,
         );
         if (file?.content) {
-          const yml = Buffer.from(file.content, (file.encoding as BufferEncoding) ?? 'base64').toString('utf-8');
+          const yml = Buffer.from(
+            file.content,
+            (file.encoding as BufferEncoding) ?? 'base64',
+          ).toString('utf-8');
           environment = parseWorkflowEnvironment(yml) ?? slug;
         }
       } catch {
@@ -299,12 +300,14 @@ export default class Deploy extends Command {
     }),
     set: Flags.string({
       char: 's',
-      description: 'Per-run deploy env override as KEY=VAL (e.g. --set COMPOSE_FILE=docker-compose.netns.yml). Repeatable.',
+      description:
+        'Per-run deploy env override as KEY=VAL (e.g. --set COMPOSE_FILE=docker-compose.netns.yml). Repeatable.',
       multiple: true,
     }),
     'env-file': Flags.string({
       char: 'e',
-      description: 'File of KEY=VAL lines to merge as deploy env. Repeatable; later files override earlier ones.',
+      description:
+        'File of KEY=VAL lines to merge as deploy env. Repeatable; later files override earlier ones.',
       multiple: true,
     }),
     yes: Flags.boolean({
@@ -330,9 +333,7 @@ export default class Deploy extends Command {
     // ── 3. Discover deploy targets ───────────────────────────────────────────
     const targets = await discoverDeployTargets(token, owner, repoName, branch);
     if (targets.length === 0) {
-      this.error(
-        `No deploy workflows found on ${branch}. Expected files matching deploy-*.yml.`,
-      );
+      this.error(`No deploy workflows found on ${branch}. Expected files matching deploy-*.yml.`);
     }
 
     // ── 4. Select target environment ─────────────────────────────────────────
@@ -370,10 +371,14 @@ export default class Deploy extends Command {
       fetchEnvironmentConfig(token, owner, repoName, target.environment),
     ]);
     if (envConfig.allowedMethods.length > 0) {
-      this.log(`Allowed methods in "${target.environment}": ${envConfig.allowedMethods.join(', ')}`);
+      this.log(
+        `Allowed methods in "${target.environment}": ${envConfig.allowedMethods.join(', ')}`,
+      );
     }
     if (releases.length === 0) {
-      this.error('No deployable releases found (no published releases advertising a deploy method).');
+      this.error(
+        'No deployable releases found (no published releases advertising a deploy method).',
+      );
     }
 
     const byPackage = groupByPackage(releases);
@@ -429,9 +434,10 @@ export default class Deploy extends Command {
       const release = selected!;
       const releaseMethods = releaseDeployMethods(release);
       // Intersect with the environment allowlist if one is configured.
-      const methods = envConfig.allowedMethods.length > 0
-        ? releaseMethods.filter((m) => envConfig.allowedMethods.includes(m))
-        : releaseMethods;
+      const methods =
+        envConfig.allowedMethods.length > 0
+          ? releaseMethods.filter((m) => envConfig.allowedMethods.includes(m))
+          : releaseMethods;
       if (methods.length === 0) {
         this.warn(
           `No allowed deploy methods for ${pkg} ${versionFromTag(release.tag_name)} ` +
@@ -449,7 +455,10 @@ export default class Deploy extends Command {
             `Method "${flags.method}" not available for ${pkg} ${versionFromTag(release.tag_name)}. Available: ${releaseMethods.join(', ')}.`,
           );
         }
-        if (envConfig.allowedMethods.length > 0 && !envConfig.allowedMethods.includes(flags.method)) {
+        if (
+          envConfig.allowedMethods.length > 0 &&
+          !envConfig.allowedMethods.includes(flags.method)
+        ) {
           this.error(
             `Method "${flags.method}" is not allowed in environment "${target.environment}". Allowed: ${envConfig.allowedMethods.join(', ')}.`,
           );
@@ -459,9 +468,10 @@ export default class Deploy extends Command {
         method = methods[0];
       } else {
         // Pre-select: environment DEPLOY_TYPE_DEFAULT > first advertised method
-        const dflt = (envConfig.defaultMethod && methods.includes(envConfig.defaultMethod))
-          ? envConfig.defaultMethod
-          : defaultMethod(methods);
+        const dflt =
+          envConfig.defaultMethod && methods.includes(envConfig.defaultMethod)
+            ? envConfig.defaultMethod
+            : defaultMethod(methods);
         const r = await prompts({
           type: 'select',
           name: 'method',

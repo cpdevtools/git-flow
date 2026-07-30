@@ -2,11 +2,6 @@
   "name": "@cpdevtools/git-flow-deploy-service",
   "version": "0.0.0-MAIN",
   "description": "Deploy gateway service for git-flow",
-  "author": "CPDevTools",
-  "license": "MIT",
-  "files": [
-    "dist"
-  ],
   "bin": {
     "gitflow-deploy-service": "./dist/cli.cjs"
   },
@@ -17,16 +12,16 @@
     "github.actions.pack": "gitflow pack",
     "github.actions.test": "pnpm test",
     "github.actions.test:integration": "pnpm test:e2e",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "start": "nest start",
+    "start:debug": "nest start --debug --watch",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main",
     "test": "jest",
-    "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:watch": "jest --watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -46,7 +41,7 @@
     "@nestjs/testing": "^11.0.1",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^20.17.11",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -61,9 +56,14 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsup": "^8.5.1",
-    "typescript": "^5.7.3",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"
   },
+  "author": "CPDevTools",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
   "jest": {
     "moduleFileExtensions": [
       "js",

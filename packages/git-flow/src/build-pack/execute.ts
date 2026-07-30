@@ -16,9 +16,19 @@ import {
   type DeployMethodContext,
   type UploadContext,
 } from '../artifacts/index.js';
-import { deploymentSlot, safeName, slotStack, majorVersion, type VersioningStrategy } from '../artifacts/slot.js';
+import {
+  deploymentSlot,
+  safeName,
+  slotStack,
+  majorVersion,
+  type VersioningStrategy,
+} from '../artifacts/slot.js';
 import { findOrCreateDraftRelease, uploadArtifact, markReleasePublished } from './github.js';
-import { generateArtifactDescriptor, loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
+import {
+  generateArtifactDescriptor,
+  loadArtifactConfig,
+  ARTIFACT_OUTPUT_DIR,
+} from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
 
@@ -272,7 +282,9 @@ async function executePackDeploy(
 ): Promise<void> {
   type WithDeploy = { deploy?: string[]; versioning?: string };
   const artifactsWithDeploy = descriptor.artifacts.filter(
-    (a: Artifact) => Array.isArray((a as unknown as WithDeploy).deploy) && ((a as unknown as WithDeploy).deploy as string[]).length > 0,
+    (a: Artifact) =>
+      Array.isArray((a as unknown as WithDeploy).deploy) &&
+      ((a as unknown as WithDeploy).deploy as string[]).length > 0,
   );
 
   if (artifactsWithDeploy.length > 0) {
@@ -281,7 +293,11 @@ async function executePackDeploy(
     for (const artifact of artifactsWithDeploy) {
       const methods = (artifact as unknown as WithDeploy).deploy as string[];
       const rawVersioning = (artifact as unknown as WithDeploy).versioning;
-      if (rawVersioning !== undefined && rawVersioning !== 'singleton' && rawVersioning !== 'major') {
+      if (
+        rawVersioning !== undefined &&
+        rawVersioning !== 'singleton' &&
+        rawVersioning !== 'major'
+      ) {
         throw new Error(
           `Invalid versioning '${rawVersioning}' on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected 'singleton' or 'major'.`,
         );
@@ -376,7 +392,9 @@ async function executePackDeploy(
         }
         const deployMeta = parse(await readFile(deployYmlPath, 'utf-8')) as Record<string, unknown>;
         if (!deployMeta.deployCommand) {
-          throw new Error(`deploy.yml produced by pack-deploy-${method} is missing required field: deployCommand`);
+          throw new Error(
+            `deploy.yml produced by pack-deploy-${method} is missing required field: deployCommand`,
+          );
         }
         // Ensure mode-change fields are present. Built-in handlers already emit
         // method/slot/versioning/teardownCommand; custom .deploy/ folders or
@@ -507,13 +525,17 @@ export async function executeUpload(
     // Determine if the new convention path was used (deploy: arrays on artifacts)
     type WithDeploy = { deploy?: string[] };
     const hasConventionDeploy = descriptor.artifacts.some(
-      (a: Artifact) => Array.isArray((a as unknown as WithDeploy).deploy) && ((a as unknown as WithDeploy).deploy as string[]).length > 0,
+      (a: Artifact) =>
+        Array.isArray((a as unknown as WithDeploy).deploy) &&
+        ((a as unknown as WithDeploy).deploy as string[]).length > 0,
     );
 
     // Re-read descriptor for legacy path — pack-deploy may have updated deploy artifact paths
     const uploadDescriptor = hasConventionDeploy
       ? descriptor
-      : (parseDocument(await readFile(artifactPath, 'utf-8')).toJSON() as ProjectArtifactDescriptor);
+      : (parseDocument(
+          await readFile(artifactPath, 'utf-8'),
+        ).toJSON() as ProjectArtifactDescriptor);
 
     for (const artifact of uploadDescriptor.artifacts) {
       // Convention deploy bundles are already uploaded inside executePackDeploy; skip type:deploy entries
@@ -527,12 +549,7 @@ export async function executeUpload(
     // This is the gate the deploy CLI checks before showing a release as
     // deployable — a release mid-publish has metadata but no published:true,
     // so it won't appear until every asset is uploaded.
-    await markReleasePublished(
-      context.githubToken,
-      owner,
-      repo,
-      release.id,
-    );
+    await markReleasePublished(context.githubToken, owner, repo, release.id);
 
     return {
       project: project.name,

@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DeployStore } from './deploy-store';
@@ -27,15 +34,27 @@ function logPath(id: number): string {
 }
 
 function readLog(id: number): string[] {
-  return existsSync(logPath(id)) ? readFileSync(logPath(id), 'utf-8').split('\n').slice(0, -1) : [];
+  return existsSync(logPath(id))
+    ? readFileSync(logPath(id), 'utf-8').split('\n').slice(0, -1)
+    : [];
 }
 
 /** Seed a persisted record on disk (as if written by a prior service instance). */
-function seed(id: number, meta: Record<string, unknown>, logLines: string[]): void {
+function seed(
+  id: number,
+  meta: Record<string, unknown>,
+  logLines: string[],
+): void {
   const dir = join(workDir, String(id));
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'deploy-record.json'), JSON.stringify({ releaseId: id, ...meta }));
-  writeFileSync(join(dir, 'deploy.log'), logLines.map((l) => l + '\n').join(''));
+  writeFileSync(
+    join(dir, 'deploy-record.json'),
+    JSON.stringify({ releaseId: id, ...meta }),
+  );
+  writeFileSync(
+    join(dir, 'deploy.log'),
+    logLines.map((l) => l + '\n').join(''),
+  );
 }
 
 async function waitFor(fn: () => boolean, timeoutMs = 4000): Promise<void> {
@@ -110,7 +129,9 @@ describe('DeployStore', () => {
     const record = store.start(1, 'owner/repo');
     store.setSelfUpdate(record);
     expect(record.selfUpdate).toBe(true);
-    const meta = JSON.parse(readFileSync(join(workDir, '1', 'deploy-record.json'), 'utf-8'));
+    const meta = JSON.parse(
+      readFileSync(join(workDir, '1', 'deploy-record.json'), 'utf-8'),
+    );
     expect(meta.selfUpdate).toBe(true);
   });
 
@@ -128,7 +149,12 @@ describe('DeployStore', () => {
     it('reconciles a record whose log already contains a terminal EXIT', () => {
       seed(
         10,
-        { repo: 'o/r', status: 'running', startedAt: new Date().toISOString(), selfUpdate: true },
+        {
+          repo: 'o/r',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          selfUpdate: true,
+        },
         ['line one', 'line two', 'EXIT:0'],
       );
 
@@ -141,20 +167,31 @@ describe('DeployStore', () => {
     });
 
     it('marks a non-self-update running record as failed (no false success)', () => {
-      seed(11, { repo: 'o/r', status: 'running', startedAt: new Date().toISOString() }, ['some progress']);
+      seed(
+        11,
+        { repo: 'o/r', status: 'running', startedAt: new Date().toISOString() },
+        ['some progress'],
+      );
 
       store.onModuleInit();
 
       const record = store.get(11)!;
       expect(record.status).toBe('failed');
       expect(record.log[record.log.length - 1]).toBe('EXIT:1');
-      expect(record.log.some((l) => l.includes('restarted unexpectedly'))).toBe(true);
+      expect(record.log.some((l) => l.includes('restarted unexpectedly'))).toBe(
+        true,
+      );
     });
 
     it('resumes tailing a self-update record and finalizes when EXIT is appended externally', async () => {
       seed(
         12,
-        { repo: 'o/r', status: 'running', startedAt: new Date().toISOString(), selfUpdate: true },
+        {
+          repo: 'o/r',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          selfUpdate: true,
+        },
         ['handed off; awaiting restart…'],
       );
 
@@ -173,7 +210,12 @@ describe('DeployStore', () => {
       // Simulate the detached restart supervisor appending its output + EXIT.
       writeFileSync(
         logPath(12),
-        ['handed off; awaiting restart…', '▸ pm2 restart svc', '✓ Restart verified', 'EXIT:0']
+        [
+          'handed off; awaiting restart…',
+          '▸ pm2 restart svc',
+          '✓ Restart verified',
+          'EXIT:0',
+        ]
           .map((l) => l + '\n')
           .join(''),
       );
@@ -181,14 +223,23 @@ describe('DeployStore', () => {
       await waitFor(() => done);
 
       expect(record.status).toBe('completed');
-      expect(streamed).toEqual(['▸ pm2 restart svc', '✓ Restart verified', 'EXIT:0']);
+      expect(streamed).toEqual([
+        '▸ pm2 restart svc',
+        '✓ Restart verified',
+        'EXIT:0',
+      ]);
       expect(record.log[record.log.length - 1]).toBe('EXIT:0');
     });
 
     it('resume tail finalizes as failed on a non-zero external EXIT', async () => {
       seed(
         13,
-        { repo: 'o/r', status: 'running', startedAt: new Date().toISOString(), selfUpdate: true },
+        {
+          repo: 'o/r',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          selfUpdate: true,
+        },
         ['awaiting restart…'],
       );
 
@@ -202,7 +253,9 @@ describe('DeployStore', () => {
 
       writeFileSync(
         logPath(13),
-        ['awaiting restart…', '✗ Version mismatch', 'EXIT:1'].map((l) => l + '\n').join(''),
+        ['awaiting restart…', '✗ Version mismatch', 'EXIT:1']
+          .map((l) => l + '\n')
+          .join(''),
       );
 
       await waitFor(() => done);
@@ -230,7 +283,9 @@ describe('DeployStore', () => {
       // confirms the update itself because it is already running the target.
       expect(record.status).toBe('completed');
       expect(record.log[record.log.length - 1]).toBe('EXIT:0');
-      expect(record.log.some((l) => l.includes('Restart verified on boot'))).toBe(true);
+      expect(
+        record.log.some((l) => l.includes('Restart verified on boot')),
+      ).toBe(true);
       expect(record.tailTimer).toBeUndefined();
       expect(store.isRunning(14)).toBe(false);
     });
