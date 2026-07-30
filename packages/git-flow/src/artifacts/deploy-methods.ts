@@ -185,7 +185,7 @@ registerDeployMethod('docker', 'compose', {
         // host port mapping ever being established — the service then runs but
         // is unreachable, so the deploy "succeeds" while health checks fail.
         // Recreating unconditionally keeps each deploy deterministic.
-        deployCommand: `docker compose -p ${slot} pull && docker compose -p ${slot} up -d --force-recreate --remove-orphans`,
+        deployCommand: `echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker compose -p ${slot} pull && docker compose -p ${slot} up -d --force-recreate --remove-orphans`,
         teardownCommand: `docker compose -p ${slot} down`,
       }),
     );

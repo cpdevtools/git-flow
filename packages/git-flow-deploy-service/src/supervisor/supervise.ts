@@ -42,7 +42,12 @@ export async function runSupervisor(planPath: string): Promise<number> {
     }
   };
   const run = (step: SupervisorStep): Promise<number> =>
-    runDeploy({ deployCommand: step.command }, step.cwd, log, plan.env).catch(
+    runDeploy(
+      { deployCommand: step.command },
+      step.cwd,
+      log,
+      step.env !== undefined ? { ...plan.env, ...step.env } : plan.env,
+    ).catch(
       (err: Error) => {
         log(`▸ Error: ${err.message}`);
         return 1;
@@ -57,7 +62,7 @@ export async function runSupervisor(planPath: string): Promise<number> {
       { deployCommand: step.command },
       step.cwd,
       (line) => { if (!line.startsWith('EXIT:')) log(line); },
-      plan.env,
+      step.env !== undefined ? { ...plan.env, ...step.env } : plan.env,
     ).catch((err: Error) => {
       log(`▸ Error: ${err.message}`);
       return 1;

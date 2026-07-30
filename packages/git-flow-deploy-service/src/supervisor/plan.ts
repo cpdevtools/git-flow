@@ -16,6 +16,10 @@ export interface SupervisorStep {
   cwd: string;
   /** Shell command line (executed with `shell: true`). */
   command: string;
+  /** Per-step environment overrides. When present, merged over plan.env.
+   * Use this to run teardown/rollback with the PRIOR deployment's env
+   * rather than the current deploy's env. */
+  env?: Record<string, string>;
 }
 
 /** Paths committed atomically once the deploy step succeeds. */
