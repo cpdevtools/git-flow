@@ -8,6 +8,7 @@ artifacts:
   - type: docker
     registries:
       - ghcr
+    versioning: major
     deploy:
       - compose
       - swarm

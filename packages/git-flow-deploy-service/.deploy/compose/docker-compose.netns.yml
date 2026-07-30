@@ -48,7 +48,7 @@
 # host, so host and local paths are identical and, with COMPOSE_FILE unset,
 # `docker compose` uses docker-compose.yml and publishes 3700 on the host.
 services:
-  git-flow-deploy-service:
+  __SERVICE_ID__:
     image: ghcr.io/cpdevtools/git-flow-deploy-service:${DEPLOY_IMAGE_TAG:?DEPLOY_IMAGE_TAG must be set (gitflow writes it into the bundle .env as the release version)}
     # Share the dev container's network namespace (no `ports:` allowed here).
     network_mode: "container:${DEPLOY_NETNS_CONTAINER:?DEPLOY_NETNS_CONTAINER must name the dev container whose network namespace to join}"

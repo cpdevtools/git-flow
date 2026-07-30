@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { resolveVersion } from './resolve.js';
 
-describe('resolveVersion - Mainline Branches', () => {
+// Each test calls resolveVersion which may run `git ls-remote --tags origin`
+// (itself capped at 10s). Give tests enough headroom for slow CI networks.
+const TEST_TIMEOUT = 30_000;
+
+describe('resolveVersion - Mainline Branches', { timeout: TEST_TIMEOUT }, () => {
   const versionsByPlaceholder = {
     '0.0.0-DEFAULT': '2.0.0',
     '0.0.0-V1_8_LTS': '1.8.5',
@@ -57,7 +61,7 @@ describe('resolveVersion - Mainline Branches', () => {
   });
 });
 
-describe('resolveVersion - Development Branches', () => {
+describe('resolveVersion - Development Branches', { timeout: TEST_TIMEOUT }, () => {
   const versionsByPlaceholder = {
     '0.0.0-DEFAULT': '2.0.0',
     '0.0.0-BETA': '2.0.0-beta.0',
@@ -108,7 +112,7 @@ describe('resolveVersion - Development Branches', () => {
   });
 });
 
-describe('resolveVersion - Edge Cases', () => {
+describe('resolveVersion - Edge Cases', { timeout: TEST_TIMEOUT }, () => {
   it('should throw error for missing placeholder', async () => {
     await expect(
       resolveVersion({
@@ -141,7 +145,7 @@ describe('resolveVersion - Edge Cases', () => {
   });
 });
 
-describe('resolveVersion - Quick Lookup Table Examples', () => {
+describe('resolveVersion - Quick Lookup Table Examples', { timeout: TEST_TIMEOUT }, () => {
   const versionsByPlaceholder = {
     '0.0.0-DEFAULT': '2.0.0',
     '0.0.0-V1_8_LTS': '1.8.5',
