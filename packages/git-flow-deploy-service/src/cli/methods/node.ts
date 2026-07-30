@@ -195,9 +195,15 @@ async function updateExisting(
 
   installGlobally(version, token, npmPrefix);
 
-  // Re-patch env vars in ecosystem.config.js (port/host may have changed)
+  // Re-patch env vars in ecosystem.config.js (port/host may have changed).
+  // Also carry forward any operator-set vars (DEPLOY_WORK_DIR, COMPOSE_FILE,
+  // DEPLOY_HOST_ROOT, etc.) that the CLI doesn't manage — the ecosystem file
+  // from the new bundle starts fresh, so without this they'd be wiped when pm2
+  // restarts from the file with --update-env.
   const ecoPath = join(extractDir, 'ecosystem.config.js');
+  const currentPm2Env = getCurrentPm2Env(npmPrefix);
   const envVars: Record<string, string> = {
+    ...currentPm2Env,
     GITHUB_TOKEN: token,
     GITFLOW_NPM_PREFIX: npmPrefix,
     ...(port ? { PORT: port } : {}),
@@ -274,6 +280,35 @@ function isPm2AppRunning(prefix: string): boolean {
     return result.status === 0 && result.stdout.includes(PM2_APP_NAME);
   } catch {
     return false;
+  }
+}
+
+/**
+ * Read the current pm2 env for our app (best-effort). Returns the vars the
+ * operator set on the running process (e.g. DEPLOY_WORK_DIR, COMPOSE_FILE) so
+ * they can be preserved when the ecosystem file is patched and the process is
+ * restarted. Returns an empty object when the process isn't running or pm2 is
+ * unavailable.
+ */
+function getCurrentPm2Env(prefix: string): Record<string, string> {
+  try {
+    const env = withGlobalBinInPath(prefix);
+    const result = spawnSync(pm2Bin(prefix), ['jlist'], { encoding: 'utf-8', env });
+    if (result.status !== 0 || !result.stdout) return {};
+    const list = JSON.parse(result.stdout) as Array<{ name: string; pm2_env?: Record<string, unknown> }>;
+    const app = list.find((p) => p.name === PM2_APP_NAME);
+    if (!app?.pm2_env) return {};
+    // Only forward vars that look like operator-set deployment config.
+    // Skip pm2 internals (pm_*), NODE_*, PATH etc.
+    const skip = new Set(['NODE_ENV', 'PORT', 'HOST', 'GITHUB_TOKEN', 'GITFLOW_NPM_PREFIX', 'NODE_VERSION', 'NODE_PATH', 'PATH', 'HOME', 'SHELL', 'USER', 'LOGNAME', 'PWD', 'OLDPWD', 'SHLVL', '_']);
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(app.pm2_env)) {
+      if (k.startsWith('pm_') || k.startsWith('PM2_') || skip.has(k) || typeof v !== 'string') continue;
+      out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
   }
 }
 

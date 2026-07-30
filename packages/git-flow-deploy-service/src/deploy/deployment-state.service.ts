@@ -39,6 +39,9 @@ export interface DeploymentState {
   teardownCommand?: string;
   /** The deploy command that brought this mode up (used for rollback). */
   deployCommand: string;
+  /** Environment variables that were active when this deployment was made.
+   * Used to re-apply the same env when tearing down or rolling back to this slot. */
+  env?: Record<string, string>;
   /** ISO timestamp of the last successful save. */
   updatedAt: string;
 }

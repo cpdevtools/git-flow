@@ -381,7 +381,7 @@ export class DeployController {
       // about to restart, so persist now — before handing off.
       if (exitCode === 0) {
         try {
-          this.state.save(this.buildState(manifest, slot, versioning), workDir);
+          this.state.save(this.buildState(manifest, slot, versioning, env), workDir);
         } catch (err) {
           this.store.appendLine(
             record,
@@ -399,7 +399,7 @@ export class DeployController {
           record,
           prior.deployCommand,
           prior.bundleDir,
-          env,
+          prior.env,
         );
         this.store.appendLine(
           record,
@@ -455,6 +455,7 @@ export class DeployController {
     manifest: DeployManifest,
     slot: string,
     versioning: 'singleton' | 'major',
+    env?: Record<string, string>,
   ): DeploymentStateInput {
     return {
       slot,
@@ -465,6 +466,7 @@ export class DeployController {
       versioning,
       teardownCommand: manifest.teardownCommand,
       deployCommand: manifest.deployCommand,
+      env,
     };
   }
 
@@ -486,6 +488,7 @@ export class DeployController {
       bundleDir: string;
       teardownCommand?: string;
       deployCommand: string;
+      env?: Record<string, string>;
     },
     env?: Record<string, string>,
   ): void {
@@ -508,16 +511,16 @@ export class DeployController {
       label: `self mode-change ${from} → ${to} (v${manifest.version})`,
       delayMs: SUPERVISOR_DELAY_MS,
       teardown: prior.teardownCommand
-        ? { cwd: prior.bundleDir, command: prior.teardownCommand }
+        ? { cwd: prior.bundleDir, command: prior.teardownCommand, env: prior.env }
         : undefined,
       deploy: { cwd: workDir, command: manifest.deployCommand },
-      rollback: { cwd: prior.bundleDir, command: prior.deployCommand },
+      rollback: { cwd: prior.bundleDir, command: prior.deployCommand, env: prior.env },
       commit: {
         currentDir: this.state.currentBundleDir(slot),
         newBundle: workDir,
         stateFile: this.state.stateFile(slot),
         stateNewFile: this.state.stageState(
-          this.buildState(manifest, slot, versioning),
+          this.buildState(manifest, slot, versioning, env),
         ),
       },
       env,
@@ -603,7 +606,7 @@ export class DeployController {
     workDir: string,
     slot: string,
     versioning: 'singleton' | 'major',
-    prior: { bundleDir: string; deployCommand: string } | undefined,
+    prior: { bundleDir: string; deployCommand: string; env?: Record<string, string> } | undefined,
     env?: Record<string, string>,
   ): boolean {
     const plan: SupervisorPlan = {
@@ -614,14 +617,14 @@ export class DeployController {
       delayMs: SUPERVISOR_DELAY_MS,
       deploy: { cwd: workDir, command: manifest.deployCommand },
       rollback: prior
-        ? { cwd: prior.bundleDir, command: prior.deployCommand }
+        ? { cwd: prior.bundleDir, command: prior.deployCommand, env: prior.env }
         : undefined,
       commit: {
         currentDir: this.state.currentBundleDir(slot),
         newBundle: workDir,
         stateFile: this.state.stateFile(slot),
         stateNewFile: this.state.stageState(
-          this.buildState(manifest, slot, versioning),
+          this.buildState(manifest, slot, versioning, env),
         ),
       },
       env,
