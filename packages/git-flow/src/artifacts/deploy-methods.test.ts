@@ -69,21 +69,22 @@ describe('docker.compose generateDeployYml', () => {
 });
 
 describe('docker.swarm generateDeployYml', () => {
-  it('singleton: stack name uses underscores', async () => {
+  it('singleton: deployCommand and teardownCommand use __STACK__ token', async () => {
     await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm'));
     const m = await readDeployYml();
     expect(m.method).toBe('swarm');
     expect(m.slot).toBe('org-svc');
-    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml org_svc');
-    expect(m.teardownCommand).toBe('docker stack rm org_svc');
+    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__');
+    expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });
 
-  it('major: stack name includes _v<major>', async () => {
+  it('major: slot is versioned, __STACK__ token is present for substitution', async () => {
     await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
     const m = await readDeployYml();
     expect(m.slot).toBe('org-svc-v2');
-    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml org_svc_v2');
-    expect(m.teardownCommand).toBe('docker stack rm org_svc_v2');
+    // __STACK__ is resolved to slotStack(slot) by substituteDeployTokens at pack time
+    expect(m.deployCommand).toBe('set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__');
+    expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });
 
   it('pins the image to the release version via .env', async () => {

@@ -218,8 +218,12 @@ registerDeployMethod('docker', 'swarm', {
         method: 'swarm',
         slot: deploymentSlot(projectName, version, versioning),
         versioning: versioning ?? 'singleton',
-        deployCommand: `set -a && . ./.env && set +a && docker stack deploy -c stack.yml ${stackName}`,
-        teardownCommand: `docker stack rm ${stackName}`,
+        // __SERVICE_ID__ and __STACK__ are substituted at pack time by
+        // substituteDeployTokens — they resolve correctly in YAML map keys
+        // (where runtime ${VAR} interpolation does not work) and let
+        // projects use them in stack.yml service names too.
+        deployCommand: `set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__`,
+        teardownCommand: `docker stack rm __STACK__`,
       }),
     );
   },
