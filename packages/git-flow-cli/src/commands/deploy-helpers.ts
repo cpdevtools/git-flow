@@ -183,14 +183,20 @@ export function extractArtifactMetadata(
 
 /**
  * Deploy methods advertised by a release, derived from its Artifact Metadata.
- * Returns the de-duplicated union of every artifact's `deploy` array, preserving
- * declaration order. Each method `m` corresponds to a `deploy-<m>.zip` asset.
+ * Returns only methods that are:
+ *   1. Marked published:true on their artifact entry (all assets uploaded)
+ *   2. Have their deploy-<m>.zip asset present (belt-and-suspenders)
+ *
+ * A release mid-publish has metadata but not published:true, so it won't
+ * appear in the deploy list until the publish workflow completes.
  */
 export function releaseDeployMethods(release: GHRelease): string[] {
   const descriptor = extractArtifactMetadata(release.body);
   if (!descriptor?.artifacts) return [];
   const methods: string[] = [];
-  for (const artifact of descriptor.artifacts) {
+  for (const artifact of descriptor.artifacts as (MetadataArtifact & { published?: boolean })[]) {
+    // Require explicit published:true — mid-publish releases have published:false
+    if (artifact.published !== true) continue;
     if (!Array.isArray(artifact.deploy)) continue;
     for (const method of artifact.deploy) {
       if (typeof method === 'string' && method && !methods.includes(method)) {
@@ -198,7 +204,9 @@ export function releaseDeployMethods(release: GHRelease): string[] {
       }
     }
   }
-  return methods;
+  // Belt-and-suspenders: also verify the asset zip is present
+  const assetNames = new Set(release.assets.map((a) => a.name));
+  return methods.filter((m) => assetNames.has(`deploy-${m}.zip`));
 }
 
 /** A release is deployable when its Artifact Metadata advertises ≥1 deploy method. */

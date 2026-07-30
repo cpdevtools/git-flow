@@ -17,7 +17,7 @@ import {
   type UploadContext,
 } from '../artifacts/index.js';
 import { deploymentSlot, safeName, slotStack, majorVersion, type VersioningStrategy } from '../artifacts/slot.js';
-import { findOrCreateDraftRelease, uploadArtifact } from './github.js';
+import { findOrCreateDraftRelease, uploadArtifact, markReleasePublished } from './github.js';
 import { generateArtifactDescriptor, loadArtifactConfig, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
@@ -522,6 +522,17 @@ export async function executeUpload(
     }
 
     console.log(`✓ ${project.name}: Upload completed`);
+
+    // Mark all artifacts published:true in the release metadata.
+    // This is the gate the deploy CLI checks before showing a release as
+    // deployable — a release mid-publish has metadata but no published:true,
+    // so it won't appear until every asset is uploaded.
+    await markReleasePublished(
+      context.githubToken,
+      owner,
+      repo,
+      release.id,
+    );
 
     return {
       project: project.name,

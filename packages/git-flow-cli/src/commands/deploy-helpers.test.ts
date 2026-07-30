@@ -18,22 +18,38 @@ import {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a release body with an Artifact Metadata block for the given methods per artifact. */
-function bodyWithDeploy(artifacts: Array<{ type: string; name: string; deploy?: string[] }>): string {
+function bodyWithDeploy(artifacts: Array<{ type: string; name: string; deploy?: string[]; published?: boolean }>): string {
   const lines = artifacts
     .map((a) => {
+      const pub = `\n    published: ${a.published ?? true}`;
       const deploy = a.deploy ? `\n    deploy:\n${a.deploy.map((m) => `      - ${m}`).join('\n')}` : '';
-      return `  - type: ${a.type}\n    name: '${a.name}'${deploy}`;
+      return `  - type: ${a.type}\n    name: '${a.name}'${pub}${deploy}`;
     })
     .join('\n');
   const yaml = `project: '@org/svc'\nartifacts:\n${lines}`;
   return `📋 **Created from PR:** #12\n\n## Artifact Metadata\n\`\`\`yaml\n${yaml}\n\`\`\``;
 }
 
+/** Derive deploy asset names from a body string (deploy-<method>.zip for each advertised method). */
+function assetsFromBody(body: string): { name: string }[] {
+  const matches = body.matchAll(/^\s*-\s*(\w+)\s*$/gm);
+  const methods = new Set<string>();
+  // Rough parse: any line that's a bare word under a 'deploy:' key
+  const deployBlocks = body.match(/deploy:[\s\S]*?(?=\n  -|\n\w|$)/g) ?? [];
+  for (const block of deployBlocks) {
+    for (const m of block.matchAll(/^\s*-\s*(\w+)\s*$/gm)) {
+      methods.add(m[1]);
+    }
+  }
+  return [...methods].map((m) => ({ name: `deploy-${m}.zip` }));
+}
+
 function release(
   id: number,
   tag: string,
-  opts: { prerelease?: boolean; draft?: boolean; body?: string | null } = {},
+  opts: { prerelease?: boolean; draft?: boolean; body?: string | null; assets?: { name: string }[] } = {},
 ): GHRelease {
+  const body = opts.body ?? bodyWithDeploy([{ type: 'npm', name: '@org/svc', deploy: ['node'] }]);
   return {
     id,
     tag_name: tag,
@@ -42,8 +58,10 @@ function release(
     prerelease: opts.prerelease ?? false,
     target_commitish: 'main',
     created_at: new Date(id * 1000).toISOString(),
-    assets: [],
-    body: opts.body ?? bodyWithDeploy([{ type: 'npm', name: '@org/svc', deploy: ['node'] }]),
+    // Default: auto-derive deploy asset names from the body so tests don't need
+    // to manually maintain the asset list alongside the method declarations.
+    assets: opts.assets ?? (body ? assetsFromBody(body) : []),
+    body,
   };
 }
 
@@ -284,6 +302,13 @@ describe('releaseDeployMethods', () => {
   it('returns [] when no artifact declares a deploy array', () => {
     const r = release(1, 'v1.0.0/@org/svc', {
       body: bodyWithDeploy([{ type: 'npm', name: '@org/svc' }]),
+    });
+    expect(releaseDeployMethods(r)).toEqual([]);
+  });
+
+  it('returns [] when artifacts have published:false (release mid-publish)', () => {
+    const r = release(1, 'v1.0.0/@org/svc', {
+      body: bodyWithDeploy([{ type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'], published: false }]),
     });
     expect(releaseDeployMethods(r)).toEqual([]);
   });
