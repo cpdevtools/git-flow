@@ -18,11 +18,12 @@ import {
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 /** Build a release body with an Artifact Metadata block for the given methods per artifact. */
-function bodyWithDeploy(artifacts: Array<{ type: string; name: string; deploy?: string[] }>): string {
+function bodyWithDeploy(artifacts: Array<{ type: string; name: string; deploy?: string[]; published?: boolean }>): string {
   const lines = artifacts
     .map((a) => {
+      const pub = `\n    published: ${a.published ?? true}`;
       const deploy = a.deploy ? `\n    deploy:\n${a.deploy.map((m) => `      - ${m}`).join('\n')}` : '';
-      return `  - type: ${a.type}\n    name: '${a.name}'${deploy}`;
+      return `  - type: ${a.type}\n    name: '${a.name}'${pub}${deploy}`;
     })
     .join('\n');
   const yaml = `project: '@org/svc'\nartifacts:\n${lines}`;
@@ -284,6 +285,13 @@ describe('releaseDeployMethods', () => {
   it('returns [] when no artifact declares a deploy array', () => {
     const r = release(1, 'v1.0.0/@org/svc', {
       body: bodyWithDeploy([{ type: 'npm', name: '@org/svc' }]),
+    });
+    expect(releaseDeployMethods(r)).toEqual([]);
+  });
+
+  it('returns [] when artifacts have published:false (release mid-publish)', () => {
+    const r = release(1, 'v1.0.0/@org/svc', {
+      body: bodyWithDeploy([{ type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'], published: false }]),
     });
     expect(releaseDeployMethods(r)).toEqual([]);
   });
