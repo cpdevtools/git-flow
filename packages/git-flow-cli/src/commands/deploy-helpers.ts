@@ -86,7 +86,10 @@ export function compareVersions(a: string, b: string): number {
 
 /**
  * Group releases by package name (extracted from tag).
- * Each group is sorted newest-first by version.
+ * Each group is sorted newest-first by creation timestamp so releases from
+ * different pre-release channels (e.g. `dev.*` and `alpha.*`) interleave
+ * correctly — pure semver ordering puts `alpha < dev` alphabetically and would
+ * push a newer alpha release below older dev ones.
  * Releases with non-gitflow tags are excluded.
  */
 export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[]> {
@@ -97,8 +100,10 @@ export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[
     (groups[pkg] ??= []).push(r);
   }
   for (const pkg of Object.keys(groups)) {
-    groups[pkg].sort((a, b) =>
-      compareVersions(versionFromTag(b.tag_name), versionFromTag(a.tag_name)),
+    // Sort newest-first by creation time; GitHub returns releases newest-first
+    // so in practice this just preserves order, but be explicit.
+    groups[pkg].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
   }
   return groups;
@@ -123,16 +128,21 @@ export function resolveVersionKeyword(
   return releases.find((r) => versionFromTag(r.tag_name) === keyword);
 }
 
+/** Sentinel value returned when the user selects "Show more versions...". */
+export const LOAD_MORE = '__load_more__' as const;
+
 // ─── prompt choices ───────────────────────────────────────────────────────────
 
 /**
  * Build a version choice list for a package's releases.
  * Always puts `next` and `latest` at the top (with version labels),
- * followed by up to 5 additional recent releases.
+ * followed by recent releases. When `showAll` is false (default) and there
+ * are more than the visible window, a "Show N more..." sentinel is appended.
  *
- * Assumes releases are already sorted newest-first.
+ * Assumes releases are already sorted newest-first by creation time.
  */
-export function buildVersionChoices(releases: GHRelease[]): prompts.Choice[] {
+export function buildVersionChoices(releases: GHRelease[], showAll = false): prompts.Choice[] {
+  const VISIBLE = 5; // additional entries below next/latest
   const choices: prompts.Choice[] = [];
   const seen = new Set<number>();
 
@@ -149,12 +159,22 @@ export function buildVersionChoices(releases: GHRelease[]): prompts.Choice[] {
     seen.add(latest.id);
   }
 
+  let shown = 0;
   for (const r of releases) {
     if (seen.has(r.id)) continue;
-    if (choices.length >= 7) break;
+    if (!showAll && shown >= VISIBLE) break;
     const ver = versionFromTag(r.tag_name);
     choices.push({ title: `${ver}${r.prerelease ? ' (pre-release)' : ''}`, value: r });
     seen.add(r.id);
+    shown++;
+  }
+
+  const remaining = releases.filter((r) => !seen.has(r.id)).length;
+  if (!showAll && remaining > 0) {
+    choices.push({
+      title: `⇧  Show ${remaining} more version${remaining === 1 ? '' : 's'}...`,
+      value: LOAD_MORE,
+    });
   }
 
   return choices;
