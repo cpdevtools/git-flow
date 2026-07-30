@@ -49,6 +49,15 @@ function parseEnvLines(raw: string): Record<string, string> | undefined {
 
 const deployEnv = parseEnvLines(process.env['INPUT_DEPLOY_ENV'] ?? '');
 
+// Comma-separated allowlist of deploy methods for this environment.
+// Set via DEPLOY_ALLOWED_METHODS GitHub Environment variable, surfaced through
+// the workflow's env: block. NOT a workflow_dispatch input — that would let
+// callers bypass the restriction.
+const allowedMethods = (process.env['INPUT_ALLOWED_METHODS'] ?? '')
+  .split('\n')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 if (!repo || !releaseIdRaw || !deployUrl || !deployToken) {
   core.setFailed('Missing required inputs: repo, release_id, deploy_url, hmac_secret');
   process.exit(1);
@@ -266,6 +275,16 @@ async function run(): Promise<void> {
   const deployRef = tag ?? githubSha;
   const deploymentId = await createDeployment(deployRef);
   if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'in_progress');
+
+  // Enforce environment-level method allowlist before touching the gateway.
+  if (allowedMethods.length > 0 && !allowedMethods.includes(deployType)) {
+    if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
+    core.setFailed(
+      `Deploy method '${deployType}' is not allowed in this environment. ` +
+        `Allowed: ${allowedMethods.join(', ')}`,
+    );
+    return;
+  }
 
   // 1. POST /deploy
   const rawBody = JSON.stringify({ repo, release_id: releaseId, bundle, ...(deployEnv ? { env: deployEnv } : {}) });
