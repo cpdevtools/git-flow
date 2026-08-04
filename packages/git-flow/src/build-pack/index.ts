@@ -35,6 +35,8 @@ export {
 // GitHub API operations (for advanced usage/testing)
 export {
   getReleaseTag,
+  getGroupTag,
+  parseReleaseTag,
   findDraftReleaseByTag,
   createDraftRelease,
   updateDraftReleaseBody,

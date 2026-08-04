@@ -13,11 +13,11 @@ $.verbose = false;
 
 /**
  * Build the tag name for a project version
- * Format: v{version}/{projectName} for scoped, or v{version} for unscoped
+ * Format: {projectName}/v{version} for scoped, or v{version} for unscoped
  */
 function buildTagName(version: string, projectName?: string): string {
   if (projectName) {
-    return `v${version}/${projectName}`;
+    return `${projectName}/v${version}`;
   }
   return `v${version}`;
 }

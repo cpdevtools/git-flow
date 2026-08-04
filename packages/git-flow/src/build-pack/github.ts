@@ -35,10 +35,30 @@ function setPublishedInMetadata(artifactYaml: string, value: boolean): string {
 }
 
 /**
- * Get release tag name for a project
+ * Get release tag name for a project.
+ *
+ * The version must be the last path segment: git refs are filesystem paths, so a
+ * `v{version}/{name}` layout would make `v{version}` a directory and permanently
+ * block the plain `v{version}` tag (and any `v*` alias) in the same repo.
  */
 export function getReleaseTag(projectName: string, version: string): string {
-  return `v${version}/${projectName}`;
+  return `${projectName}/v${version}`;
+}
+
+/**
+ * Get the version-group tag (e.g. `MAIN/v1.2.3`)
+ */
+export function getGroupTag(versionGroup: string, version: string): string {
+  return `${versionGroup}/v${version}`;
+}
+
+/**
+ * Parse a release tag into its project name and version.
+ * Returns null for tags that aren't in `{name}/v{version}` form.
+ */
+export function parseReleaseTag(tag: string): { name: string; version: string } | null {
+  const match = tag.match(/^(.+)\/v([^/]+)$/);
+  return match ? { name: match[1], version: match[2] } : null;
 }
 
 /**
@@ -65,9 +85,9 @@ export async function findDraftReleaseByTag(
     });
 
     // Parse tag to get name and version for fallback search
-    // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
-    const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
-    const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
+    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
+    const parsed = parseReleaseTag(tag);
+    const expectedName = parsed ? `${parsed.name} ${parsed.version}` : null;
 
     // First try to find by exact tag match
     let draftRelease = releases.find((r) => r.tag_name === tag && r.draft);
@@ -197,8 +217,8 @@ export async function findOrCreateDraftRelease(
   // Calculate all tags that will be created
   const versionGroup = project.placeholder.split('-')[1] || 'MAIN';
   const tags = [
-    tag, // Package-specific tag (e.g., v0.2.1/@cpdevtools/git-flow)
-    `v${project.version}/${versionGroup}`, // Version group tag (e.g., v0.2.1/MAIN)
+    tag, // Package-specific tag (e.g., @cpdevtools/git-flow/v0.2.1)
+    getGroupTag(versionGroup, project.version), // Version group tag (e.g., MAIN/v0.2.1)
   ];
   // Add simple version tag for MAIN group only
   if (versionGroup === 'MAIN') {
@@ -485,7 +505,7 @@ export async function createGitTag(
 
   const tagsToCreate = [
     { tag, label: 'package-specific tag' },
-    { tag: `v${version}/${versionGroup}`, label: 'version group tag' },
+    { tag: getGroupTag(versionGroup, version), label: 'version group tag' },
   ];
 
   // If version group is MAIN, also create simple vX.Y.Z tag
@@ -536,9 +556,9 @@ export async function getDraftReleaseMetadata(
     });
 
     // Parse tag to get name and version for fallback search
-    // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
-    const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
-    const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
+    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
+    const parsed = parseReleaseTag(tag);
+    const expectedName = parsed ? `${parsed.name} ${parsed.version}` : null;
 
     // First try to find by exact tag match
     let release = releases.find((r) => r.tag_name === tag && r.draft);
@@ -583,9 +603,9 @@ export async function isReleasePublished(
       per_page: 100,
     });
 
-    // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
-    const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
-    const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
+    // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
+    const parsed = parseReleaseTag(tag);
+    const expectedName = parsed ? `${parsed.name} ${parsed.version}` : null;
 
     return releases.some(
       (r) => !r.draft && (r.tag_name === tag || (expectedName != null && r.name === expectedName)),

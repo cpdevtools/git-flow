@@ -74,19 +74,27 @@ runs:
       shell: bash
       run: echo "${{ inputs.workspace-root }}/node_modules/.bin" >> $GITHUB_PATH
 
-    - name: Pre-build git-flow-cli
+    # Only meaningful when this action runs inside the git-flow workspace itself,
+    # where the CLI is a workspace member rather than an installed dependency.
+    - name: Use workspace-local git-flow-cli if present
       shell: bash
-      run: pnpm --filter @cpdevtools/git-flow-cli build
+      working-directory: ${{ inputs.workspace-root }}
+      run: |
+        set -euo pipefail
+        if [ ! -f packages/git-flow-cli/package.json ]; then
+          echo "git-flow-cli is not a workspace member — using the installed @cpdevtools/git-flow-cli."
+          if [ ! -x node_modules/.bin/gitflow ]; then
+            echo "::error::gitflow binary not found. Add @cpdevtools/git-flow-cli to the workspace root devDependencies."
+            exit 1
+          fi
+          exit 0
+        fi
+        pnpm --filter @cpdevtools/git-flow-cli build
+        chmod +x packages/git-flow-cli/dist/bin.js
+        ln -sf "$(pwd)/packages/git-flow-cli/dist/bin.js" node_modules/.bin/gitflow
       env:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}
-
-    - name: Relink workspace binaries
-      shell: bash
-      run: |
-        chmod +x packages/git-flow-cli/dist/bin.js
-        ln -sf "$(pwd)/packages/git-flow-cli/dist/bin.js" node_modules/.bin/gitflow
-      working-directory: ${{ inputs.workspace-root }}
 
     - name: Install action dependencies
       shell: bash

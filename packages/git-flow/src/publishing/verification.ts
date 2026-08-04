@@ -3,7 +3,7 @@ import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { NpmRegistry, NugetRegistry, DockerRegistry, VerificationResult } from './types.js';
-import { resolveDockerImageBase } from './publishers.js';
+import { dockerLogin, dockerLogout, resolveDockerImageBase } from './publishers.js';
 
 /**
  * Check if a package version is published to NPM registry
@@ -138,9 +138,19 @@ export async function isDockerPublished(
   imageName: string,
   tag: string,
   registry: DockerRegistry,
+  token?: string,
 ): Promise<VerificationResult> {
+  let authenticated = false;
+
   try {
     const fullImageName = `${resolveDockerImageBase(imageName, registry)}:${tag}`;
+
+    // Reading a private/internal manifest anonymously fails as `unauthorized`,
+    // which is indistinguishable from "not published" — so authenticate first.
+    if (token) {
+      await dockerLogin(registry, token);
+      authenticated = true;
+    }
 
     // Try to inspect the remote image manifest
     await $`docker manifest inspect ${fullImageName}`;
@@ -154,6 +164,10 @@ export async function isDockerPublished(
       published: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    if (authenticated) {
+      await dockerLogout(registry);
+    }
   }
 }
 
@@ -174,7 +188,7 @@ export async function verifyPublication(
       return isNugetPublished(artifactName, version, registry);
 
     case 'docker':
-      return isDockerPublished(artifactName, version, registry);
+      return isDockerPublished(artifactName, version, registry, token);
 
     default:
       throw new Error(`Unknown registry type: ${(registry as unknown as { type: string }).type}`);
