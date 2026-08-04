@@ -78,8 +78,8 @@ function release(
 
 describe('versionFromTag', () => {
   it('extracts semver from a gitflow tag', () => {
-    expect(versionFromTag('v1.2.3/@org/pkg')).toBe('1.2.3');
-    expect(versionFromTag('v0.4.0-dev.5/@org/svc')).toBe('0.4.0-dev.5');
+    expect(versionFromTag('@org/pkg/v1.2.3')).toBe('1.2.3');
+    expect(versionFromTag('@org/svc/v0.4.0-dev.5')).toBe('0.4.0-dev.5');
   });
 
   it('returns the input unchanged when no match', () => {
@@ -91,11 +91,11 @@ describe('versionFromTag', () => {
 
 describe('packageFromTag', () => {
   it('extracts scoped package name', () => {
-    expect(packageFromTag('v1.2.3/@org/pkg')).toBe('@org/pkg');
+    expect(packageFromTag('@org/pkg/v1.2.3')).toBe('@org/pkg');
   });
 
   it('extracts unscoped package name', () => {
-    expect(packageFromTag('v1.0.0/my-service')).toBe('my-service');
+    expect(packageFromTag('my-service/v1.0.0')).toBe('my-service');
   });
 
   it('returns undefined for non-gitflow tags', () => {
@@ -153,9 +153,9 @@ describe('compareVersions', () => {
 
 describe('groupByPackage', () => {
   const releases = [
-    release(1, 'v1.0.0/@org/svc'),
-    release(2, 'v1.1.0/@org/svc'),
-    release(3, 'v1.0.0/@org/app'),
+    release(1, '@org/svc/v1.0.0'),
+    release(2, '@org/svc/v1.1.0'),
+    release(3, '@org/app/v1.0.0'),
     release(4, 'not-a-gitflow-tag'),
   ];
 
@@ -183,10 +183,10 @@ describe('groupByPackage', () => {
 describe('resolveVersionKeyword', () => {
   // Sorted newest-first (as groupByPackage would produce)
   const releases = [
-    release(4, 'v2.0.0-dev.1/@org/svc', { prerelease: true }),
-    release(3, 'v1.1.0/@org/svc'),
-    release(2, 'v1.0.0-rc.1/@org/svc', { prerelease: true }),
-    release(1, 'v1.0.0/@org/svc'),
+    release(4, '@org/svc/v2.0.0-dev.1', { prerelease: true }),
+    release(3, '@org/svc/v1.1.0'),
+    release(2, '@org/svc/v1.0.0-rc.1', { prerelease: true }),
+    release(1, '@org/svc/v1.0.0'),
   ];
 
   it('"next" returns the overall newest (including pre-release)', () => {
@@ -218,10 +218,10 @@ describe('resolveVersionKeyword', () => {
 
 describe('buildVersionChoices', () => {
   const releases = [
-    release(4, 'v2.0.0-dev.1/@org/svc', { prerelease: true }),
-    release(3, 'v1.1.0/@org/svc'),
-    release(2, 'v1.0.0-rc.1/@org/svc', { prerelease: true }),
-    release(1, 'v1.0.0/@org/svc'),
+    release(4, '@org/svc/v2.0.0-dev.1', { prerelease: true }),
+    release(3, '@org/svc/v1.1.0'),
+    release(2, '@org/svc/v1.0.0-rc.1', { prerelease: true }),
+    release(1, '@org/svc/v1.0.0'),
   ];
 
   it('puts next first and latest second', () => {
@@ -257,7 +257,7 @@ describe('buildVersionChoices', () => {
   });
 
   it('when next === latest (stable is newest), only one top entry', () => {
-    const stableOnly = [release(2, 'v2.0.0/@org/svc'), release(1, 'v1.0.0/@org/svc')];
+    const stableOnly = [release(2, '@org/svc/v2.0.0'), release(1, '@org/svc/v1.0.0')];
     const choices = buildVersionChoices(stableOnly);
     // next and latest are the same release — only one top entry
     expect(choices[0].title).toMatch(/^next/);
@@ -289,7 +289,7 @@ describe('extractArtifactMetadata', () => {
 
 describe('releaseDeployMethods', () => {
   it('unions deploy arrays across artifacts, preserving declaration order', () => {
-    const r = release(1, 'v1.0.0/@org/svc', {
+    const r = release(1, '@org/svc/v1.0.0', {
       body: bodyWithDeploy([
         { type: 'npm', name: '@org/svc', deploy: ['node'] },
         { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose', 'swarm'] },
@@ -299,7 +299,7 @@ describe('releaseDeployMethods', () => {
   });
 
   it('de-duplicates methods shared across artifacts', () => {
-    const r = release(1, 'v1.0.0/@org/svc', {
+    const r = release(1, '@org/svc/v1.0.0', {
       body: bodyWithDeploy([
         { type: 'npm', name: '@org/svc', deploy: ['node', 'compose'] },
         { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'] },
@@ -309,14 +309,14 @@ describe('releaseDeployMethods', () => {
   });
 
   it('returns [] when no artifact declares a deploy array', () => {
-    const r = release(1, 'v1.0.0/@org/svc', {
+    const r = release(1, '@org/svc/v1.0.0', {
       body: bodyWithDeploy([{ type: 'npm', name: '@org/svc' }]),
     });
     expect(releaseDeployMethods(r)).toEqual([]);
   });
 
   it('returns [] when artifacts have published:false (release mid-publish)', () => {
-    const r = release(1, 'v1.0.0/@org/svc', {
+    const r = release(1, '@org/svc/v1.0.0', {
       body: bodyWithDeploy([
         { type: 'docker', name: 'ghcr.io/org/svc', deploy: ['compose'], published: false },
       ]),
@@ -329,18 +329,18 @@ describe('releaseDeployMethods', () => {
 
 describe('isDeployable', () => {
   it('is true when the release advertises a deploy method', () => {
-    expect(isDeployable(release(1, 'v1.0.0/@org/svc'))).toBe(true);
+    expect(isDeployable(release(1, '@org/svc/v1.0.0'))).toBe(true);
   });
 
   it('is false when no deploy method is advertised', () => {
-    const r = release(1, 'v1.0.0/@org/svc', {
+    const r = release(1, '@org/svc/v1.0.0', {
       body: bodyWithDeploy([{ type: 'npm', name: '@org/svc' }]),
     });
     expect(isDeployable(r)).toBe(false);
   });
 
   it('is false when there is no metadata block at all', () => {
-    expect(isDeployable(release(1, 'v1.0.0/@org/svc', { body: 'plain body' }))).toBe(false);
+    expect(isDeployable(release(1, '@org/svc/v1.0.0', { body: 'plain body' }))).toBe(false);
   });
 });
 

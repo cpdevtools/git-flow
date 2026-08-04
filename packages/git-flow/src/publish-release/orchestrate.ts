@@ -23,6 +23,7 @@ import {
   finalizeRelease,
   createGitTag,
   getReleaseTag,
+  parseReleaseTag,
   getDraftReleaseMetadata,
   isReleasePublished,
   updateDraftReleaseBody,
@@ -51,10 +52,10 @@ async function downloadReleaseAssets(
   });
 
   // Parse tag to get expected release name
-  // Tag format: vX.Y.Z/@scope/name -> name: "@scope/name X.Y.Z"
+  // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
   // GitHub stores tags containing @ or / as untagged-<hash>, so we fall back to name match.
-  const tagMatch = tag.match(/^v([^/]+)\/(.+)$/);
-  const expectedName = tagMatch ? `${tagMatch[2]} ${tagMatch[1]}` : null;
+  const parsed = parseReleaseTag(tag);
+  const expectedName = parsed ? `${parsed.name} ${parsed.version}` : null;
 
   // First try exact tag match, then fall back to name match for untagged releases
   const release =

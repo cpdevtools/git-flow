@@ -57,7 +57,7 @@ export async function downloadBundle(
     assets: Array<{ name: string; url: string }>;
   }>;
 
-  const tag = `v${version}/${PACKAGE_NAME}`;
+  const tag = `${PACKAGE_NAME}/v${version}`;
   const release = releases.find((r) => r.tag_name === tag);
   if (!release) {
     throw new Error(`Release not found for tag: ${tag}`);

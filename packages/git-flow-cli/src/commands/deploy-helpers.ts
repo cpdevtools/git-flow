@@ -37,14 +37,14 @@ interface MetadataDescriptor {
 
 // ─── tag helpers ──────────────────────────────────────────────────────────────
 
-/** Extract the semver string from a gitflow tag (e.g. `v1.2.3/@org/pkg` → `1.2.3`). */
+/** Extract the semver string from a gitflow tag (e.g. `@org/pkg/v1.2.3` → `1.2.3`). */
 export function versionFromTag(tag: string): string {
-  return tag.match(/^v([^/]+)\//)?.[1] ?? tag;
+  return tag.match(/\/v([^/]+)$/)?.[1] ?? tag;
 }
 
-/** Extract the package name from a gitflow tag (e.g. `v1.2.3/@org/pkg` → `@org/pkg`). */
+/** Extract the package name from a gitflow tag (e.g. `@org/pkg/v1.2.3` → `@org/pkg`). */
 export function packageFromTag(tag: string): string | undefined {
-  return tag.match(/^v[^/]+\/(.+)$/)?.[1];
+  return tag.match(/^(.+)\/v[^/]+$/)?.[1];
 }
 
 /** Parse a GitHub repo slug from a git remote URL (https or ssh). */

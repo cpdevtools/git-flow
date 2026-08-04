@@ -316,7 +316,7 @@ function generateYamlMetadata(metadata: any): string {
     const versionGroup = placeholder;
     const firstProject = (projects as any[])[0];
     if (firstProject) {
-      const groupTags = [`v${firstProject.resolvedVersion}/${versionGroup}`];
+      const groupTags = [`${versionGroup}/v${firstProject.resolvedVersion}`];
       
       // Add simple version tag for MAIN group only
       if (versionGroup === 'MAIN') {
@@ -332,7 +332,7 @@ function generateYamlMetadata(metadata: any): string {
     yaml.push(`  projects:`);
     for (const project of projects as any[]) {
       // Calculate project-specific tag
-      const packageTag = `v${project.resolvedVersion}/${project.name}`;
+      const packageTag = `${project.name}/v${project.resolvedVersion}`;
       
       yaml.push(`    - name: ${project.name}`);
       yaml.push(`      version: ${project.resolvedVersion}`);

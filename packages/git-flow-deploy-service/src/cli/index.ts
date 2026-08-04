@@ -88,7 +88,7 @@ async function resolveLatestVersion(
       (r) =>
         !r.draft &&
         (includePrereleases || !r.prerelease) &&
-        r.tag_name.endsWith(`/${PACKAGE_NAME}`),
+        r.tag_name.startsWith(`${PACKAGE_NAME}/v`),
     )
     .sort(
       (a, b) =>
@@ -102,7 +102,7 @@ async function resolveLatestVersion(
     );
   }
 
-  const match = pkgReleases[0].tag_name.match(/^v([^/]+)\//);
+  const match = pkgReleases[0].tag_name.match(/\/v([^/]+)$/);
   if (!match)
     throw new Error(`Unexpected tag format: ${pkgReleases[0].tag_name}`);
   return match[1];
