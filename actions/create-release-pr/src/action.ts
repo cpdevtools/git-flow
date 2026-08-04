@@ -235,7 +235,16 @@ ${Object.entries(projectsByPlaceholder)
 
     if (!hasDifferences) {
       core.info('No differences between branches');
-      
+
+      if (releaseBranchCreated) {
+        core.warning(
+          `${releaseBranch} did not exist and was created at the current tip of ${branch}, so there is nothing to compare and no release PR can be opened yet. ` +
+            `GitHub will not accept a pull request with no commits between the branches. ` +
+            `Either push another commit to ${branch}, or reset ${releaseBranch} back to the last commit you consider released ` +
+            `(e.g. \`git push --force-with-lease origin <last-released-sha>:refs/heads/${releaseBranch}\`) and re-run this workflow.`,
+        );
+      }
+
       // Close any existing PR since there are no changes
       if (existingPRs.length > 0) {
         const pr = existingPRs[0];
