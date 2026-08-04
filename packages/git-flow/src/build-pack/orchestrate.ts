@@ -160,6 +160,7 @@ export async function runBuildPack(
       const config = projectConfigMap.get(project.name)!;
       console.log(`  📝 ${project.name}: Applying version ${config.version}...`);
       await applyVersion(config.cwd, config.version);
+      return { PROJECT_VERSION: config.version };
     },
     afterTask: async (project, result) => {
       if (result.state !== 'passed') return;
