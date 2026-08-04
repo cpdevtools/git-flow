@@ -27,6 +27,40 @@ export function resolveDockerImageBase(imageName: string, registry: DockerRegist
 }
 
 /**
+ * Authenticate the docker CLI against a registry.
+ *
+ * Private and internal images need credentials to *read* as well as to push, so
+ * verification uses this too.
+ */
+export async function dockerLogin(
+  registry: DockerRegistry,
+  token: string,
+  username?: string,
+): Promise<void> {
+  // GHCR (and most registries) require a username alongside --password-stdin;
+  // fall back to the Actions actor when no username env is configured.
+  const loginUser =
+    username ??
+    (registry.usernameEnv ? process.env[registry.usernameEnv] : undefined) ??
+    process.env.GITHUB_ACTOR;
+
+  if (loginUser) {
+    await $`echo ${token} | docker login ${registry.registry} -u ${loginUser} --password-stdin`;
+  } else {
+    await $`echo ${token} | docker login ${registry.registry} --password-stdin`;
+  }
+}
+
+/**
+ * Drop docker credentials for a registry. Best effort.
+ */
+export async function dockerLogout(registry: DockerRegistry): Promise<void> {
+  await $`docker logout ${registry.registry}`.catch(() => {
+    // Best effort logout
+  });
+}
+
+/**
  * Publish NPM package to registry
  */
 export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
@@ -113,14 +147,7 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
     );
   }
 
-  // Authenticate. GHCR (and most registries) require a username alongside
-  // --password-stdin; fall back to the Actions actor when no username env is configured.
-  const loginUser = username ?? process.env.GITHUB_ACTOR;
-  if (loginUser) {
-    await $`echo ${token} | docker login ${registry.registry} -u ${loginUser} --password-stdin`;
-  } else {
-    await $`echo ${token} | docker login ${registry.registry} --password-stdin`;
-  }
+  await dockerLogin(registry, token, username);
 
   try {
     // Build final image name with namespace if provided
@@ -141,8 +168,6 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
       // Ignore errors - cleanup is best-effort
     });
   } finally {
-    await $`docker logout ${registry.registry}`.catch(() => {
-      // Best effort logout
-    });
+    await dockerLogout(registry);
   }
 }
