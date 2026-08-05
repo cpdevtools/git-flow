@@ -277,7 +277,7 @@ registerDeployMethod('npm', 'node', {
     const installCmd = `npm install -g --prefix "$NPM_PREFIX" ${projectName}@${version}`;
     // restart.sh supervises the pm2 restart: it survives the restart that kills
     // this process, appends ALL output plus the terminal EXIT line to the
-    // release's deploy.log (never /dev/null), and verifies /health reports the
+    // release's deploy.log (never /dev/null), and verifies /status reports the
     // new version. The service tails that same deploy.log to finalize the deploy.
     // The script is a real shell asset (src/artifacts/restart.sh), read verbatim.
     await writeFile(join(deployOutputDir, 'restart.sh'), loadRestartScript());

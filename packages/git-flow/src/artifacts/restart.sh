@@ -78,18 +78,18 @@ if [ "$rc" -ne 0 ]; then
   exit "$rc"
 fi
 
-echo "▸ Verifying /health on 127.0.0.1:$PORT ..."
+echo "▸ Verifying /status on 127.0.0.1:$PORT ..."
 code=""
 got=""
 i=0
 while [ "$i" -lt 30 ]; do
   i=$((i + 1))
   sleep 2
-  body=$(node -e "fetch('http://127.0.0.1:$PORT/health').then(r=>r.text()).then(t=>process.stdout.write(t)).catch(()=>process.exit(1))" 2>/dev/null) || { echo "  [$i] no response yet"; continue; }
-  echo "  [$i] health: $body"
+  body=$(node -e "fetch('http://127.0.0.1:$PORT/status').then(r=>r.text()).then(t=>process.stdout.write(t)).catch(()=>process.exit(1))" 2>/dev/null) || { echo "  [$i] no response yet"; continue; }
+  echo "  [$i] status: $body"
   got=$(printf '%s' "$body" | sed -n 's/.*"version"[": ]*"\([^"]*\)".*/\1/p')
   if [ -z "$got" ]; then
-    echo "✓ Service healthy (no version reported by /health)."
+    echo "✓ Service healthy (no version reported by /status)."
     code=0
     break
   fi
@@ -98,13 +98,13 @@ while [ "$i" -lt 30 ]; do
     code=0
     break
   fi
-  echo "✗ Version mismatch: /health reports v$got, expected v$VERSION."
+  echo "✗ Version mismatch: /status reports v$got, expected v$VERSION."
   code=1
   break
 done
 
 if [ -z "$code" ]; then
-  echo "⚠ Restart issued but /health did not confirm within timeout."
+  echo "⚠ Restart issued but /status did not confirm within timeout."
   code=0
 fi
 
