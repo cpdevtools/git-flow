@@ -222,7 +222,13 @@ registerDeployMethod('docker', 'swarm', {
         // substituteDeployTokens — they resolve correctly in YAML map keys
         // (where runtime ${VAR} interpolation does not work) and let
         // projects use them in stack.yml service names too.
-        deployCommand: `set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__`,
+        //
+        // --with-registry-auth ships the manager's registry credentials to the
+        // nodes along with the service spec. Deploys land on a manager but the
+        // tasks run on workers, which have no login of their own — without it a
+        // private/internal image pull fails on every worker while the deploy
+        // itself reports success.
+        deployCommand: `set -a && . ./.env && set +a && echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker stack deploy --with-registry-auth -c stack.yml __STACK__`,
         teardownCommand: `docker stack rm __STACK__`,
       }),
     );

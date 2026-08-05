@@ -1,5 +1,5 @@
 import { Command } from '@oclif/core';
-import { readReposConfig } from '../../../repos-config.js';
+import { readReposConfig } from '@cpdevtools/git-flow-deploy';
 
 export default class ReposDenyList extends Command {
   static override description = 'List deny patterns';

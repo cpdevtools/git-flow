@@ -9,7 +9,7 @@
  * Method resolution delegates to the registered DeployMethodHandler for the
  * artifact type.  Built-in handlers:
  *   docker.compose — copies docker-compose.yml + overrides; deploy.yml = docker compose pull && up -d
- *   docker.swarm   — copies stack.yml + overlays; deploy.yml = docker stack deploy -c stack.yml ...
+ *   docker.swarm   — copies stack.yml + overlays; deploy.yml = docker stack deploy --with-registry-auth -c stack.yml ...
  *   npm.node       — copies ecosystem.config.js; deploy.yml = pm2 reload ecosystem.config.js
  *
  * Plugins can register additional handlers via registerDeployMethod().

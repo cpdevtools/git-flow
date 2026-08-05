@@ -244,7 +244,7 @@ async function main(): Promise<void> {
       });
       break;
     case 'swarm':
-      await handleSwarm({ extractDir });
+      await handleSwarm({ extractDir, token });
       break;
   }
 

@@ -2,6 +2,7 @@ import { Command, Args, Flags } from '@oclif/core';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fetchDeployBundle } from '@cpdevtools/git-flow-deploy';
+import { readSecret } from '../secrets.js';
 
 export default class Fetch extends Command {
   static override description =
@@ -27,8 +28,12 @@ export default class Fetch extends Command {
     const releaseId = args['release-id'];
     const dest = flags['dest'] ?? join(tmpdir(), 'deploy-gateway', String(releaseId));
 
-    const token = process.env['GITHUB_TOKEN'];
-    if (!token) this.error('GITHUB_TOKEN environment variable is required');
+    let token: string;
+    try {
+      token = await readSecret('GITHUB_TOKEN');
+    } catch (err) {
+      this.error((err as Error).message);
+    }
 
     this.log(`Fetching deploy.zip for release ${releaseId} of ${repo}...`);
     const manifest = await fetchDeployBundle(token, repo, releaseId, dest);
