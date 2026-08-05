@@ -40,13 +40,13 @@ describe('Deploy Service (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Health
+  // Status
   // ---------------------------------------------------------------------------
 
-  describe('GET /health', () => {
+  describe('GET /status', () => {
     it('returns ok:true with service info, without authentication', async () => {
       await request(app.getHttpServer())
-        .get('/health')
+        .get('/status')
         .expect(200)
         .expect((res) => {
           expect(res.body.ok).toBe(true);

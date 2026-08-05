@@ -72,8 +72,8 @@ export class DeployController {
     private readonly state: DeploymentStateService,
   ) {}
 
-  @Get('health')
-  health(): { ok: boolean; name: string; version: string } {
+  @Get('status')
+  status(): { ok: boolean; name: string; version: string } {
     const { name, version } = getServiceInfo();
     return { ok: true, name, version };
   }

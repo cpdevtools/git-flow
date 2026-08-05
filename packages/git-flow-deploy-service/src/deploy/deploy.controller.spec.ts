@@ -58,12 +58,12 @@ describe('DeployController', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // GET /health
+  // GET /status
   // ---------------------------------------------------------------------------
-  describe('GET /health', () => {
+  describe('GET /status', () => {
     it('returns 200 with ok:true and service info', () => {
       return request(app.getHttpServer())
-        .get('/health')
+        .get('/status')
         .expect(200)
         .expect((res) => {
           expect(res.body.ok).toBe(true);

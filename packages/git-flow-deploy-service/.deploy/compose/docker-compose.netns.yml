@@ -6,7 +6,7 @@
 # `pm2 stop` frees :3700 inside the dev container's network namespace but NOT on
 # the host, and a sibling compose container can never bind host :3700. That makes
 # a node -> compose mode change fail (or, worse, silently start unpublished), and
-# breaks the action's log reconnect + /health check because the endpoint moves.
+# breaks the action's log reconnect + /status check because the endpoint moves.
 #
 # FIX: don't publish a host port at all — join the dev container's network
 # namespace instead. Host :3700 then reaches whichever process is listening on
