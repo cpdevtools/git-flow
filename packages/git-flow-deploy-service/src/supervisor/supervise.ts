@@ -47,12 +47,10 @@ export async function runSupervisor(planPath: string): Promise<number> {
       step.cwd,
       log,
       step.env !== undefined ? { ...plan.env, ...step.env } : plan.env,
-    ).catch(
-      (err: Error) => {
-        log(`▸ Error: ${err.message}`);
-        return 1;
-      },
-    );
+    ).catch((err: Error) => {
+      log(`▸ Error: ${err.message}`);
+      return 1;
+    });
 
   // Like run(), but suppresses EXIT: lines so a nested supervisor script (e.g.
   // restart.sh invoked during rollback) cannot write EXIT:0 and mislead the
@@ -61,7 +59,9 @@ export async function runSupervisor(planPath: string): Promise<number> {
     runDeploy(
       { deployCommand: step.command },
       step.cwd,
-      (line) => { if (!line.startsWith('EXIT:')) log(line); },
+      (line) => {
+        if (!line.startsWith('EXIT:')) log(line);
+      },
       step.env !== undefined ? { ...plan.env, ...step.env } : plan.env,
     ).catch((err: Error) => {
       log(`▸ Error: ${err.message}`);

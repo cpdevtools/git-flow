@@ -8,11 +8,11 @@
   "scripts": {
     "build": "wireit",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test": "vitest run",
     "github.actions.build": "pnpm build",
     "github.actions.pack": "gitflow pack",
     "github.actions.test": "pnpm test",
     "lint": "eslint src --ext .ts",
+    "test": "vitest run",
     "typecheck": "wireit"
   },
   "dependencies": {

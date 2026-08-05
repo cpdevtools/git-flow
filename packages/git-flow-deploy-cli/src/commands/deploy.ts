@@ -1,7 +1,12 @@
 import { Command, Args, Flags } from '@oclif/core';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fetchDeployBundle, prepareSharedStorage, runDeploy } from '@cpdevtools/git-flow-deploy';
+import {
+  fetchDeployBundle,
+  declaresSharedStorage,
+  prepareSharedStorage,
+  runDeploy,
+} from '@cpdevtools/git-flow-deploy';
 
 export default class Deploy extends Command {
   static override description =
@@ -43,7 +48,7 @@ export default class Deploy extends Command {
     this.log(`▸ Fetching deploy.zip from release ${releaseId}...`);
     const manifest = await fetchDeployBundle(token, repo, releaseId, dest);
 
-    if (sharedStorageBase && manifest.sharedStorage) {
+    if (sharedStorageBase && declaresSharedStorage(manifest)) {
       this.log(`▸ Preparing shared storage: ${sharedStorageBase}/${manifest.name}/`);
       await prepareSharedStorage(manifest, sharedStorageBase);
     }

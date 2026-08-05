@@ -17,6 +17,7 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   fetchDeployBundle,
+  declaresSharedStorage,
   prepareSharedStorage,
   runDeploy,
   deploymentSlot,
@@ -238,7 +239,7 @@ export class DeployController {
         return;
       }
 
-      if (this.config.sharedStorageBaseDir && manifest.sharedStorage) {
+      if (this.config.sharedStorageBaseDir && declaresSharedStorage(manifest)) {
         this.store.appendLine(
           record,
           `▸ Preparing shared storage: ${this.config.sharedStorageBaseDir}/${manifest.name}/`,
@@ -381,7 +382,10 @@ export class DeployController {
       // about to restart, so persist now — before handing off.
       if (exitCode === 0) {
         try {
-          this.state.save(this.buildState(manifest, slot, versioning, env), workDir);
+          this.state.save(
+            this.buildState(manifest, slot, versioning, env),
+            workDir,
+          );
         } catch (err) {
           this.store.appendLine(
             record,
@@ -511,10 +515,18 @@ export class DeployController {
       label: `self mode-change ${from} → ${to} (v${manifest.version})`,
       delayMs: SUPERVISOR_DELAY_MS,
       teardown: prior.teardownCommand
-        ? { cwd: prior.bundleDir, command: prior.teardownCommand, env: prior.env }
+        ? {
+            cwd: prior.bundleDir,
+            command: prior.teardownCommand,
+            env: prior.env,
+          }
         : undefined,
       deploy: { cwd: workDir, command: manifest.deployCommand },
-      rollback: { cwd: prior.bundleDir, command: prior.deployCommand, env: prior.env },
+      rollback: {
+        cwd: prior.bundleDir,
+        command: prior.deployCommand,
+        env: prior.env,
+      },
       commit: {
         currentDir: this.state.currentBundleDir(slot),
         newBundle: workDir,
@@ -606,7 +618,13 @@ export class DeployController {
     workDir: string,
     slot: string,
     versioning: 'singleton' | 'major',
-    prior: { bundleDir: string; deployCommand: string; env?: Record<string, string> } | undefined,
+    prior:
+      | {
+          bundleDir: string;
+          deployCommand: string;
+          env?: Record<string, string>;
+        }
+      | undefined,
     env?: Record<string, string>,
   ): boolean {
     const plan: SupervisorPlan = {

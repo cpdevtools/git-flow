@@ -431,7 +431,10 @@ export default class Deploy extends Command {
             choices: buildVersionChoices(pkgReleases, showAllVersions),
           });
           if (!r.release) process.exit(0);
-          if (r.release === LOAD_MORE) { showAllVersions = true; continue; }
+          if (r.release === LOAD_MORE) {
+            showAllVersions = true;
+            continue;
+          }
           selected = r.release as GHRelease;
         }
       }

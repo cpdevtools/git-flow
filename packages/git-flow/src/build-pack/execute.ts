@@ -264,6 +264,43 @@ export function deployTokens(
 }
 
 /**
+ * Validate an artifact's `sharedStorage` declaration from release-artifacts.yml.
+ *
+ * Mirrors the manifest-side rules in @cpdevtools/git-flow-deploy so a bad value
+ * fails at pack time rather than mid-deploy.
+ */
+export function normalizeSharedStorage(
+  raw: unknown,
+  artifactLabel: string,
+): boolean | string[] | undefined {
+  if (raw === undefined || raw === false) return undefined;
+  if (raw === true) return true;
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `Invalid sharedStorage on artifact '${artifactLabel}': expected true or an array of relative paths.`,
+    );
+  }
+  return raw.map((entry, index) => {
+    if (typeof entry !== 'string' || entry === '') {
+      throw new Error(
+        `sharedStorage[${index}] on artifact '${artifactLabel}' must be a non-empty string`,
+      );
+    }
+    if (entry.startsWith('/')) {
+      throw new Error(
+        `sharedStorage[${index}] on artifact '${artifactLabel}' must be a relative path: ${entry}`,
+      );
+    }
+    if (entry.split('/').includes('..')) {
+      throw new Error(
+        `sharedStorage[${index}] on artifact '${artifactLabel}' must not contain '..': ${entry}`,
+      );
+    }
+    return entry;
+  });
+}
+
+/**
  *
  * Resolution chain per (artifact, method) pair — first match wins:
  *   1. .deploy/{method}/ folder   — copy files; fall through to handler.generateDeployYml
@@ -280,7 +317,7 @@ async function executePackDeploy(
   descriptor: ProjectArtifactDescriptor,
   uploadCtx: UploadContext,
 ): Promise<void> {
-  type WithDeploy = { deploy?: string[]; versioning?: string };
+  type WithDeploy = { deploy?: string[]; versioning?: string; sharedStorage?: unknown };
   const artifactsWithDeploy = descriptor.artifacts.filter(
     (a: Artifact) =>
       Array.isArray((a as unknown as WithDeploy).deploy) &&
@@ -303,6 +340,10 @@ async function executePackDeploy(
         );
       }
       const versioning = (rawVersioning ?? 'singleton') as VersioningStrategy;
+      const sharedStorage = normalizeSharedStorage(
+        (artifact as unknown as WithDeploy).sharedStorage,
+        (artifact as { name?: string }).name ?? artifact.type,
+      );
       for (const method of methods) {
         // Parallel-major deploys are only supported for compose/swarm today
         // (node's pm2 identity + port binding are author-controlled).
@@ -413,6 +454,11 @@ async function executePackDeploy(
             method: deployMeta.method ?? method,
             slot: deployMeta.slot ?? slot,
             versioning: deployMeta.versioning ?? versioning,
+            // Conditional spread: an absent key must stay absent, since the
+            // deploy side rejects a sharedStorage that is present but null.
+            ...(deployMeta.sharedStorage === undefined && sharedStorage !== undefined
+              ? { sharedStorage }
+              : {}),
             name: project.name,
             version: project.version,
             repo: `https://github.com/${process.env.GITHUB_REPOSITORY ?? ''}`,
