@@ -102,9 +102,7 @@ export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[
   for (const pkg of Object.keys(groups)) {
     // Sort newest-first by creation time; GitHub returns releases newest-first
     // so in practice this just preserves order, but be explicit.
-    groups[pkg].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
+    groups[pkg].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
   return groups;
 }

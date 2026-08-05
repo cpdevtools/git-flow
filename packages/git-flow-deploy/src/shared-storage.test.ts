@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { prepareSharedStorage } from './shared-storage.js';
+import { prepareSharedStorage, declaresSharedStorage } from './shared-storage.js';
 import type { DeployManifest } from './types.js';
 
 let baseDir: string;
@@ -42,6 +42,16 @@ describe('prepareSharedStorage', () => {
     expect(await dirExists(join(baseDir, 'my-service'))).toBe(true);
   });
 
+  it('creates the service dir when sharedStorage is an empty array', async () => {
+    await prepareSharedStorage({ ...manifest, sharedStorage: [] }, baseDir);
+    expect(await dirExists(join(baseDir, 'my-service'))).toBe(true);
+  });
+
+  it('is a no-op when sharedStorage is false', async () => {
+    await prepareSharedStorage({ ...manifest, sharedStorage: false }, baseDir);
+    expect(await dirExists(join(baseDir, 'my-service'))).toBe(false);
+  });
+
   it('creates service dir and each named subdir', async () => {
     await prepareSharedStorage({ ...manifest, sharedStorage: ['data', 'logs'] }, baseDir);
     expect(await dirExists(join(baseDir, 'my-service', 'data'))).toBe(true);
@@ -77,5 +87,18 @@ describe('prepareSharedStorage', () => {
     await expect(
       prepareSharedStorage({ ...manifest, sharedStorage: ['a/../../outside'] }, baseDir),
     ).rejects.toThrow();
+  });
+});
+
+describe('declaresSharedStorage', () => {
+  it('is true for true, an empty array and a populated array', () => {
+    expect(declaresSharedStorage({ ...manifest, sharedStorage: true })).toBe(true);
+    expect(declaresSharedStorage({ ...manifest, sharedStorage: [] })).toBe(true);
+    expect(declaresSharedStorage({ ...manifest, sharedStorage: ['data'] })).toBe(true);
+  });
+
+  it('is false when absent or false', () => {
+    expect(declaresSharedStorage({ ...manifest })).toBe(false);
+    expect(declaresSharedStorage({ ...manifest, sharedStorage: false })).toBe(false);
   });
 });
