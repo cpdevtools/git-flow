@@ -16,6 +16,7 @@ export default defineConfig({
     'commands/repos/deny/list': 'src/commands/repos/deny/list.ts',
     'commands/hmac/sign': 'src/commands/hmac/sign.ts',
     'commands/hmac/verify': 'src/commands/hmac/verify.ts',
+    'commands/swarm/status': 'src/commands/swarm/status.ts',
   },
   format: ['cjs'],
   target: 'node24',

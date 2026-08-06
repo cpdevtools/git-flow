@@ -11,6 +11,13 @@ export {
 } from './shared-storage.js';
 export type { VersioningStrategy } from './slot.js';
 export { safeName, majorVersion, deploymentSlot, slotStack } from './slot.js';
+export type {
+  SwarmRolloutState,
+  SwarmServiceRollout,
+  SwarmStackRollout,
+  DockerRunner,
+} from './swarm-rollout.js';
+export { stackRollout, rolloutStateOf, aggregateRollout } from './swarm-rollout.js';
 export type { ReposConfig } from './repo-rules.js';
 export {
   DEFAULT_REPOS_CONFIG_PATH,
