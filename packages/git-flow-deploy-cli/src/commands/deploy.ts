@@ -12,10 +12,11 @@ import { readSecret } from '../secrets.js';
 
 export default class Deploy extends Command {
   static override description =
-    'Fetch deploy.zip from a GitHub Release and immediately execute its deployCommand (fetch + run in one shot)';
+    'Fetch a deploy bundle from a GitHub Release and immediately execute its deployCommand (fetch + run in one shot)';
 
   static override examples = [
     '<%= config.bin %> deploy owner/repo 123456789',
+    '<%= config.bin %> deploy owner/repo 123456789 --bundle deploy-swarm.zip',
     '<%= config.bin %> deploy owner/repo 123456789 --dest /tmp/my-deploy --shared-storage-base /docker-nfs/swarm',
   ];
 
@@ -30,6 +31,11 @@ export default class Deploy extends Command {
       description: 'Working directory for extraction (default: temp dir)',
       required: false,
     }),
+    bundle: Flags.string({
+      description:
+        'Release asset to deploy (e.g. deploy-swarm.zip). Required: releases carry per-method bundles, not a generic deploy.zip.',
+      required: true,
+    }),
     'shared-storage-base': Flags.string({
       description: 'Base path for shared storage (overrides SHARED_STORAGE_BASE_DIR)',
       required: false,
@@ -41,6 +47,7 @@ export default class Deploy extends Command {
     const repo = args['repo'];
     const releaseId = args['release-id'];
     const dest = flags['dest'] ?? join(tmpdir(), 'deploy-gateway', String(releaseId));
+    const bundle = flags['bundle'];
     const sharedStorageBase =
       flags['shared-storage-base'] ?? process.env['SHARED_STORAGE_BASE_DIR'];
 
@@ -51,8 +58,8 @@ export default class Deploy extends Command {
       this.error((err as Error).message);
     }
 
-    this.log(`▸ Fetching deploy.zip from release ${releaseId}...`);
-    const manifest = await fetchDeployBundle(token, repo, releaseId, dest);
+    this.log(`▸ Fetching ${bundle} from release ${releaseId}...`);
+    const manifest = await fetchDeployBundle(token, repo, releaseId, dest, bundle);
 
     if (sharedStorageBase && declaresSharedStorage(manifest)) {
       this.log(`▸ Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`);
