@@ -19,6 +19,7 @@ import {
   fetchDeployBundle,
   declaresSharedStorage,
   prepareSharedStorage,
+  sharedStorageDir,
   runDeploy,
   deploymentSlot,
   slotStack,
@@ -242,7 +243,7 @@ export class DeployController {
       if (this.config.sharedStorageBaseDir && declaresSharedStorage(manifest)) {
         this.store.appendLine(
           record,
-          `▸ Preparing shared storage: ${this.config.sharedStorageBaseDir}/${manifest.name}/`,
+          `▸ Preparing shared storage: ${sharedStorageDir(manifest, this.config.sharedStorageBaseDir)}/`,
         );
         try {
           await prepareSharedStorage(

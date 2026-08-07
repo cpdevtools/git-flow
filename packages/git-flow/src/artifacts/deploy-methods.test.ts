@@ -75,7 +75,7 @@ describe('docker.swarm generateDeployYml', () => {
     expect(m.method).toBe('swarm');
     expect(m.slot).toBe('org-svc');
     expect(m.deployCommand).toBe(
-      'set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__',
+      'set -a && . ./.env && set +a && echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker stack deploy --with-registry-auth -c stack.yml __STACK__',
     );
     expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });
@@ -86,7 +86,7 @@ describe('docker.swarm generateDeployYml', () => {
     expect(m.slot).toBe('org-svc-v2');
     // __STACK__ is resolved to slotStack(slot) by substituteDeployTokens at pack time
     expect(m.deployCommand).toBe(
-      'set -a && . ./.env && set +a && docker stack deploy -c stack.yml __STACK__',
+      'set -a && . ./.env && set +a && echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker stack deploy --with-registry-auth -c stack.yml __STACK__',
     );
     expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });

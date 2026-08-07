@@ -241,6 +241,9 @@ importers:
       adm-zip:
         specifier: ^0.5.16
         version: 0.5.18
+      minimatch:
+        specifier: ^10.0.1
+        version: 10.2.5
       yaml:
         specifier: ^2.8.2
         version: 2.9.0

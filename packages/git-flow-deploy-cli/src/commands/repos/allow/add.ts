@@ -1,5 +1,5 @@
 import { Command, Args } from '@oclif/core';
-import { readReposConfig, writeReposConfig } from '../../../repos-config.js';
+import { readReposConfig, writeReposConfig } from '@cpdevtools/git-flow-deploy';
 
 export default class ReposAllowAdd extends Command {
   static override description = 'Add a glob pattern to the allow list';

@@ -1,6 +1,12 @@
 import { Command, Flags } from '@oclif/core';
 import { join } from 'node:path';
-import { parseDeployYml, runDeploy } from '@cpdevtools/git-flow-deploy';
+import {
+  parseDeployYml,
+  runDeploy,
+  declaresSharedStorage,
+  prepareSharedStorage,
+  sharedStorageDir,
+} from '@cpdevtools/git-flow-deploy';
 
 export default class Run extends Command {
   static override description =
@@ -20,16 +26,27 @@ export default class Run extends Command {
       description: 'Path to deploy.yml (defaults to <work-dir>/deploy.yml)',
       required: false,
     }),
+    'shared-storage-base': Flags.string({
+      description: 'Base path for shared storage (overrides SHARED_STORAGE_BASE_DIR)',
+      required: false,
+    }),
   };
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Run);
     const workDir = flags['work-dir'];
     const manifestPath = flags['manifest'] ?? join(workDir, 'deploy.yml');
+    const sharedStorageBase =
+      flags['shared-storage-base'] ?? process.env['SHARED_STORAGE_BASE_DIR'];
 
     const manifest = await parseDeployYml(manifestPath);
 
-    this.log(`Running: ${manifest.deployCommand}`);
+    if (sharedStorageBase && declaresSharedStorage(manifest)) {
+      this.log(`\u25b8 Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`);
+      await prepareSharedStorage(manifest, sharedStorageBase);
+    }
+
+    this.log(`\u25b8 Running: ${manifest.deployCommand}`);
 
     const exitCode = await runDeploy(manifest, workDir, (line) => {
       process.stdout.write(line + '\n');
