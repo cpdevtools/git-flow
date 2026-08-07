@@ -2,9 +2,8 @@ import * as semver from 'semver';
 import { $ } from 'zx';
 import { extractVersionParts, buildVersion } from './utils.js';
 
-// Must stay in semver-ascending order — see the invariant test in bumps.test.ts.
-// `dev` is retired: semver compares prerelease identifiers by ASCII, so it sorted
-// between `beta` and `rc`, and a `dev` build outranked the `alpha` that followed it.
+// Semver compares prerelease identifiers by ASCII, so this must stay in
+// ascending order — see the invariant test in bumps.test.ts.
 const CHANNEL_ORDER = ['alpha', 'beta', 'rc'] as const;
 type Channel = (typeof CHANNEL_ORDER)[number];
 

@@ -83,7 +83,7 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   console.log(`  📝 Writing .npmrc to ${npmrcPath}`);
   await writeFile(npmrcPath, npmrcContent);
 
-  // Detect prerelease tag from tarball filename (e.g. pkg-1.2.3-dev.0.tgz → 'dev')
+  // Detect prerelease tag from tarball filename (e.g. pkg-1.2.3-alpha.0.tgz → 'alpha')
   const filenameVersion = basename(artifactPath).match(/(\d+\.\d+\.\d+(?:-.+?)?)\.tgz$/)?.[1];
   const prereleaseTag = filenameVersion?.includes('-')
     ? filenameVersion.split('-')[1].split('.')[0]

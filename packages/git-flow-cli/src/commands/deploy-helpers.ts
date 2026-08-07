@@ -86,10 +86,7 @@ export function compareVersions(a: string, b: string): number {
 
 /**
  * Group releases by package name (extracted from tag).
- * Each group is sorted newest-first by creation timestamp so releases from
- * different pre-release channels (e.g. `dev.*` and `alpha.*`) interleave
- * correctly — pure semver ordering puts `alpha < dev` alphabetically and would
- * push a newer alpha release below older dev ones.
+ * Each group is sorted newest-first by version.
  * Releases with non-gitflow tags are excluded.
  */
 export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[]> {
@@ -100,9 +97,7 @@ export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[
     (groups[pkg] ??= []).push(r);
   }
   for (const pkg of Object.keys(groups)) {
-    // Sort newest-first by creation time; GitHub returns releases newest-first
-    // so in practice this just preserves order, but be explicit.
-    groups[pkg].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    groups[pkg].sort((a, b) => compareVersions(versionFromTag(b.tag_name), versionFromTag(a.tag_name)));
   }
   return groups;
 }
@@ -137,7 +132,7 @@ export const LOAD_MORE = '__load_more__' as const;
  * followed by recent releases. When `showAll` is false (default) and there
  * are more than the visible window, a "Show N more..." sentinel is appended.
  *
- * Assumes releases are already sorted newest-first by creation time.
+ * Assumes releases are already sorted newest-first by version.
  */
 export function buildVersionChoices(releases: GHRelease[], showAll = false): prompts.Choice[] {
   const VISIBLE = 5; // additional entries below next/latest

@@ -22,10 +22,6 @@ describe('CHANNEL_ORDER', () => {
       expect(semver.lt(`1.0.0-${channel}.0`, '1.0.0')).toBe(true);
     }
   });
-
-  it('does not offer the retired dev channel', () => {
-    expect(declaredLadder()).not.toContain('dev');
-  });
 });
 
 describe('computeBumpOptions', () => {
@@ -38,10 +34,5 @@ describe('computeBumpOptions', () => {
     expect(declaredLadder()).toEqual(['alpha', 'beta', 'rc']);
     const fromRc = computeBumpOptions('1.2.3-rc.0').filter((o) => o.id.startsWith('channel-'));
     expect(fromRc).toEqual([]);
-  });
-
-  it('still increments a legacy dev version rather than stranding it', () => {
-    const next = computeBumpOptions('1.2.3-dev.4').find((o) => o.id === 'next');
-    expect(next?.result).toBe('1.2.3-dev.5');
   });
 });

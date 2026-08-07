@@ -52,7 +52,7 @@ function parseArgs(argv: string[]): CliArgs {
 
 /**
  * Newest published release of this package.
- * @param includePrereleases include `-dev.N` / `-rc.N` builds (the `--next` channel).
+ * @param includePrereleases include `-alpha.N` / `-rc.N` builds (the `--next` channel).
  */
 async function resolveLatestVersion(
   owner: string,

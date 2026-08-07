@@ -79,7 +79,7 @@ function release(
 describe('versionFromTag', () => {
   it('extracts semver from a gitflow tag', () => {
     expect(versionFromTag('@org/pkg/v1.2.3')).toBe('1.2.3');
-    expect(versionFromTag('@org/svc/v0.4.0-dev.5')).toBe('0.4.0-dev.5');
+    expect(versionFromTag('@org/svc/v0.4.0-alpha.5')).toBe('0.4.0-alpha.5');
   });
 
   it('returns the input unchanged when no match', () => {
@@ -140,8 +140,8 @@ describe('compareVersions', () => {
   });
 
   it('stable sorts above its own pre-release', () => {
-    expect(compareVersions('1.0.0', '1.0.0-dev.1')).toBeGreaterThan(0);
-    expect(compareVersions('1.0.0-dev.1', '1.0.0')).toBeLessThan(0);
+    expect(compareVersions('1.0.0', '1.0.0-alpha.1')).toBeGreaterThan(0);
+    expect(compareVersions('1.0.0-alpha.1', '1.0.0')).toBeLessThan(0);
   });
 
   it('pre-release comparison is consistent', () => {
@@ -183,7 +183,7 @@ describe('groupByPackage', () => {
 describe('resolveVersionKeyword', () => {
   // Sorted newest-first (as groupByPackage would produce)
   const releases = [
-    release(4, '@org/svc/v2.0.0-dev.1', { prerelease: true }),
+    release(4, '@org/svc/v2.0.0-alpha.1', { prerelease: true }),
     release(3, '@org/svc/v1.1.0'),
     release(2, '@org/svc/v1.0.0-rc.1', { prerelease: true }),
     release(1, '@org/svc/v1.0.0'),
@@ -218,7 +218,7 @@ describe('resolveVersionKeyword', () => {
 
 describe('buildVersionChoices', () => {
   const releases = [
-    release(4, '@org/svc/v2.0.0-dev.1', { prerelease: true }),
+    release(4, '@org/svc/v2.0.0-alpha.1', { prerelease: true }),
     release(3, '@org/svc/v1.1.0'),
     release(2, '@org/svc/v1.0.0-rc.1', { prerelease: true }),
     release(1, '@org/svc/v1.0.0'),
