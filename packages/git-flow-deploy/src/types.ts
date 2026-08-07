@@ -30,6 +30,13 @@ export interface DeployManifest {
    * Subdirs must be relative (no leading /) and must not contain '..' segments.
    */
   sharedStorage?: boolean | string[];
+  /**
+   * Files copied from the bundle into shared storage, seed-if-missing: an
+   * existing target is never overwritten, so operator edits survive redeploys.
+   * `from` is relative to the extracted bundle dir; `to` is relative to
+   * $SHARED_STORAGE_BASE/{name}/. Both must be relative and free of '..'.
+   */
+  seedStorage?: { from: string; to: string }[];
 }
 
 export interface DeployRequest {

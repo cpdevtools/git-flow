@@ -112,6 +112,46 @@ describe('parseDeployYml', () => {
     });
   });
 
+  describe('seedStorage', () => {
+    it('parses an array of { from, to } entries', async () => {
+      const path = await write(
+        VALID_BASE + 'seedStorage:\n  - from: seed/repos.json\n    to: config/repos.json\n',
+      );
+      const manifest = await parseDeployYml(path);
+      expect(manifest.seedStorage).toEqual([{ from: 'seed/repos.json', to: 'config/repos.json' }]);
+    });
+
+    it('is undefined when absent', async () => {
+      const path = await write(VALID_BASE);
+      const manifest = await parseDeployYml(path);
+      expect(manifest.seedStorage).toBeUndefined();
+    });
+
+    it('throws when seedStorage is not an array', async () => {
+      const path = await write(VALID_BASE + 'seedStorage: nope\n');
+      await expect(parseDeployYml(path)).rejects.toThrow('seedStorage');
+    });
+
+    it('throws when an entry is missing from/to', async () => {
+      const path = await write(VALID_BASE + 'seedStorage:\n  - from: seed/x\n');
+      await expect(parseDeployYml(path)).rejects.toThrow();
+    });
+
+    it('throws when a path is absolute', async () => {
+      const path = await write(
+        VALID_BASE + 'seedStorage:\n  - from: seed/x\n    to: /etc/passwd\n',
+      );
+      await expect(parseDeployYml(path)).rejects.toThrow();
+    });
+
+    it('throws when a path contains ..', async () => {
+      const path = await write(
+        VALID_BASE + 'seedStorage:\n  - from: ../escape\n    to: config/x\n',
+      );
+      await expect(parseDeployYml(path)).rejects.toThrow();
+    });
+  });
+
   describe('mode-change fields', () => {
     it('parses method, slot, versioning and teardownCommand', async () => {
       const path = await write(

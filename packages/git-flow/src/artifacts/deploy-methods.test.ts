@@ -3,7 +3,11 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse } from 'yaml';
-import { getDeployMethod, type DeployMethodContext } from './deploy-methods.js';
+import {
+  getDeployMethod,
+  SWARM_DEPLOY_COMMAND,
+  type DeployMethodContext,
+} from './deploy-methods.js';
 
 let dir: string;
 
@@ -69,26 +73,32 @@ describe('docker.compose generateDeployYml', () => {
 });
 
 describe('docker.swarm generateDeployYml', () => {
-  it('singleton: deployCommand and teardownCommand use __STACK__ token', async () => {
+  it('singleton: deployCommand and teardownCommand use the @{ STACK } placeholder', async () => {
     await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm'));
     const m = await readDeployYml();
     expect(m.method).toBe('swarm');
     expect(m.slot).toBe('org-svc');
-    expect(m.deployCommand).toBe(
-      'set -a && . ./.env && set +a && echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker stack deploy --with-registry-auth -c stack.yml __STACK__',
-    );
-    expect(m.teardownCommand).toBe('docker stack rm __STACK__');
+    expect(m.deployCommand).toBe(SWARM_DEPLOY_COMMAND);
+    expect(m.teardownCommand).toBe('docker stack rm @{ STACK }');
   });
 
-  it('major: slot is versioned, __STACK__ token is present for substitution', async () => {
+  it('major: slot is versioned, @{ STACK } placeholder is present for rendering', async () => {
     await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
     const m = await readDeployYml();
     expect(m.slot).toBe('org-svc-v2');
-    // __STACK__ is resolved to slotStack(slot) by substituteDeployTokens at pack time
-    expect(m.deployCommand).toBe(
-      'set -a && . ./.env && set +a && echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker stack deploy --with-registry-auth -c stack.yml __STACK__',
+    // @{ STACK } is resolved to slotStack(slot) by renderDeployTemplates at pack time
+    expect(m.deployCommand).toBe(SWARM_DEPLOY_COMMAND);
+    expect(m.teardownCommand).toBe('docker stack rm @{ STACK }');
+  });
+
+  it('deployCommand merges stack.$DEPLOY_STACK_ENV.yml and fails when it is missing', () => {
+    expect(SWARM_DEPLOY_COMMAND).toContain('STACK_FILES="-c stack.yml"');
+    expect(SWARM_DEPLOY_COMMAND).toContain('if [ -n "$DEPLOY_STACK_ENV" ]');
+    expect(SWARM_DEPLOY_COMMAND).toContain('[ -f "stack.$DEPLOY_STACK_ENV.yml" ]');
+    expect(SWARM_DEPLOY_COMMAND).toContain('exit 1');
+    expect(SWARM_DEPLOY_COMMAND).toContain(
+      'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK }',
     );
-    expect(m.teardownCommand).toBe('docker stack rm __STACK__');
   });
 
   it('pins the image to the release version via .env', async () => {
