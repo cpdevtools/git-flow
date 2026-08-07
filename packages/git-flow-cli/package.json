@@ -21,12 +21,14 @@
     "@oclif/plugin-autocomplete": "^3.2.40",
     "@oclif/plugin-help": "^6.2.37",
     "prompts": "^2.4.2",
+    "semver": "^7.8.5",
     "yaml": "^2.8.2",
     "zx": "^8.2.4"
   },
   "devDependencies": {
     "@types/node": "^20.17.11",
     "@types/prompts": "^2.4.9",
+    "@types/semver": "^7.7.1",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "^9.18.0",

@@ -1,3 +1,4 @@
+import * as semver from 'semver';
 import { downloadBundle } from './download.js';
 import { handleCompose } from './methods/compose.js';
 import { handleNode } from './methods/node.js';
@@ -52,7 +53,7 @@ function parseArgs(argv: string[]): CliArgs {
 
 /**
  * Newest published release of this package.
- * @param includePrereleases include `-dev.N` / `-rc.N` builds (the `--next` channel).
+ * @param includePrereleases include `-alpha.N` / `-rc.N` builds (the `--next` channel).
  */
 async function resolveLatestVersion(
   owner: string,
@@ -80,20 +81,23 @@ async function resolveLatestVersion(
     tag_name: string;
     draft: boolean;
     prerelease: boolean;
-    created_at: string;
   }>;
 
+  const prefix = `${PACKAGE_NAME}/v`;
   const pkgReleases = releases
+    .map((r) => ({
+      draft: r.draft,
+      version: r.tag_name.startsWith(prefix)
+        ? semver.valid(r.tag_name.slice(prefix.length))
+        : null,
+    }))
     .filter(
-      (r) =>
+      (r): r is { draft: boolean; version: string } =>
         !r.draft &&
-        (includePrereleases || !r.prerelease) &&
-        r.tag_name.startsWith(`${PACKAGE_NAME}/v`),
+        r.version !== null &&
+        (includePrereleases || semver.prerelease(r.version) === null),
     )
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
+    .sort((a, b) => semver.rcompare(a.version, b.version));
 
   if (pkgReleases.length === 0) {
     throw new Error(
@@ -102,10 +106,7 @@ async function resolveLatestVersion(
     );
   }
 
-  const match = pkgReleases[0].tag_name.match(/\/v([^/]+)$/);
-  if (!match)
-    throw new Error(`Unexpected tag format: ${pkgReleases[0].tag_name}`);
-  return match[1];
+  return pkgReleases[0].version;
 }
 
 async function main(): Promise<void> {

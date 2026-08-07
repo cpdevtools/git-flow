@@ -26,7 +26,6 @@ import {
   versionFromTag,
   packageFromTag,
   parseRepoFromUrl,
-  compareVersions,
   groupByPackage,
   resolveVersionKeyword,
   buildVersionChoices,

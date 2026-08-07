@@ -22,7 +22,7 @@ describe('majorVersion', () => {
 
   it('handles a leading v and pre-release suffixes', () => {
     expect(majorVersion('v3.1.0')).toBe(3);
-    expect(majorVersion('4.0.0-dev.5')).toBe(4);
+    expect(majorVersion('4.0.0-alpha.5')).toBe(4);
   });
 
   it('returns 0 for unparseable input', () => {
