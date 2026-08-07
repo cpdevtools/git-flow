@@ -2,7 +2,10 @@ import * as semver from 'semver';
 import { $ } from 'zx';
 import { extractVersionParts, buildVersion } from './utils.js';
 
-const CHANNEL_ORDER = ['dev', 'alpha', 'beta', 'rc'] as const;
+// Must stay in semver-ascending order — see the invariant test in bumps.test.ts.
+// `dev` is retired: semver compares prerelease identifiers by ASCII, so it sorted
+// between `beta` and `rc`, and a `dev` build outranked the `alpha` that followed it.
+const CHANNEL_ORDER = ['alpha', 'beta', 'rc'] as const;
 type Channel = (typeof CHANNEL_ORDER)[number];
 
 export interface BumpOption {
@@ -58,7 +61,7 @@ function changeChannel(prerelease: string[], newChannel: Channel): string[] {
 
 /**
  * Build the patch/minor/major bump options for a base version. Each bump yields
- * both a pre-release (`-dev.0`) option and a direct stable option, so the caller
+ * both a pre-release (`-alpha.0`) option and a direct stable option, so the caller
  * can offer "start a pre-release" and "ship a stable release" side by side.
  */
 function nextVersionOptions(base: string): BumpOption[] {
@@ -68,7 +71,7 @@ function nextVersionOptions(base: string): BumpOption[] {
     opts.push({
       id: bump,
       label: bump,
-      result: buildVersion(bumped, ['dev', '0']),
+      result: buildVersion(bumped, ['alpha', '0']),
       description: 'pre-release',
       group: 'next-version',
     });
