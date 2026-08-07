@@ -207,6 +207,9 @@ importers:
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       yaml:
         specifier: ^2.8.2
         version: 2.9.0
@@ -220,6 +223,9 @@ importers:
       '@types/prompts':
         specifier: ^2.4.9
         version: 2.4.9
+      '@types/semver':
+        specifier: ^7.7.1
+        version: 7.7.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.20.0
         version: 8.62.1(@typescript-eslint/parser@8.62.1(eslint@9.39.4)(typescript@5.9.3))(eslint@9.39.4)(typescript@5.9.3)
@@ -250,6 +256,9 @@ importers:
       minimatch:
         specifier: ^10.0.1
         version: 10.2.5
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       yaml:
         specifier: ^2.8.2
         version: 2.9.0
@@ -260,6 +269,9 @@ importers:
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(postcss@8.5.16)(tsx@4.22.4)(typescript@5.9.3)(yaml@2.9.0)
@@ -324,6 +336,9 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.2.0
@@ -349,6 +364,9 @@ importers:
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       '@types/supertest':
         specifier: ^7.0.0
         version: 7.2.0
@@ -1831,6 +1849,9 @@ packages:
 
   '@types/semver@7.7.1':
     resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
+
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
   '@types/send@1.2.1':
     resolution: {integrity: sha512-arsCikDvlU99zl1g69TcAB3mzZPpxgw0UQnaHeC1Nwb015xp8bknZv5rIfri9xTOcMuaVgvabfIRA7PSZVuZIQ==}
@@ -6079,6 +6100,8 @@ snapshots:
   '@types/range-parser@1.2.7': {}
 
   '@types/semver@7.7.1': {}
+
+  '@types/semver@7.8.0': {}
 
   '@types/send@1.2.1':
     dependencies:

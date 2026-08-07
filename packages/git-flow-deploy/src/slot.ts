@@ -12,8 +12,9 @@
  * and v2 of a REST API side by side); patches/minors within a major share a slot.
  */
 
-export type VersioningStrategy = 'singleton' | 'major';
+import * as semver from 'semver';
 
+export type VersioningStrategy = 'singleton' | 'major';
 /** Convert a package name to a safe identifier (strips '@', replaces '/' with '-'). */
 export function safeName(name: string): string {
   return name.replace(/@/g, '').replace(/\//g, '-');
@@ -21,9 +22,7 @@ export function safeName(name: string): string {
 
 /** Extract the major version number from a semver string (e.g. '1.2.3' → 1). */
 export function majorVersion(version: string): number {
-  const core = version.replace(/^v/, '').split('-')[0] ?? '';
-  const major = parseInt(core.split('.')[0] ?? '', 10);
-  return Number.isNaN(major) ? 0 : major;
+  return semver.parse(version, { loose: true })?.major ?? semver.coerce(version)?.major ?? 0;
 }
 
 /**

@@ -3,7 +3,7 @@ import {
   versionFromTag,
   packageFromTag,
   parseRepoFromUrl,
-  compareVersions,
+  isPrerelease,
   groupByPackage,
   resolveVersionKeyword,
   buildVersionChoices,
@@ -52,7 +52,6 @@ function release(
   id: number,
   tag: string,
   opts: {
-    prerelease?: boolean;
     draft?: boolean;
     body?: string | null;
     assets?: { name: string }[];
@@ -64,7 +63,6 @@ function release(
     tag_name: tag,
     name: tag,
     draft: opts.draft ?? false,
-    prerelease: opts.prerelease ?? false,
     target_commitish: 'main',
     created_at: new Date(id * 1000).toISOString(),
     // Default: auto-derive deploy asset names from the body so tests don't need
@@ -122,33 +120,6 @@ describe('parseRepoFromUrl', () => {
   });
 });
 
-// ─── compareVersions ─────────────────────────────────────────────────────────
-
-describe('compareVersions', () => {
-  it('returns 0 for equal versions', () => {
-    expect(compareVersions('1.2.3', '1.2.3')).toBe(0);
-  });
-
-  it('compares major versions', () => {
-    expect(compareVersions('2.0.0', '1.9.9')).toBeGreaterThan(0);
-    expect(compareVersions('1.0.0', '2.0.0')).toBeLessThan(0);
-  });
-
-  it('compares minor and patch', () => {
-    expect(compareVersions('1.2.0', '1.1.9')).toBeGreaterThan(0);
-    expect(compareVersions('1.0.1', '1.0.2')).toBeLessThan(0);
-  });
-
-  it('stable sorts above its own pre-release', () => {
-    expect(compareVersions('1.0.0', '1.0.0-alpha.1')).toBeGreaterThan(0);
-    expect(compareVersions('1.0.0-alpha.1', '1.0.0')).toBeLessThan(0);
-  });
-
-  it('pre-release comparison is consistent', () => {
-    expect(compareVersions('1.0.0-alpha', '1.0.0-beta')).toBeLessThan(0);
-  });
-});
-
 // ─── groupByPackage ───────────────────────────────────────────────────────────
 
 describe('groupByPackage', () => {
@@ -183,9 +154,9 @@ describe('groupByPackage', () => {
 describe('resolveVersionKeyword', () => {
   // Sorted newest-first (as groupByPackage would produce)
   const releases = [
-    release(4, '@org/svc/v2.0.0-alpha.1', { prerelease: true }),
+    release(4, '@org/svc/v2.0.0-alpha.1'),
     release(3, '@org/svc/v1.1.0'),
-    release(2, '@org/svc/v1.0.0-rc.1', { prerelease: true }),
+    release(2, '@org/svc/v1.0.0-rc.1'),
     release(1, '@org/svc/v1.0.0'),
   ];
 
@@ -209,7 +180,7 @@ describe('resolveVersionKeyword', () => {
   });
 
   it('returns undefined for "latest" when no stable releases exist', () => {
-    const preOnly = releases.filter((r) => r.prerelease);
+    const preOnly = releases.filter((r) => isPrerelease(r));
     expect(resolveVersionKeyword('latest', preOnly)).toBeUndefined();
   });
 });
@@ -218,9 +189,9 @@ describe('resolveVersionKeyword', () => {
 
 describe('buildVersionChoices', () => {
   const releases = [
-    release(4, '@org/svc/v2.0.0-alpha.1', { prerelease: true }),
+    release(4, '@org/svc/v2.0.0-alpha.1'),
     release(3, '@org/svc/v1.1.0'),
-    release(2, '@org/svc/v1.0.0-rc.1', { prerelease: true }),
+    release(2, '@org/svc/v1.0.0-rc.1'),
     release(1, '@org/svc/v1.0.0'),
   ];
 

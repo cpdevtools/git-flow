@@ -1,6 +1,7 @@
 import { writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
+import * as semver from 'semver';
 import { $ } from 'zx';
 import type {
   NpmPublishOptions,
@@ -83,10 +84,10 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   console.log(`  📝 Writing .npmrc to ${npmrcPath}`);
   await writeFile(npmrcPath, npmrcContent);
 
-  // Detect prerelease tag from tarball filename (e.g. pkg-1.2.3-alpha.0.tgz → 'alpha')
-  const filenameVersion = basename(artifactPath).match(/(\d+\.\d+\.\d+(?:-.+?)?)\.tgz$/)?.[1];
-  const prereleaseTag = filenameVersion?.includes('-')
-    ? filenameVersion.split('-')[1].split('.')[0]
+  // The dist-tag is the first prerelease identifier (e.g. pkg-1.2.3-alpha.0.tgz → 'alpha').
+  const filenameVersion = basename(artifactPath).match(/-(\d.*?)\.tgz$/)?.[1];
+  const prereleaseTag = filenameVersion
+    ? String(semver.prerelease(filenameVersion)?.[0] ?? '') || undefined
     : undefined;
 
   // Add --provenance when OIDC is available (GitHub Actions with id-token: write)

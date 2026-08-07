@@ -4,6 +4,7 @@
  */
 
 import type prompts from 'prompts';
+import * as semver from 'semver';
 import { parse as parseYaml } from 'yaml';
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -13,7 +14,6 @@ export interface GHRelease {
   tag_name: string;
   name: string;
   draft: boolean;
-  prerelease: boolean;
   target_commitish: string;
   created_at: string;
   assets: { name: string }[];
@@ -54,50 +54,31 @@ export function parseRepoFromUrl(remoteUrl: string): string {
   return match[1];
 }
 
-// ─── version comparison ───────────────────────────────────────────────────────
+// ─── version helpers ──────────────────────────────────────────────────────────
 
-/**
- * Semver-aware comparison.
- * Returns negative if a < b, 0 if equal, positive if a > b.
- * Pre-release versions sort below their stable equivalent.
- */
-export function compareVersions(a: string, b: string): number {
-  const splitSemver = (v: string): [number[], string] => {
-    const [core, pre = ''] = v.split('-');
-    const nums = (core || '0.0.0').split('.').map((n) => parseInt(n, 10) || 0);
-    return [nums, pre];
-  };
-
-  const [numsA, preA] = splitSemver(a);
-  const [numsB, preB] = splitSemver(b);
-
-  for (let i = 0; i < 3; i++) {
-    const diff = (numsA[i] ?? 0) - (numsB[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-
-  // Same core: stable > pre-release
-  if (preA && !preB) return -1;
-  if (!preA && preB) return 1;
-  return preA.localeCompare(preB);
+/** True when the release's tag carries a semver pre-release (e.g. `1.2.3-alpha.0`). */
+export function isPrerelease(release: GHRelease): boolean {
+  return semver.prerelease(versionFromTag(release.tag_name)) !== null;
 }
 
 // ─── release grouping ─────────────────────────────────────────────────────────
 
 /**
  * Group releases by package name (extracted from tag).
- * Each group is sorted newest-first by version.
- * Releases with non-gitflow tags are excluded.
+ * Each group is sorted newest-first by semver.
+ * Tags that aren't `{name}/v{semver}` are excluded.
  */
 export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[]> {
   const groups: Record<string, GHRelease[]> = {};
   for (const r of releases) {
     const pkg = packageFromTag(r.tag_name);
-    if (!pkg) continue;
+    if (!pkg || !semver.valid(versionFromTag(r.tag_name))) continue;
     (groups[pkg] ??= []).push(r);
   }
   for (const pkg of Object.keys(groups)) {
-    groups[pkg].sort((a, b) => compareVersions(versionFromTag(b.tag_name), versionFromTag(a.tag_name)));
+    groups[pkg].sort((a, b) =>
+      semver.rcompare(versionFromTag(a.tag_name), versionFromTag(b.tag_name)),
+    );
   }
   return groups;
 }
@@ -108,7 +89,7 @@ export function groupByPackage(releases: GHRelease[]): Record<string, GHRelease[
  * Resolve a version keyword or explicit version string to a release.
  * - `"latest"` → highest non-pre-release version
  * - `"next"`   → highest version including pre-releases
- * - anything else → exact semver match against tag
+ * - anything else → semver-equal match against tag
  *
  * Assumes releases are already sorted newest-first.
  */
@@ -116,9 +97,10 @@ export function resolveVersionKeyword(
   keyword: string,
   releases: GHRelease[],
 ): GHRelease | undefined {
-  if (keyword === 'latest') return releases.find((r) => !r.prerelease);
+  if (keyword === 'latest') return releases.find((r) => !isPrerelease(r));
   if (keyword === 'next') return releases[0];
-  return releases.find((r) => versionFromTag(r.tag_name) === keyword);
+  if (!semver.valid(keyword)) return undefined;
+  return releases.find((r) => semver.eq(versionFromTag(r.tag_name), keyword));
 }
 
 /** Sentinel value returned when the user selects "Show more versions...". */
@@ -140,10 +122,10 @@ export function buildVersionChoices(releases: GHRelease[], showAll = false): pro
   const seen = new Set<number>();
 
   const next = releases[0];
-  const latest = releases.find((r) => !r.prerelease);
+  const latest = releases.find((r) => !isPrerelease(r));
 
   if (next) {
-    const label = `next   — ${versionFromTag(next.tag_name)}${next.prerelease ? ' (pre-release)' : ''}`;
+    const label = `next   — ${versionFromTag(next.tag_name)}${isPrerelease(next) ? ' (pre-release)' : ''}`;
     choices.push({ title: label, value: next });
     seen.add(next.id);
   }
@@ -157,7 +139,7 @@ export function buildVersionChoices(releases: GHRelease[], showAll = false): pro
     if (seen.has(r.id)) continue;
     if (!showAll && shown >= VISIBLE) break;
     const ver = versionFromTag(r.tag_name);
-    choices.push({ title: `${ver}${r.prerelease ? ' (pre-release)' : ''}`, value: r });
+    choices.push({ title: `${ver}${isPrerelease(r) ? ' (pre-release)' : ''}`, value: r });
     seen.add(r.id);
     shown++;
   }

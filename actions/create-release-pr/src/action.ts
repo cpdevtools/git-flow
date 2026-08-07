@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { readFile } from 'node:fs/promises';
+import * as semver from 'semver';
 import { parse as parseYaml } from 'yaml';
 import { resolveVersion } from '@cpdevtools/git-flow/version';
 import { parseJson } from '@cpdevtools/ts-dev-utilities/json';
@@ -113,9 +114,8 @@ async function run() {
       const uniqueVersions = [...new Set(groupProjects.map(p => p.resolvedVersion))];
       if (uniqueVersions.length <= 1) continue;
 
-      // Pick the "latest" version — a bumped version (e.g. 1.0.0-rc.78.build.0) always
-      // sorts after the base (1.0.0-rc.78) because the extra segments extend the string.
-      const groupVersion = [...uniqueVersions].sort().pop()!;
+      // Pick the highest version in the group by semver.
+      const groupVersion = semver.rsort([...uniqueVersions])[0];
 
       core.warning(
         `Version group '${placeholder}' has mixed versions [${uniqueVersions.join(', ')}] — normalizing all to ${groupVersion}`,
