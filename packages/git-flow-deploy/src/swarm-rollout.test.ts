@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   aggregateRollout,
   rolloutStateOf,
+  serviceRollout,
   stackRollout,
   type DockerResult,
   type DockerRunner,
@@ -160,5 +161,43 @@ describe('stackRollout', () => {
     );
     expect(r.state).toBe('in-progress');
     expect(r.services.map((s) => s.service)).toEqual(['gw_api', 'gw_worker']);
+  });
+});
+
+describe('serviceRollout', () => {
+  it('reads the one service and never lists the stack', () => {
+    const calls: string[][] = [];
+    const r = serviceRollout(
+      'webservice_gw-v1',
+      fakeDocker(['webservice_gw-v1'], { 'webservice_gw-v1': update('completed') }, calls),
+    );
+    expect(r.state).toBe('converged');
+    expect(calls).toEqual([
+      ['service', 'inspect', 'webservice_gw-v1', '--format', '{{json .UpdateStatus}}'],
+    ]);
+  });
+
+  it('ignores a sibling service in the shared stack that rolled back', () => {
+    const calls: string[][] = [];
+    const r = serviceRollout(
+      'webservice_gw-v1',
+      fakeDocker(
+        ['webservice_gw-v1', 'webservice_other'],
+        {
+          'webservice_gw-v1': update('completed'),
+          'webservice_other': update('rollback_completed'),
+        },
+        calls,
+      ),
+    );
+    expect(r.state).toBe('converged');
+  });
+
+  it('rejects a service name that could be read as a flag', () => {
+    const r = serviceRollout('--help', () => {
+      throw new Error('docker must not be invoked');
+    });
+    expect(r.state).toBe('unknown');
+    expect(r.error).toContain('invalid service name');
   });
 });

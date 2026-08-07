@@ -22,7 +22,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
-import { deploymentSlot, slotStack, type VersioningStrategy } from './slot.js';
+import { deploymentSlot, type VersioningStrategy } from './slot.js';
 
 /**
  * Upsert variables into the bundle's `.env`.
@@ -69,6 +69,11 @@ export interface DeployMethodContext {
    * deployment slot baked into resource names. Defaults to 'singleton'.
    */
   versioning?: VersioningStrategy;
+  /**
+   * Shared stack this artifact deploys into, when it does not get one of its
+   * own. Set means other services live alongside it and must survive teardown.
+   */
+  stack?: string;
 }
 
 export interface DeployMethodHandler {
@@ -234,8 +239,7 @@ registerDeployMethod('docker', 'swarm', {
       }
     }
   },
-  async generateDeployYml({ deployOutputDir, projectName, version, versioning }) {
-    const stackName = slotStack(deploymentSlot(projectName, version, versioning));
+  async generateDeployYml({ deployOutputDir, projectName, version, versioning, stack }) {
     await upsertDeployEnv(deployOutputDir, { DEPLOY_IMAGE_TAG: version });
     await writeFile(
       join(deployOutputDir, 'deploy.yml'),
@@ -261,7 +265,9 @@ registerDeployMethod('docker', 'swarm', {
         // private/internal image pull fails on every worker while the deploy
         // itself reports success.
         deployCommand: SWARM_DEPLOY_COMMAND,
-        teardownCommand: `docker stack rm @{ STACK }`,
+        // A shared stack holds other services, so removing it would take them
+        // down too; drop just this service instead.
+        teardownCommand: stack ? `docker service rm @{ SERVICE_NAME }` : `docker stack rm @{ STACK }`,
       }),
     );
   },

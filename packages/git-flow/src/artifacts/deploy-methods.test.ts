@@ -19,7 +19,11 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function ctx(method: string, versioning?: 'singleton' | 'major'): DeployMethodContext {
+function ctx(
+  method: string,
+  versioning?: 'singleton' | 'major',
+  stack?: string,
+): DeployMethodContext {
   return {
     projectCwd: dir,
     deployOutputDir: dir,
@@ -27,6 +31,7 @@ function ctx(method: string, versioning?: 'singleton' | 'major'): DeployMethodCo
     version: '2.3.5',
     method,
     versioning,
+    stack,
   };
 }
 
@@ -89,6 +94,14 @@ describe('docker.swarm generateDeployYml', () => {
     // @{ STACK } is resolved to slotStack(slot) by renderDeployTemplates at pack time
     expect(m.deployCommand).toBe(SWARM_DEPLOY_COMMAND);
     expect(m.teardownCommand).toBe('docker stack rm @{ STACK }');
+  });
+
+  it('shared stack: tears down only this service, leaving its siblings up', async () => {
+    await getDeployMethod('docker', 'swarm')!.generateDeployYml(
+      ctx('swarm', 'major', 'webservice'),
+    );
+    const m = await readDeployYml();
+    expect(m.teardownCommand).toBe('docker service rm @{ SERVICE_NAME }');
   });
 
   it('deployCommand merges stack.$DEPLOY_STACK_ENV.yml and fails when it is missing', () => {

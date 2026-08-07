@@ -37,8 +37,8 @@ export interface DockerResult {
 /** Injected so the mapping and aggregation can be tested without a swarm. */
 export type DockerRunner = (args: string[]) => DockerResult;
 
-/** Stack names become argv entries; keep them to what swarm itself accepts. */
-const STACK_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+/** Stack and service names become argv entries; keep them to what swarm itself accepts. */
+const SWARM_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
 const defaultRunner: DockerRunner = (args) => {
   const res = spawnSync('docker', args, { encoding: 'utf-8' });
@@ -85,9 +85,26 @@ export function aggregateRollout(services: readonly SwarmServiceRollout[]): Swar
   return 'unknown';
 }
 
+/**
+ * Read the rollout state of one service.
+ *
+ * The only correct read when the stack is shared: `stackRollout` fails or blocks
+ * on any sibling service's update, which has nothing to do with this deploy.
+ */
+export function serviceRollout(
+  service: string,
+  run: DockerRunner = defaultRunner,
+): SwarmStackRollout {
+  if (!SWARM_NAME.test(service)) {
+    return { state: 'unknown', services: [], error: `invalid service name: ${service}` };
+  }
+  const rollout = inspectService(service, run);
+  return { state: rollout.state, services: [rollout] };
+}
+
 /** Read the rollout state of every service in a stack. Never throws. */
 export function stackRollout(stack: string, run: DockerRunner = defaultRunner): SwarmStackRollout {
-  if (!STACK_NAME.test(stack)) {
+  if (!SWARM_NAME.test(stack)) {
     return { state: 'unknown', services: [], error: `invalid stack name: ${stack}` };
   }
 
