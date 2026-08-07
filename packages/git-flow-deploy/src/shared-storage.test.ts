@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { mkdtemp, rm, stat, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { prepareSharedStorage, declaresSharedStorage, sharedStorageDir } from './shared-storage.js';
+import {
+  prepareSharedStorage,
+  declaresSharedStorage,
+  sharedStorageDir,
+  prepareSeedStorage,
+  declaresSeedStorage,
+} from './shared-storage.js';
 import type { DeployManifest } from './types.js';
 
 let baseDir: string;
@@ -106,5 +112,69 @@ describe('declaresSharedStorage', () => {
 describe('sharedStorageDir', () => {
   it('matches the __SERVICE__ token, not the raw package name', () => {
     expect(sharedStorageDir(manifest, '/shared')).toBe('/shared/org-my-service');
+  });
+});
+
+describe('prepareSeedStorage', () => {
+  let bundleDir: string;
+
+  beforeEach(async () => {
+    bundleDir = await mkdtemp(join(tmpdir(), 'seed-bundle-test-'));
+    await mkdir(join(bundleDir, 'seed'), { recursive: true });
+    await writeFile(join(bundleDir, 'seed', 'repos.json'), '{"allow":["a/*"],"deny":[]}');
+  });
+
+  afterEach(async () => {
+    await rm(bundleDir, { recursive: true, force: true });
+  });
+
+  const seed = { from: 'seed/repos.json', to: 'repos-config/repos.json' };
+  const dest = () => join(baseDir, 'org-my-service', 'repos-config', 'repos.json');
+
+  it('is a no-op when seedStorage is absent', async () => {
+    await prepareSeedStorage({ ...manifest }, baseDir, bundleDir);
+    expect(await dirExists(join(baseDir, 'org-my-service'))).toBe(false);
+  });
+
+  it('copies the file when the target is missing', async () => {
+    await prepareSeedStorage({ ...manifest, seedStorage: [seed] }, baseDir, bundleDir);
+    expect(await readFile(dest(), 'utf-8')).toBe('{"allow":["a/*"],"deny":[]}');
+  });
+
+  it('does not overwrite an existing target (seed-if-missing)', async () => {
+    await mkdir(join(baseDir, 'org-my-service', 'repos-config'), { recursive: true });
+    await writeFile(dest(), 'EDITED');
+    await prepareSeedStorage({ ...manifest, seedStorage: [seed] }, baseDir, bundleDir);
+    expect(await readFile(dest(), 'utf-8')).toBe('EDITED');
+  });
+
+  it('throws when from escapes the bundle', async () => {
+    await expect(
+      prepareSeedStorage(
+        { ...manifest, seedStorage: [{ from: '../secret', to: 'x' }] },
+        baseDir,
+        bundleDir,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('throws when to escapes the service dir', async () => {
+    await expect(
+      prepareSeedStorage(
+        { ...manifest, seedStorage: [{ from: 'seed/repos.json', to: '../escape' }] },
+        baseDir,
+        bundleDir,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('declaresSeedStorage', () => {
+  it('is true only for a populated array', () => {
+    expect(
+      declaresSeedStorage({ ...manifest, seedStorage: [{ from: 'a', to: 'b' }] }),
+    ).toBe(true);
+    expect(declaresSeedStorage({ ...manifest, seedStorage: [] })).toBe(false);
+    expect(declaresSeedStorage({ ...manifest })).toBe(false);
   });
 });

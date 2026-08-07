@@ -3,9 +3,11 @@
  */
 
 import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
-import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
+import nunjucks from 'nunjucks';
 import { parse, parseDocument, stringify } from 'yaml';
 import { $ } from 'zx';
 import {
@@ -210,43 +212,115 @@ export async function executePack(
 }
 
 /**
- * Replace __TOKEN__ placeholders in every text file under `dir`.
+ * Template delimiters for deploy files.
+ *
+ * Deliberately not `{{ }}`/`${ }`: the rendered output still contains literal
+ * `${VAR}` that `docker stack deploy` interpolates at deploy time, and that must
+ * survive this pass untouched.
+ */
+const DEPLOY_TEMPLATE_TAGS = {
+  variableStart: '@{',
+  variableEnd: '}',
+  blockStart: '@%',
+  blockEnd: '%@',
+  commentStart: '@#',
+  commentEnd: '#@',
+};
+
+/**
+ * Render every text file under `dir` as a nunjucks template.
  *
  * Runs at pack time — after all source files are in the deploy output dir and
- * deploy.yml has been generated — so baked-in values like __SERVICE_ID__ work
+ * deploy.yml has been generated — so baked-in values like `@{ SERVICE_ID }` work
  * in places where runtime env interpolation doesn't (e.g. YAML map keys).
+ *
+ * `file()` returns a sibling's *rendered* content, so a checksum taken over it
+ * covers the bytes that actually ship. Results are memoized, so each file is
+ * rendered once no matter which order the walk reaches it in.
  */
-export async function substituteDeployTokens(
+export async function renderDeployTemplates(
   dir: string,
-  tokens: Record<string, string>,
+  values: Record<string, string>,
 ): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await substituteDeployTokens(fullPath, tokens);
-      continue;
+  const root = resolve(dir);
+  const env = new nunjucks.Environment(null, {
+    autoescape: false,
+    throwOnUndefined: true,
+    tags: DEPLOY_TEMPLATE_TAGS,
+  });
+
+  const rendered = new Map<string, string>();
+  const active = new Set<string>();
+
+  const readRendered = (templatePath: string): string => {
+    const target = resolve(root, templatePath);
+    if (target !== root && !target.startsWith(root + sep)) {
+      throw new Error(`file() escapes the deploy bundle: ${templatePath}`);
     }
-    if (!entry.isFile()) continue;
-    let content: string;
+    const key = relative(root, target);
+    const cached = rendered.get(key);
+    if (cached !== undefined) return cached;
+    if (active.has(key)) {
+      throw new Error(`Circular file() reference in deploy templates: ${key}`);
+    }
+    active.add(key);
     try {
-      content = await readFile(fullPath, 'utf-8');
+      return render(key, readFileSync(target, 'utf-8'));
+    } finally {
+      active.delete(key);
+    }
+  };
+
+  const context: Record<string, unknown> = {
+    ...values,
+    file: readRendered,
+    sha256: (input: string) => createHash('sha256').update(String(input)).digest('hex'),
+    shortHash: (input: string) =>
+      createHash('sha256').update(String(input)).digest('hex').slice(0, 12),
+    now: () => Date.now(),
+    envVar: (name: string, fallback = '') => process.env[name] ?? fallback,
+  };
+
+  const render = (key: string, content: string): string => {
+    let output: string;
+    try {
+      output = env.renderString(content, context);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to render deploy template '${key}': ${message}`);
+    }
+    rendered.set(key, output);
+    return output;
+  };
+
+  const walk = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      let content: string;
+      try {
+        content = readFileSync(fullPath, 'utf-8');
+      } catch {
+        continue;
+      }
       if (content.includes('\0')) continue; // binary file
-    } catch {
-      continue;
+      const key = relative(root, fullPath);
+      const output = rendered.get(key) ?? render(key, content);
+      if (output !== content) writeFileSync(fullPath, output, 'utf-8');
     }
-    let result = content;
-    for (const [key, value] of Object.entries(tokens)) {
-      result = result.replaceAll(`__${key}__`, value);
-    }
-    if (result !== content) await writeFile(fullPath, result, 'utf-8');
-  }
+  };
+
+  walk(root);
 }
 
 /**
- * Build the token map for deploy template substitution.
+ * Build the value map exposed to deploy templates.
  */
-export function deployTokens(
+export function deployContext(
   projectName: string,
   version: string,
   versioning: VersioningStrategy,
@@ -301,6 +375,53 @@ export function normalizeSharedStorage(
 }
 
 /**
+ * Validate an artifact's `seedStorage` declaration from release-artifacts.yml.
+ *
+ * Mirrors the manifest-side rules in @cpdevtools/git-flow-deploy so a bad value
+ * fails at pack time rather than mid-deploy.
+ */
+export function normalizeSeedStorage(
+  raw: unknown,
+  artifactLabel: string,
+): { from: string; to: string }[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `Invalid seedStorage on artifact '${artifactLabel}': expected an array of { from, to } objects.`,
+    );
+  }
+  return raw.map((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) {
+      throw new Error(
+        `seedStorage[${index}] on artifact '${artifactLabel}' must be an object with 'from' and 'to'`,
+      );
+    }
+    const { from, to } = entry as { from?: unknown; to?: unknown };
+    for (const [key, value] of [
+      ['from', from],
+      ['to', to],
+    ] as const) {
+      if (typeof value !== 'string' || value === '') {
+        throw new Error(
+          `seedStorage[${index}].${key} on artifact '${artifactLabel}' must be a non-empty string`,
+        );
+      }
+      if (value.startsWith('/')) {
+        throw new Error(
+          `seedStorage[${index}].${key} on artifact '${artifactLabel}' must be a relative path: ${value}`,
+        );
+      }
+      if (value.split('/').includes('..')) {
+        throw new Error(
+          `seedStorage[${index}].${key} on artifact '${artifactLabel}' must not contain '..': ${value}`,
+        );
+      }
+    }
+    return { from: from as string, to: to as string };
+  });
+}
+
+/**
  *
  * Resolution chain per (artifact, method) pair — first match wins:
  *   1. .deploy/{method}/ folder   — copy files; fall through to handler.generateDeployYml
@@ -317,7 +438,12 @@ async function executePackDeploy(
   descriptor: ProjectArtifactDescriptor,
   uploadCtx: UploadContext,
 ): Promise<void> {
-  type WithDeploy = { deploy?: string[]; versioning?: string; sharedStorage?: unknown };
+  type WithDeploy = {
+    deploy?: string[];
+    versioning?: string;
+    sharedStorage?: unknown;
+    seedStorage?: unknown;
+  };
   const artifactsWithDeploy = descriptor.artifacts.filter(
     (a: Artifact) =>
       Array.isArray((a as unknown as WithDeploy).deploy) &&
@@ -342,6 +468,10 @@ async function executePackDeploy(
       const versioning = (rawVersioning ?? 'singleton') as VersioningStrategy;
       const sharedStorage = normalizeSharedStorage(
         (artifact as unknown as WithDeploy).sharedStorage,
+        (artifact as { name?: string }).name ?? artifact.type,
+      );
+      const seedStorage = normalizeSeedStorage(
+        (artifact as unknown as WithDeploy).seedStorage,
         (artifact as { name?: string }).name ?? artifact.type,
       );
       for (const method of methods) {
@@ -459,6 +589,9 @@ async function executePackDeploy(
             ...(deployMeta.sharedStorage === undefined && sharedStorage !== undefined
               ? { sharedStorage }
               : {}),
+            ...(deployMeta.seedStorage === undefined && seedStorage !== undefined
+              ? { seedStorage }
+              : {}),
             name: project.name,
             version: project.version,
             repo: `https://github.com/${process.env.GITHUB_REPOSITORY ?? ''}`,
@@ -466,12 +599,11 @@ async function executePackDeploy(
           }),
         );
 
-        // Substitute __TOKEN__ placeholders in all text files (including
-        // deploy.yml itself) so baked-in values work in YAML keys and anywhere
-        // else runtime env interpolation can't reach.
-        await substituteDeployTokens(
+        // Render all text files (including deploy.yml itself) so baked-in values
+        // work in YAML keys and anywhere else runtime env interpolation can't reach.
+        await renderDeployTemplates(
           deployOutputDir,
-          deployTokens(project.name, project.version, versioning),
+          deployContext(project.name, project.version, versioning),
         );
 
         // Zip the deploy output dir and upload directly

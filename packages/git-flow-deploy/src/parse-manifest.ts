@@ -15,6 +15,28 @@ function validateSharedStorageEntry(entry: unknown, index: number): string {
   return entry;
 }
 
+function validateSeedStorageEntry(entry: unknown, index: number): { from: string; to: string } {
+  if (typeof entry !== 'object' || entry === null) {
+    throw new Error(`seedStorage[${index}] must be an object with 'from' and 'to'`);
+  }
+  const { from, to } = entry as { from?: unknown; to?: unknown };
+  for (const [key, value] of [
+    ['from', from],
+    ['to', to],
+  ] as const) {
+    if (typeof value !== 'string' || value === '') {
+      throw new Error(`seedStorage[${index}].${key} must be a non-empty string`);
+    }
+    if (value.startsWith('/')) {
+      throw new Error(`seedStorage[${index}].${key} must be a relative path: ${value}`);
+    }
+    if (value.split('/').includes('..')) {
+      throw new Error(`seedStorage[${index}].${key} must not contain '..': ${value}`);
+    }
+  }
+  return { from: from as string, to: to as string };
+}
+
 /**
  * Parse and validate a deploy.yml manifest file.
  */
@@ -66,6 +88,13 @@ export async function parseDeployYml(path: string): Promise<DeployManifest> {
     } else {
       throw new Error(`deploy.yml sharedStorage must be true or an array of strings`);
     }
+  }
+
+  if (raw['seedStorage'] !== undefined) {
+    if (!Array.isArray(raw['seedStorage'])) {
+      throw new Error(`deploy.yml seedStorage must be an array of { from, to } objects`);
+    }
+    manifest.seedStorage = (raw['seedStorage'] as unknown[]).map(validateSeedStorageEntry);
   }
 
   return manifest;

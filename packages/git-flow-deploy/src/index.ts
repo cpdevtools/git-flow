@@ -8,6 +8,8 @@ export {
   prepareSharedStorage,
   declaresSharedStorage,
   sharedStorageDir,
+  prepareSeedStorage,
+  declaresSeedStorage,
 } from './shared-storage.js';
 export type { VersioningStrategy } from './slot.js';
 export { safeName, majorVersion, deploymentSlot, slotStack } from './slot.js';

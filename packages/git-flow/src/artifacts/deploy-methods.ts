@@ -193,6 +193,30 @@ registerDeployMethod('docker', 'compose', {
 });
 
 // ── docker.swarm ───────────────────────────────────────────────────────────
+
+/**
+ * Environment variable naming the `stack.<env>.yml` overlay to merge, if any.
+ */
+export const SWARM_STACK_ENV_VAR = 'DEPLOY_STACK_ENV';
+
+/**
+ * Swarm deploy command baked into every generated deploy.yml.
+ *
+ * `@{ STACK }` is resolved at pack time; `$DEPLOY_STACK_ENV` is resolved by the
+ * shell at deploy time, so one bundle can target several environments.
+ */
+export const SWARM_DEPLOY_COMMAND = [
+  'set -a && . ./.env && set +a',
+  '&& echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null;',
+  'STACK_FILES="-c stack.yml";',
+  `if [ -n "$${SWARM_STACK_ENV_VAR}" ]; then`,
+  `[ -f "stack.$${SWARM_STACK_ENV_VAR}.yml" ] ||`,
+  `{ echo "deploy: stack.$${SWARM_STACK_ENV_VAR}.yml not found in bundle" >&2; exit 1; };`,
+  `STACK_FILES="$STACK_FILES -c stack.$${SWARM_STACK_ENV_VAR}.yml";`,
+  'fi;',
+  'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK }',
+].join(' ');
+
 registerDeployMethod('docker', 'swarm', {
   async copyFiles({ projectCwd, deployOutputDir }) {
     const stackFile = join(projectCwd, 'stack.yml');
@@ -201,7 +225,8 @@ registerDeployMethod('docker', 'swarm', {
     }
     await mkdir(deployOutputDir, { recursive: true });
     await copyFile(stackFile, join(deployOutputDir, 'stack.yml'));
-    // Copy stack.*.yml overlays
+    // stack.<env>.yml overlays — the deployCommand merges one of these on top of
+    // stack.yml when DEPLOY_STACK_ENV names it.
     const all = await readdir(projectCwd);
     for (const file of all) {
       if (file.startsWith('stack.') && file.endsWith('.yml') && file !== 'stack.yml') {
@@ -218,18 +243,25 @@ registerDeployMethod('docker', 'swarm', {
         method: 'swarm',
         slot: deploymentSlot(projectName, version, versioning),
         versioning: versioning ?? 'singleton',
-        // __SERVICE_ID__ and __STACK__ are substituted at pack time by
-        // substituteDeployTokens — they resolve correctly in YAML map keys
+        // @{ SERVICE_ID } and @{ STACK } are rendered at pack time by
+        // renderDeployTemplates — they resolve correctly in YAML map keys
         // (where runtime ${VAR} interpolation does not work) and let
         // projects use them in stack.yml service names too.
+        //
+        // DEPLOY_STACK_ENV merges stack.<env>.yml over stack.yml. Docker only
+        // creates the config/secret objects declared in the files it is given, so
+        // per-env objects belong in an overlay: declaring every env in stack.yml
+        // would create all of them on every deploy regardless of which is mounted.
+        // A named-but-missing overlay is fatal — silently deploying without an
+        // env's configs is worse than failing.
         //
         // --with-registry-auth ships the manager's registry credentials to the
         // nodes along with the service spec. Deploys land on a manager but the
         // tasks run on workers, which have no login of their own — without it a
         // private/internal image pull fails on every worker while the deploy
         // itself reports success.
-        deployCommand: `set -a && . ./.env && set +a && echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null; docker stack deploy --with-registry-auth -c stack.yml __STACK__`,
-        teardownCommand: `docker stack rm __STACK__`,
+        deployCommand: SWARM_DEPLOY_COMMAND,
+        teardownCommand: `docker stack rm @{ STACK }`,
       }),
     );
   },

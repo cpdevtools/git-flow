@@ -1,5 +1,5 @@
-import { mkdir } from 'node:fs/promises';
-import { isAbsolute, resolve, join, sep } from 'node:path';
+import { mkdir, copyFile, access } from 'node:fs/promises';
+import { isAbsolute, resolve, join, sep, dirname } from 'node:path';
 import { safeName } from './slot.js';
 import type { DeployManifest } from './types.js';
 
@@ -63,5 +63,66 @@ export async function prepareSharedStorage(
       throw new Error(`sharedStorage entry escapes service directory: ${subdir}`);
     }
     await mkdir(resolved, { recursive: true });
+  }
+}
+
+/**
+ * Whether a manifest asks to seed any bundle files into shared storage.
+ */
+export function declaresSeedStorage(manifest: DeployManifest): boolean {
+  return Array.isArray(manifest.seedStorage) && manifest.seedStorage.length > 0;
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Copy bundle files into a service's shared storage, seed-if-missing.
+ *
+ * For each { from, to }: `from` is resolved within `bundleDir`, `to` within
+ * `baseDir/{service}/`. An existing target is left untouched, so a redeploy never
+ * clobbers a file an operator has edited in place (e.g. an allowlist).
+ *
+ * Path traversal protection: both `from` and `to` must be relative, must not
+ * contain '..', and must resolve within their respective roots.
+ */
+export async function prepareSeedStorage(
+  manifest: DeployManifest,
+  baseDir: string,
+  bundleDir: string,
+): Promise<void> {
+  if (!declaresSeedStorage(manifest)) return;
+
+  const serviceDir = sharedStorageDir(manifest, baseDir);
+  const canonicalServiceDir = resolve(serviceDir) + sep;
+  const canonicalBundleDir = resolve(bundleDir) + sep;
+
+  for (const { from, to } of manifest.seedStorage!) {
+    if (isAbsolute(from) || from.split('/').includes('..')) {
+      throw new Error(`seedStorage 'from' must be a relative path without '..': ${from}`);
+    }
+    if (isAbsolute(to) || to.split('/').includes('..')) {
+      throw new Error(`seedStorage 'to' must be a relative path without '..': ${to}`);
+    }
+
+    const src = resolve(bundleDir, from);
+    if (!src.startsWith(canonicalBundleDir)) {
+      throw new Error(`seedStorage 'from' escapes the bundle: ${from}`);
+    }
+    const dest = resolve(serviceDir, to);
+    if (!dest.startsWith(canonicalServiceDir)) {
+      throw new Error(`seedStorage 'to' escapes service directory: ${to}`);
+    }
+
+    // Seed-if-missing: never overwrite an existing (possibly operator-edited) file.
+    if (await pathExists(dest)) continue;
+    await mkdir(dirname(dest), { recursive: true });
+    await copyFile(src, dest);
   }
 }
