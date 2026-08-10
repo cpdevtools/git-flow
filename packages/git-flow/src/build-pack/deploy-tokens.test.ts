@@ -41,6 +41,15 @@ describe('deployContext', () => {
     expect(t['SERVICE_ID']).toBe('org-my-svc');
     expect(t['STACK']).toBe('webservices');
   });
+
+  it('SERVICE_NAME is what docker names the service: <stack>_<service key>', () => {
+    expect(deployContext('@org/my-svc', '2.5.0', 'major')['SERVICE_NAME']).toBe(
+      'org_my_svc_v2_org-my-svc-v2',
+    );
+    expect(deployContext('@org/my-svc', '2.5.0', 'major', 'webservice')['SERVICE_NAME']).toBe(
+      'webservice_org-my-svc-v2',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

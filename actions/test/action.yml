@@ -66,6 +66,16 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 
+    # Project builds may pull private base images from ghcr.io. Skipped on runners
+    # without docker so non-container repos don't require it.
+    - name: Configure container registry auth
+      shell: bash
+      run: |
+        command -v docker >/dev/null || exit 0
+        echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
     - name: Install workspace dependencies
       shell: bash
       run: pnpm install --lockfile-dir .pnpm-prod

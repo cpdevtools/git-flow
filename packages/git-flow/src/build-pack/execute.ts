@@ -328,10 +328,14 @@ export function deployContext(
 ): Record<string, string> {
   const serviceId = deploymentSlot(projectName, version, versioning);
   const service = safeName(projectName);
+  const stack = stackOverride ?? slotStack(serviceId);
   return {
     SERVICE: service,
     SERVICE_ID: serviceId,
-    STACK: stackOverride ?? slotStack(serviceId),
+    STACK: stack,
+    // What docker names the running service. Assumes the stack file keys its
+    // service on SERVICE_ID, which is the convention these tokens exist to make.
+    SERVICE_NAME: `${stack}_${serviceId}`,
     VERSION: version,
     MAJOR: String(majorVersion(version)),
   };
@@ -441,6 +445,7 @@ async function executePackDeploy(
   type WithDeploy = {
     deploy?: string[];
     versioning?: string;
+    stack?: string;
     sharedStorage?: unknown;
     seedStorage?: unknown;
   };
@@ -466,6 +471,17 @@ async function executePackDeploy(
         );
       }
       const versioning = (rawVersioning ?? 'singleton') as VersioningStrategy;
+      // Opt-in for hosts that run many services in one shared stack; default is
+      // a stack per slot.
+      const stackOverride = (artifact as unknown as WithDeploy).stack;
+      if (
+        stackOverride !== undefined &&
+        (typeof stackOverride !== 'string' || stackOverride.trim() === '')
+      ) {
+        throw new Error(
+          `Invalid stack on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected a non-empty string.`,
+        );
+      }
       const sharedStorage = normalizeSharedStorage(
         (artifact as unknown as WithDeploy).sharedStorage,
         (artifact as { name?: string }).name ?? artifact.type,
@@ -495,6 +511,7 @@ async function executePackDeploy(
           version: project.version,
           method,
           versioning,
+          stack: stackOverride,
         };
 
         const env = {
@@ -603,7 +620,7 @@ async function executePackDeploy(
         // work in YAML keys and anywhere else runtime env interpolation can't reach.
         await renderDeployTemplates(
           deployOutputDir,
-          deployContext(project.name, project.version, versioning),
+          deployContext(project.name, project.version, versioning, stackOverride),
         );
 
         // Zip the deploy output dir and upload directly
