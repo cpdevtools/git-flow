@@ -8,6 +8,7 @@ import {
   sharedStorageDir,
   declaresSeedStorage,
   prepareSeedStorage,
+  prepareStorageMigrations,
 } from '@cpdevtools/git-flow-deploy';
 
 export default class Run extends Command {
@@ -46,6 +47,10 @@ export default class Run extends Command {
     if (sharedStorageBase && declaresSharedStorage(manifest)) {
       this.log(`\u25b8 Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`);
       await prepareSharedStorage(manifest, sharedStorageBase);
+    }
+
+    if (sharedStorageBase) {
+      await prepareStorageMigrations(manifest, sharedStorageBase, workDir);
     }
 
     if (sharedStorageBase && declaresSeedStorage(manifest)) {

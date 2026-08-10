@@ -22,6 +22,7 @@ import {
   sharedStorageDir,
   declaresSeedStorage,
   prepareSeedStorage,
+  prepareStorageMigrations,
   runDeploy,
   deploymentSlot,
   slotStack,
@@ -257,6 +258,23 @@ export class DeployController {
           this.store.finish(record, 1);
           this.logger.error(
             `Deploy failed (storage): ${repo} release ${releaseId} — ${(err as Error).message}`,
+          );
+          return;
+        }
+      }
+
+      if (this.config.sharedStorageBaseDir) {
+        try {
+          await prepareStorageMigrations(
+            manifest,
+            this.config.sharedStorageBaseDir,
+            workDir,
+          );
+        } catch (err) {
+          this.store.appendLine(record, `▸ Error: ${(err as Error).message}`);
+          this.store.finish(record, 1);
+          this.logger.error(
+            `Deploy failed (migrate): ${repo} release ${releaseId} — ${(err as Error).message}`,
           );
           return;
         }

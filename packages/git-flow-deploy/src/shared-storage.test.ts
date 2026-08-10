@@ -6,8 +6,11 @@ import {
   prepareSharedStorage,
   declaresSharedStorage,
   sharedStorageDir,
+  sharedBucketDir,
+  versionedBucketDir,
   prepareSeedStorage,
   declaresSeedStorage,
+  prepareStorageMigrations,
 } from './shared-storage.js';
 import type { DeployManifest } from './types.js';
 
@@ -176,5 +179,151 @@ describe('declaresSeedStorage', () => {
     ).toBe(true);
     expect(declaresSeedStorage({ ...manifest, seedStorage: [] })).toBe(false);
     expect(declaresSeedStorage({ ...manifest })).toBe(false);
+  });
+});
+
+// ── Stacked layout ({stack}/{service}/{shared|v{major}}) ─────────────────────
+
+const stacked: DeployManifest = { ...manifest, stack: 'webservice', version: '2.4.1' };
+
+describe('stacked layout paths', () => {
+  it('roots the service under the stack segment', () => {
+    expect(sharedStorageDir(stacked, '/base')).toBe('/base/webservice/org-my-service');
+  });
+
+  it('derives the shared and per-major buckets', () => {
+    expect(sharedBucketDir(stacked, '/base')).toBe('/base/webservice/org-my-service/shared');
+    expect(versionedBucketDir(stacked, '/base')).toBe('/base/webservice/org-my-service/v2');
+  });
+
+  it('uses manifest.service for the service segment when set', () => {
+    const svc: DeployManifest = { ...stacked, service: 'my-service' };
+    expect(sharedStorageDir(svc, '/base')).toBe('/base/webservice/my-service');
+    expect(sharedBucketDir(svc, '/base')).toBe('/base/webservice/my-service/shared');
+  });
+});
+
+describe('prepareSharedStorage (stacked)', () => {
+  it('creates both buckets even when sharedStorage is true', async () => {
+    await prepareSharedStorage({ ...stacked, sharedStorage: true }, baseDir);
+    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service', 'shared'))).toBe(true);
+    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service', 'v2'))).toBe(true);
+  });
+
+  it('places a bare array under the shared bucket', async () => {
+    await prepareSharedStorage({ ...stacked, sharedStorage: ['repos-config'] }, baseDir);
+    expect(
+      await dirExists(join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config')),
+    ).toBe(true);
+  });
+
+  it('splits object form across shared and versioned buckets', async () => {
+    await prepareSharedStorage(
+      { ...stacked, sharedStorage: { shared: ['uploads'], versioned: ['cache'] } },
+      baseDir,
+    );
+    expect(
+      await dirExists(join(baseDir, 'webservice', 'org-my-service', 'shared', 'uploads')),
+    ).toBe(true);
+    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service', 'v2', 'cache'))).toBe(true);
+  });
+
+  it('rejects a versioned entry that escapes its bucket', async () => {
+    await expect(
+      prepareSharedStorage({ ...stacked, sharedStorage: { versioned: ['../escape'] } }, baseDir),
+    ).rejects.toThrow();
+  });
+});
+
+describe('prepareSeedStorage (stacked)', () => {
+  let bundleDir: string;
+
+  beforeEach(async () => {
+    bundleDir = await mkdtemp(join(tmpdir(), 'seed-stacked-'));
+    await mkdir(join(bundleDir, 'seed'), { recursive: true });
+    await writeFile(join(bundleDir, 'seed', 'repos.json'), 'SEED');
+  });
+
+  afterEach(async () => {
+    await rm(bundleDir, { recursive: true, force: true });
+  });
+
+  it('seeds into the shared bucket for a shared/ target', async () => {
+    await prepareSeedStorage(
+      { ...stacked, seedStorage: [{ from: 'seed/repos.json', to: 'shared/repos-config/repos.json' }] },
+      baseDir,
+      bundleDir,
+    );
+    const dest = join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config', 'repos.json');
+    expect(await readFile(dest, 'utf-8')).toBe('SEED');
+  });
+
+  it('maps a versioned/ target onto the per-major bucket', async () => {
+    await prepareSeedStorage(
+      { ...stacked, seedStorage: [{ from: 'seed/repos.json', to: 'versioned/state.json' }] },
+      baseDir,
+      bundleDir,
+    );
+    const dest = join(baseDir, 'webservice', 'org-my-service', 'v2', 'state.json');
+    expect(await readFile(dest, 'utf-8')).toBe('SEED');
+  });
+});
+
+describe('prepareStorageMigrations', () => {
+  let bundleDir: string;
+  let legacyDir: string;
+
+  beforeEach(async () => {
+    bundleDir = await mkdtemp(join(tmpdir(), 'migrate-bundle-'));
+    legacyDir = await mkdtemp(join(tmpdir(), 'migrate-legacy-'));
+    await writeFile(join(legacyDir, 'repos.json'), 'LEGACY');
+  });
+
+  afterEach(async () => {
+    await rm(bundleDir, { recursive: true, force: true });
+    await rm(legacyDir, { recursive: true, force: true });
+  });
+
+  const writeMigrations = (to: string) =>
+    writeFile(
+      join(bundleDir, 'storage-migrations.yml'),
+      `migrations:\n  - from: ${legacyDir}\n    to: ${to}\n`,
+    );
+
+  it('is a no-op when the bundle has no storage-migrations.yml', async () => {
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service'))).toBe(false);
+  });
+
+  it('copies legacy data into the target bucket and writes a marker', async () => {
+    await writeMigrations('shared/repos-config');
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+    const target = join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config');
+    expect(await readFile(join(target, 'repos.json'), 'utf-8')).toBe('LEGACY');
+    expect(await readFile(join(target, '.migrated-from'), 'utf-8')).toContain(legacyDir);
+    // Copy, not move: the source survives.
+    expect(await readFile(join(legacyDir, 'repos.json'), 'utf-8')).toBe('LEGACY');
+  });
+
+  it('does not clobber a non-empty target (migrate-if-empty)', async () => {
+    const target = join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config');
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, 'repos.json'), 'NEWER');
+    await writeMigrations('shared/repos-config');
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+    expect(await readFile(join(target, 'repos.json'), 'utf-8')).toBe('NEWER');
+    expect(await dirExists(join(target))).toBe(true);
+    await expect(readFile(join(target, '.migrated-from'), 'utf-8')).rejects.toThrow();
+  });
+
+  it('skips when the source path does not exist', async () => {
+    await writeFile(
+      join(bundleDir, 'storage-migrations.yml'),
+      `migrations:\n  - from: /nonexistent/legacy/path\n    to: shared/repos-config\n`,
+    );
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+    expect(
+      await dirExists(join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config')),
+    ).toBe(false);
   });
 });

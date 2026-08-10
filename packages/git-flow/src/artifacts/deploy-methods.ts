@@ -267,7 +267,7 @@ registerDeployMethod('docker', 'swarm', {
         deployCommand: SWARM_DEPLOY_COMMAND,
         // A shared stack holds other services, so removing it would take them
         // down too; drop just this service instead.
-        teardownCommand: stack ? `docker service rm @{ SERVICE_NAME }` : `docker stack rm @{ STACK }`,
+        teardownCommand: stack ? `docker service rm @{ STACK_SERVICE_ID }` : `docker stack rm @{ STACK }`,
       }),
     );
   },

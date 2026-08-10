@@ -18,8 +18,20 @@ describe('normalizeSharedStorage', () => {
     ]);
   });
 
-  it('rejects a non-array, non-true value', () => {
-    expect(() => normalizeSharedStorage('data-protection', 'svc')).toThrow(/expected true or an/);
+  it('rejects a non-array, non-true, non-object value', () => {
+    expect(() => normalizeSharedStorage('data-protection', 'svc')).toThrow(
+      /expected true, an array of relative paths, or/,
+    );
+  });
+
+  it('accepts the { shared, versioned } object form', () => {
+    expect(
+      normalizeSharedStorage({ shared: ['repos-config'], versioned: ['cache'] }, 'svc'),
+    ).toEqual({ shared: ['repos-config'], versioned: ['cache'] });
+  });
+
+  it('validates entries inside the object form', () => {
+    expect(() => normalizeSharedStorage({ versioned: ['../escape'] }, 'svc')).toThrow(/'\.\.'/);
   });
 
   it('rejects absolute paths', () => {

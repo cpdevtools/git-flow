@@ -101,7 +101,7 @@ describe('docker.swarm generateDeployYml', () => {
       ctx('swarm', 'major', 'webservice'),
     );
     const m = await readDeployYml();
-    expect(m.teardownCommand).toBe('docker service rm @{ SERVICE_NAME }');
+    expect(m.teardownCommand).toBe('docker service rm @{ STACK_SERVICE_ID }');
   });
 
   it('deployCommand merges stack.$DEPLOY_STACK_ENV.yml and fails when it is missing', () => {
