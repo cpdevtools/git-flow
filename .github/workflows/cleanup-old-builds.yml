@@ -23,8 +23,9 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: ./actions/cleanup-old-builds
+      # Must be a fully-qualified reference: when called via workflow_call the
+      # workspace contains the *caller's* repo, not git-flow.
+      - uses: cpdevtools/git-flow/actions/cleanup-old-builds@main
         with:
           days-old: ${{ inputs.days_old }}
           dry-run: ${{ inputs.dry_run }}
