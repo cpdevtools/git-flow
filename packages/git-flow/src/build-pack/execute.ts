@@ -21,7 +21,8 @@ import {
 import {
   deploymentSlot,
   safeName,
-  slotStack,
+  packageScope,
+  packageService,
   majorVersion,
   type VersioningStrategy,
 } from '../artifacts/slot.js';
@@ -325,17 +326,20 @@ export function deployContext(
   version: string,
   versioning: VersioningStrategy,
   stackOverride?: string,
+  serviceOverride?: string,
 ): Record<string, string> {
-  const serviceId = deploymentSlot(projectName, version, versioning);
-  const service = safeName(projectName);
-  const stack = stackOverride ?? slotStack(serviceId);
+  const service = serviceOverride ?? packageService(projectName);
+  const stack = stackOverride ?? packageScope(projectName) ?? service;
+  const serviceId = versioning === 'major' ? `${service}_v${majorVersion(version)}` : service;
   return {
     SERVICE: service,
     SERVICE_ID: serviceId,
     STACK: stack,
-    // What docker names the running service. Assumes the stack file keys its
-    // service on SERVICE_ID, which is the convention these tokens exist to make.
-    SERVICE_NAME: `${stack}_${serviceId}`,
+    // What docker names the running service: the stack prefix joined to the
+    // service key (SERVICE_ID) with '_', matching `docker service ls`.
+    STACK_SERVICE_ID: `${stack}_${serviceId}`,
+    // Same join, unversioned — stable across coexisting majors.
+    STACK_SERVICE: `${stack}_${service}`,
     VERSION: version,
     MAJOR: String(majorVersion(version)),
   };
@@ -350,32 +354,48 @@ export function deployContext(
 export function normalizeSharedStorage(
   raw: unknown,
   artifactLabel: string,
-): boolean | string[] | undefined {
+): boolean | string[] | { shared?: string[]; versioned?: string[] } | undefined {
   if (raw === undefined || raw === false) return undefined;
   if (raw === true) return true;
-  if (!Array.isArray(raw)) {
-    throw new Error(
-      `Invalid sharedStorage on artifact '${artifactLabel}': expected true or an array of relative paths.`,
-    );
-  }
-  return raw.map((entry, index) => {
+  const validateEntry = (entry: unknown, index: number, field: string): string => {
     if (typeof entry !== 'string' || entry === '') {
-      throw new Error(
-        `sharedStorage[${index}] on artifact '${artifactLabel}' must be a non-empty string`,
-      );
+      throw new Error(`${field}[${index}] on artifact '${artifactLabel}' must be a non-empty string`);
     }
     if (entry.startsWith('/')) {
-      throw new Error(
-        `sharedStorage[${index}] on artifact '${artifactLabel}' must be a relative path: ${entry}`,
-      );
+      throw new Error(`${field}[${index}] on artifact '${artifactLabel}' must be a relative path: ${entry}`);
     }
     if (entry.split('/').includes('..')) {
-      throw new Error(
-        `sharedStorage[${index}] on artifact '${artifactLabel}' must not contain '..': ${entry}`,
-      );
+      throw new Error(`${field}[${index}] on artifact '${artifactLabel}' must not contain '..': ${entry}`);
     }
     return entry;
-  });
+  };
+  if (Array.isArray(raw)) {
+    return raw.map((entry, index) => validateEntry(entry, index, 'sharedStorage'));
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    const obj = raw as { shared?: unknown; versioned?: unknown };
+    const spec: { shared?: string[]; versioned?: string[] } = {};
+    if (obj.shared !== undefined) {
+      if (!Array.isArray(obj.shared)) {
+        throw new Error(
+          `sharedStorage.shared on artifact '${artifactLabel}' must be an array of relative paths.`,
+        );
+      }
+      spec.shared = obj.shared.map((e, i) => validateEntry(e, i, 'sharedStorage.shared'));
+    }
+    if (obj.versioned !== undefined) {
+      if (!Array.isArray(obj.versioned)) {
+        throw new Error(
+          `sharedStorage.versioned on artifact '${artifactLabel}' must be an array of relative paths.`,
+        );
+      }
+      spec.versioned = obj.versioned.map((e, i) => validateEntry(e, i, 'sharedStorage.versioned'));
+    }
+    return spec;
+  }
+  throw new Error(
+    `Invalid sharedStorage on artifact '${artifactLabel}': expected true, an array of relative paths, or { shared, versioned }.`,
+  );
 }
 
 /**
@@ -446,6 +466,7 @@ async function executePackDeploy(
     deploy?: string[];
     versioning?: string;
     stack?: string;
+    service?: string;
     sharedStorage?: unknown;
     seedStorage?: unknown;
   };
@@ -480,6 +501,16 @@ async function executePackDeploy(
       ) {
         throw new Error(
           `Invalid stack on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected a non-empty string.`,
+        );
+      }
+      // Overrides the unscoped package name as the SERVICE token / storage segment.
+      const serviceOverride = (artifact as unknown as WithDeploy).service;
+      if (
+        serviceOverride !== undefined &&
+        (typeof serviceOverride !== 'string' || serviceOverride.trim() === '')
+      ) {
+        throw new Error(
+          `Invalid service on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected a non-empty string.`,
         );
       }
       const sharedStorage = normalizeSharedStorage(
@@ -601,6 +632,11 @@ async function executePackDeploy(
             method: deployMeta.method ?? method,
             slot: deployMeta.slot ?? slot,
             versioning: deployMeta.versioning ?? versioning,
+            // Presence of `stack` is what switches the deploy side to the
+            // versioned `{stack}/{service}/{shared|v{major}}` storage layout.
+            ...(deployMeta.stack === undefined && stackOverride !== undefined
+              ? { stack: stackOverride }
+              : {}),
             // Conditional spread: an absent key must stay absent, since the
             // deploy side rejects a sharedStorage that is present but null.
             ...(deployMeta.sharedStorage === undefined && sharedStorage !== undefined
@@ -610,6 +646,12 @@ async function executePackDeploy(
               ? { seedStorage }
               : {}),
             name: project.name,
+            // Unscoped service segment the deploy side uses for storage paths;
+            // must equal the SERVICE token rendered into stack.yml.
+            service:
+              (deployMeta.service as string | undefined) ??
+              serviceOverride ??
+              packageService(project.name),
             version: project.version,
             repo: `https://github.com/${process.env.GITHUB_REPOSITORY ?? ''}`,
             releaseId: uploadCtx.releaseId,
@@ -620,7 +662,7 @@ async function executePackDeploy(
         // work in YAML keys and anywhere else runtime env interpolation can't reach.
         await renderDeployTemplates(
           deployOutputDir,
-          deployContext(project.name, project.version, versioning, stackOverride),
+          deployContext(project.name, project.version, versioning, stackOverride, serviceOverride),
         );
 
         // Zip the deploy output dir and upload directly

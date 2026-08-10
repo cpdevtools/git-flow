@@ -1,4 +1,4 @@
-export type { DeployManifest, DeployRequest } from './types.js';
+export type { DeployManifest, DeployRequest, SharedStorageSpec } from './types.js';
 export { signRequest, validateHmac, validateTimestamp } from './hmac.js';
 export { SIGNATURE_HEADER, TIMESTAMP_HEADER, DEFAULT_TIMESTAMP_WINDOW_SECONDS } from './hmac.js';
 export { fetchDeployBundle } from './fetch-bundle.js';
@@ -8,8 +8,11 @@ export {
   prepareSharedStorage,
   declaresSharedStorage,
   sharedStorageDir,
+  sharedBucketDir,
+  versionedBucketDir,
   prepareSeedStorage,
   declaresSeedStorage,
+  prepareStorageMigrations,
 } from './shared-storage.js';
 export type { VersioningStrategy } from './slot.js';
 export { safeName, majorVersion, deploymentSlot, slotStack } from './slot.js';

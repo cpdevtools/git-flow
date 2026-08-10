@@ -19,36 +19,47 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('deployContext', () => {
-  it('singleton: SERVICE and SERVICE_ID are both the base name', () => {
+  it('singleton: SERVICE/SERVICE_ID are the unscoped name, STACK is the scope', () => {
     const t = deployContext('@org/my-svc', '1.2.3', 'singleton');
-    expect(t['SERVICE']).toBe('org-my-svc');
-    expect(t['SERVICE_ID']).toBe('org-my-svc');
-    expect(t['STACK']).toBe('org_my_svc');
+    expect(t['SERVICE']).toBe('my-svc');
+    expect(t['SERVICE_ID']).toBe('my-svc');
+    expect(t['STACK']).toBe('org');
     expect(t['VERSION']).toBe('1.2.3');
     expect(t['MAJOR']).toBe('1');
   });
 
-  it('major: SERVICE_ID includes -v<major>, SERVICE stays unversioned', () => {
+  it('major: SERVICE_ID gets _v<major>, SERVICE stays unversioned', () => {
     const t = deployContext('@org/my-svc', '2.5.0', 'major');
-    expect(t['SERVICE']).toBe('org-my-svc');
-    expect(t['SERVICE_ID']).toBe('org-my-svc-v2');
-    expect(t['STACK']).toBe('org_my_svc_v2'); // default: slotStack(SERVICE_ID)
+    expect(t['SERVICE']).toBe('my-svc');
+    expect(t['SERVICE_ID']).toBe('my-svc_v2');
+    expect(t['STACK']).toBe('org');
     expect(t['MAJOR']).toBe('2');
+  });
+
+  it('unscoped package: STACK falls back to SERVICE', () => {
+    const t = deployContext('my-svc', '1.0.0', 'singleton');
+    expect(t['SERVICE']).toBe('my-svc');
+    expect(t['STACK']).toBe('my-svc');
   });
 
   it('stackOverride replaces STACK without affecting SERVICE_ID', () => {
     const t = deployContext('@org/my-svc', '1.0.0', 'singleton', 'webservices');
-    expect(t['SERVICE_ID']).toBe('org-my-svc');
+    expect(t['SERVICE_ID']).toBe('my-svc');
     expect(t['STACK']).toBe('webservices');
   });
 
-  it('SERVICE_NAME is what docker names the service: <stack>_<service key>', () => {
-    expect(deployContext('@org/my-svc', '2.5.0', 'major')['SERVICE_NAME']).toBe(
-      'org_my_svc_v2_org-my-svc-v2',
-    );
-    expect(deployContext('@org/my-svc', '2.5.0', 'major', 'webservice')['SERVICE_NAME']).toBe(
-      'webservice_org-my-svc-v2',
-    );
+  it('serviceOverride replaces SERVICE and the SERVICE_ID base', () => {
+    const t = deployContext('@org/my-svc', '2.0.0', 'major', undefined, 'custom');
+    expect(t['SERVICE']).toBe('custom');
+    expect(t['SERVICE_ID']).toBe('custom_v2');
+    expect(t['STACK']).toBe('org');
+  });
+
+  it('STACK_SERVICE_ID is docker’s service name; STACK_SERVICE is its unversioned twin', () => {
+    const t = deployContext('@org/my-svc', '2.5.0', 'major', 'webservice');
+    expect(t['STACK_SERVICE_ID']).toBe('webservice_my-svc_v2');
+    expect(t['STACK_SERVICE']).toBe('webservice_my-svc');
+    expect(t['SERVICE_NAME']).toBeUndefined();
   });
 });
 

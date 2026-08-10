@@ -37,3 +37,14 @@ export function deploymentSlot(
 export function slotStack(slot: string): string {
   return slot.replace(/-/g, '_');
 }
+
+/** Scope of a package name without the leading '@' (e.g. '@org/app' → 'org'); undefined when unscoped. */
+export function packageScope(name: string): string | undefined {
+  const match = /^@([^/]+)\//.exec(name);
+  return match ? safeName(match[1]!) : undefined;
+}
+
+/** Package name without its scope (e.g. '@org/app' → 'app', 'app' → 'app'). */
+export function packageService(name: string): string {
+  return safeName(name.replace(/^@[^/]+\//, ''));
+}

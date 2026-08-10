@@ -63,6 +63,12 @@ export async function parseDeployYml(path: string): Promise<DeployManifest> {
     throw new Error(`deploy.yml releaseId must be a positive integer`);
   }
 
+  if (raw['stack'] !== undefined && raw['stack'] !== null && raw['stack'] !== '') {
+    manifest.stack = String(raw['stack']);
+  }
+  if (raw['service'] !== undefined && raw['service'] !== null && raw['service'] !== '') {
+    manifest.service = String(raw['service']);
+  }
   if (raw['method'] !== undefined && raw['method'] !== null && raw['method'] !== '') {
     manifest.method = String(raw['method']);
   }
@@ -85,8 +91,26 @@ export async function parseDeployYml(path: string): Promise<DeployManifest> {
       manifest.sharedStorage = true;
     } else if (Array.isArray(raw['sharedStorage'])) {
       manifest.sharedStorage = (raw['sharedStorage'] as unknown[]).map(validateSharedStorageEntry);
+    } else if (typeof raw['sharedStorage'] === 'object' && raw['sharedStorage'] !== null) {
+      const obj = raw['sharedStorage'] as { shared?: unknown; versioned?: unknown };
+      const spec: { shared?: string[]; versioned?: string[] } = {};
+      if (obj.shared !== undefined) {
+        if (!Array.isArray(obj.shared)) {
+          throw new Error(`deploy.yml sharedStorage.shared must be an array of strings`);
+        }
+        spec.shared = (obj.shared as unknown[]).map(validateSharedStorageEntry);
+      }
+      if (obj.versioned !== undefined) {
+        if (!Array.isArray(obj.versioned)) {
+          throw new Error(`deploy.yml sharedStorage.versioned must be an array of strings`);
+        }
+        spec.versioned = (obj.versioned as unknown[]).map(validateSharedStorageEntry);
+      }
+      manifest.sharedStorage = spec;
     } else {
-      throw new Error(`deploy.yml sharedStorage must be true or an array of strings`);
+      throw new Error(
+        `deploy.yml sharedStorage must be true, an array of strings, or { shared, versioned }`,
+      );
     }
   }
 

@@ -52,6 +52,26 @@ describe('parseDeployYml', () => {
     expect(manifest.sharedStorage).toEqual(['data', 'logs/archive']);
   });
 
+  it('parses the { shared, versioned } sharedStorage object form', async () => {
+    const path = await write(
+      VALID_BASE + 'sharedStorage:\n  shared:\n    - repos-config\n  versioned:\n    - cache\n',
+    );
+    const manifest = await parseDeployYml(path);
+    expect(manifest.sharedStorage).toEqual({ shared: ['repos-config'], versioned: ['cache'] });
+  });
+
+  it('parses the stack field', async () => {
+    const path = await write(VALID_BASE + 'stack: webservice\n');
+    const manifest = await parseDeployYml(path);
+    expect(manifest.stack).toBe('webservice');
+  });
+
+  it('parses the service field', async () => {
+    const path = await write(VALID_BASE + 'service: my-service\n');
+    const manifest = await parseDeployYml(path);
+    expect(manifest.service).toBe('my-service');
+  });
+
   describe('required field validation', () => {
     it('throws when name is missing', async () => {
       const path = await write(`version: 1.0.0\nrepo: o/r\nreleaseId: 1\ndeployCommand: run\n`);

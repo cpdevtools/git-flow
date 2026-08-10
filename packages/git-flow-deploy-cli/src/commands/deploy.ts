@@ -8,6 +8,7 @@ import {
   sharedStorageDir,
   declaresSeedStorage,
   prepareSeedStorage,
+  prepareStorageMigrations,
   runDeploy,
 } from '@cpdevtools/git-flow-deploy';
 import { readSecret } from '../secrets.js';
@@ -66,6 +67,10 @@ export default class Deploy extends Command {
     if (sharedStorageBase && declaresSharedStorage(manifest)) {
       this.log(`▸ Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`);
       await prepareSharedStorage(manifest, sharedStorageBase);
+    }
+
+    if (sharedStorageBase) {
+      await prepareStorageMigrations(manifest, sharedStorageBase, dest);
     }
 
     if (sharedStorageBase && declaresSeedStorage(manifest)) {
