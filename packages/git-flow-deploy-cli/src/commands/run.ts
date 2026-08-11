@@ -45,7 +45,9 @@ export default class Run extends Command {
     const manifest = await parseDeployYml(manifestPath);
 
     if (sharedStorageBase && declaresSharedStorage(manifest)) {
-      this.log(`\u25b8 Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`);
+      this.log(
+        `\u25b8 Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`,
+      );
       await prepareSharedStorage(manifest, sharedStorageBase);
     }
 

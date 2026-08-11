@@ -38,15 +38,29 @@ describe('signRequest', () => {
 
 describe('validateHmac', () => {
   it('accepts a matching signature', () => {
-    expect(validateHmac('secret', signRequest('secret', '1700000000', 'body'), '1700000000', 'body')).toBe(true);
+    expect(
+      validateHmac('secret', signRequest('secret', '1700000000', 'body'), '1700000000', 'body'),
+    ).toBe(true);
   });
 
   it.each([
     ['wrong secret', 'other', signRequest('secret', '1700000000', 'body'), '1700000000', 'body'],
     ['tampered body', 'secret', signRequest('secret', '1700000000', 'body'), '1700000000', 'evil'],
-    ['tampered timestamp', 'secret', signRequest('secret', '1700000000', 'body'), '1700000001', 'body'],
+    [
+      'tampered timestamp',
+      'secret',
+      signRequest('secret', '1700000000', 'body'),
+      '1700000001',
+      'body',
+    ],
     ['empty signature', 'secret', '', '1700000000', 'body'],
-    ['unprefixed digest', 'secret', signRequest('secret', '1700000000', 'body').slice(7), '1700000000', 'body'],
+    [
+      'unprefixed digest',
+      'secret',
+      signRequest('secret', '1700000000', 'body').slice(7),
+      '1700000000',
+      'body',
+    ],
   ])('rejects %s', (_label, secret, signature, ts, body) => {
     expect(validateHmac(secret, signature, ts, body)).toBe(false);
   });

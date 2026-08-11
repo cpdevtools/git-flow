@@ -34,12 +34,15 @@ export async function handleSwarm(options: SwarmHandlerOptions): Promise<void> {
   // there is nothing to forward and workers fail the pull on a private image.
   dockerLogin(token);
 
-  execSync(`docker stack deploy --with-registry-auth -c "${stackFile}" "${stackName}"`, {
-    stdio: 'inherit',
-    // Pinned for the same reason as compose: a self-deploy runs from inside the
-    // task, where $HOME is /root, so the bind sources must not depend on it.
-    env: { ...process.env, DEPLOY_HOST_ROOT: defaultHostRoot() },
-  });
+  execSync(
+    `docker stack deploy --with-registry-auth -c "${stackFile}" "${stackName}"`,
+    {
+      stdio: 'inherit',
+      // Pinned for the same reason as compose: a self-deploy runs from inside the
+      // task, where $HOME is /root, so the bind sources must not depend on it.
+      env: { ...process.env, DEPLOY_HOST_ROOT: defaultHostRoot() },
+    },
+  );
   console.log(`Stack ${stackName} deployed ✓`);
 }
 

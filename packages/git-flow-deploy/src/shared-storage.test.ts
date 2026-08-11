@@ -174,9 +174,7 @@ describe('prepareSeedStorage', () => {
 
 describe('declaresSeedStorage', () => {
   it('is true only for a populated array', () => {
-    expect(
-      declaresSeedStorage({ ...manifest, seedStorage: [{ from: 'a', to: 'b' }] }),
-    ).toBe(true);
+    expect(declaresSeedStorage({ ...manifest, seedStorage: [{ from: 'a', to: 'b' }] })).toBe(true);
     expect(declaresSeedStorage({ ...manifest, seedStorage: [] })).toBe(false);
     expect(declaresSeedStorage({ ...manifest })).toBe(false);
   });
@@ -225,7 +223,9 @@ describe('prepareSharedStorage (stacked)', () => {
     expect(
       await dirExists(join(baseDir, 'webservice', 'org-my-service', 'shared', 'uploads')),
     ).toBe(true);
-    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service', 'v2', 'cache'))).toBe(true);
+    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service', 'v2', 'cache'))).toBe(
+      true,
+    );
   });
 
   it('rejects a versioned entry that escapes its bucket', async () => {
@@ -250,11 +250,21 @@ describe('prepareSeedStorage (stacked)', () => {
 
   it('seeds into the shared bucket for a shared/ target', async () => {
     await prepareSeedStorage(
-      { ...stacked, seedStorage: [{ from: 'seed/repos.json', to: 'shared/repos-config/repos.json' }] },
+      {
+        ...stacked,
+        seedStorage: [{ from: 'seed/repos.json', to: 'shared/repos-config/repos.json' }],
+      },
       baseDir,
       bundleDir,
     );
-    const dest = join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config', 'repos.json');
+    const dest = join(
+      baseDir,
+      'webservice',
+      'org-my-service',
+      'shared',
+      'repos-config',
+      'repos.json',
+    );
     expect(await readFile(dest, 'utf-8')).toBe('SEED');
   });
 

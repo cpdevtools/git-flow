@@ -36,7 +36,9 @@ export class ReposConfigService implements OnModuleInit {
     } catch (err) {
       // Keep whatever is already in memory: a corrupt or half-written file must
       // not widen access by reading as "no rules".
-      this.logger.error(`Keeping previous repos config: ${(err as Error).message}`);
+      this.logger.error(
+        `Keeping previous repos config: ${(err as Error).message}`,
+      );
     }
   }
 
