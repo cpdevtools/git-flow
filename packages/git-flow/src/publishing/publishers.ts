@@ -62,6 +62,100 @@ export async function dockerLogout(registry: DockerRegistry): Promise<void> {
 }
 
 /**
+ * Substrings/patterns in a failed `docker push`'s output that indicate a
+ * transient, retryable condition rather than a genuine auth/config failure.
+ *
+ * GHCR is the main offender: pushing a large multi-layer image issues many blob
+ * writes in a short window, and GitHub's *secondary rate limit* rejects the tail
+ * of that burst with a confusing `403 "permission_denied"` whose body actually
+ * reads "You have exceeded a secondary rate limit". Network blips (timeouts,
+ * resets, 5xx) are retryable too.
+ */
+const TRANSIENT_PUSH_PATTERNS: RegExp[] = [
+  /secondary rate limit/i,
+  /\btoomanyrequests\b/i,
+  /rate limit/i,
+  /status code 429/i,
+  /status code 5\d\d/i,
+  /\b(?:500|502|503|504)\b/,
+  /i\/o timeout/i,
+  /connection reset/i,
+  /connection refused/i,
+  /unexpected eof/i,
+  /tls handshake timeout/i,
+  /temporarily unavailable/i,
+];
+
+/**
+ * Classify `docker push` output as a transient (retryable) registry error.
+ */
+export function isTransientRegistryError(output: string): boolean {
+  return TRANSIENT_PUSH_PATTERNS.some((pattern) => pattern.test(output));
+}
+
+export interface DockerPushRetryOptions {
+  retries?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  /** Runs a single push attempt. Injectable for tests. */
+  push?: (image: string) => Promise<{ exitCode: number | null; output: string }>;
+  /** Sleep between attempts. Injectable for tests. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+async function defaultDockerPush(
+  image: string,
+): Promise<{ exitCode: number | null; output: string }> {
+  const result = await $`docker push ${image}`.nothrow();
+  return { exitCode: result.exitCode, output: `${result.stdout}\n${result.stderr}` };
+}
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * `docker push` with exponential backoff on transient registry failures.
+ *
+ * Re-pushing is idempotent -- blobs already uploaded are skipped -- so retrying
+ * a rate-limited or flaky push is safe and usually succeeds quickly because most
+ * layers are already present. Non-transient failures (bad auth, unknown repo)
+ * fail immediately so real problems aren't masked by minutes of pointless waits.
+ */
+export async function dockerPushWithRetry(
+  image: string,
+  options: DockerPushRetryOptions = {},
+): Promise<void> {
+  const {
+    retries = 5,
+    baseDelayMs = 20_000,
+    maxDelayMs = 180_000,
+    push = defaultDockerPush,
+    sleep = defaultSleep,
+  } = options;
+
+  for (let attempt = 1; ; attempt++) {
+    const { exitCode, output } = await push(image);
+    if (exitCode === 0) {
+      return;
+    }
+
+    if (attempt > retries || !isTransientRegistryError(output)) {
+      throw new Error(
+        `docker push ${image} failed (exit ${exitCode ?? 'null'}):\n${output.trim()}`,
+      );
+    }
+
+    const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
+    const waitMs = backoff + Math.floor(Math.random() * 1_000);
+    console.log(
+      `  ⚠️  Transient registry error pushing ${image} ` +
+        `(attempt ${attempt}/${retries}); retrying in ${Math.round(waitMs / 1000)}s...`,
+    );
+    await sleep(waitMs);
+  }
+}
+
+/**
  * Publish NPM package to registry
  */
 export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
@@ -161,8 +255,10 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
     await $`docker tag ${digest} ${finalVersionImage}`;
     await $`docker tag ${digest} ${finalLatestImage}`;
 
-    await $`docker push ${finalVersionImage}`;
-    await $`docker push ${finalLatestImage}`;
+    // Retry on transient registry failures (GHCR secondary rate limits, network
+    // blips). Re-pushing is idempotent, so this is safe.
+    await dockerPushWithRetry(finalVersionImage);
+    await dockerPushWithRetry(finalLatestImage);
 
     // Best-effort local cleanup of the tags we created.
     await $`docker rmi ${finalVersionImage} ${finalLatestImage}`.catch(() => {
