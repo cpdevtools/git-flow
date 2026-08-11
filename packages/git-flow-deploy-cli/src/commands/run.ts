@@ -10,6 +10,7 @@ import {
   prepareSeedStorage,
   prepareStorageMigrations,
 } from '@cpdevtools/git-flow-deploy';
+import { readSecret } from '../secrets.js';
 
 export default class Run extends Command {
   static override description =
@@ -62,9 +63,27 @@ export default class Run extends Command {
 
     this.log(`\u25b8 Running: ${manifest.deployCommand}`);
 
-    const exitCode = await runDeploy(manifest, workDir, (line) => {
-      process.stdout.write(line + '\n');
-    });
+    // The deploy command logs in to the registry with $GITHUB_TOKEN before pulling
+    // (`docker login … && docker stack deploy --with-registry-auth`). In production
+    // the token arrives as a docker/swarm secret mounted via GITHUB_TOKEN_FILE, not
+    // as an exported env var, so $GITHUB_TOKEN would otherwise be empty and pulls of
+    // private/internal images fail. Resolve it here and pass it through; deploys that
+    // need no registry auth simply proceed without a token.
+    let deployEnv: Record<string, string> | undefined;
+    try {
+      deployEnv = { GITHUB_TOKEN: await readSecret('GITHUB_TOKEN') };
+    } catch {
+      deployEnv = undefined;
+    }
+
+    const exitCode = await runDeploy(
+      manifest,
+      workDir,
+      (line) => {
+        process.stdout.write(line + '\n');
+      },
+      deployEnv,
+    );
 
     this.exit(exitCode);
   }
