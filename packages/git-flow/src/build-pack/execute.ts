@@ -359,13 +359,19 @@ export function normalizeSharedStorage(
   if (raw === true) return true;
   const validateEntry = (entry: unknown, index: number, field: string): string => {
     if (typeof entry !== 'string' || entry === '') {
-      throw new Error(`${field}[${index}] on artifact '${artifactLabel}' must be a non-empty string`);
+      throw new Error(
+        `${field}[${index}] on artifact '${artifactLabel}' must be a non-empty string`,
+      );
     }
     if (entry.startsWith('/')) {
-      throw new Error(`${field}[${index}] on artifact '${artifactLabel}' must be a relative path: ${entry}`);
+      throw new Error(
+        `${field}[${index}] on artifact '${artifactLabel}' must be a relative path: ${entry}`,
+      );
     }
     if (entry.split('/').includes('..')) {
-      throw new Error(`${field}[${index}] on artifact '${artifactLabel}' must not contain '..': ${entry}`);
+      throw new Error(
+        `${field}[${index}] on artifact '${artifactLabel}' must not contain '..': ${entry}`,
+      );
     }
     return entry;
   };

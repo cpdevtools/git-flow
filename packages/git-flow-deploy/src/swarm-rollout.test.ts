@@ -26,7 +26,8 @@ function fakeDocker(
   };
 }
 
-const update = (state: string, message = ''): string => JSON.stringify({ State: state, Message: message });
+const update = (state: string, message = ''): string =>
+  JSON.stringify({ State: state, Message: message });
 
 describe('rolloutStateOf', () => {
   it('treats a completed update as converged', () => {
@@ -106,7 +107,9 @@ describe('stackRollout', () => {
   it('carries swarm\u2019s own reason through on a rollback', () => {
     const r = stackRollout(
       'gw',
-      fakeDocker(['gw_api'], { gw_api: update('rollback_completed', 'update rolled back due to failure') }),
+      fakeDocker(['gw_api'], {
+        gw_api: update('rollback_completed', 'update rolled back due to failure'),
+      }),
     );
     expect(r.state).toBe('rolled-back');
     expect(r.services[0].message).toBe('update rolled back due to failure');
@@ -185,7 +188,7 @@ describe('serviceRollout', () => {
         ['webservice_gw-v1', 'webservice_other'],
         {
           'webservice_gw-v1': update('completed'),
-          'webservice_other': update('rollback_completed'),
+          webservice_other: update('rollback_completed'),
         },
         calls,
       ),

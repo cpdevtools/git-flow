@@ -22,12 +22,7 @@ export type {
   SwarmStackRollout,
   DockerRunner,
 } from './swarm-rollout.js';
-export {
-  stackRollout,
-  serviceRollout,
-  rolloutStateOf,
-  aggregateRollout,
-} from './swarm-rollout.js';
+export { stackRollout, serviceRollout, rolloutStateOf, aggregateRollout } from './swarm-rollout.js';
 export type { ReposConfig } from './repo-rules.js';
 export {
   DEFAULT_REPOS_CONFIG_PATH,
