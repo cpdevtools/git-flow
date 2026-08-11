@@ -95,6 +95,10 @@
     "dist",
     "src"
   ],
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
   "packageManager": "pnpm@11.5.0",
   "wireit": {
     "build": {
