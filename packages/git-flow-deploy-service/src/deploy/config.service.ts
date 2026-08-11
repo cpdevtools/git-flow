@@ -22,7 +22,7 @@ function requireSecret(name: string): string {
 @Injectable()
 export class ConfigService {
   readonly hmacSecret: string = requireSecret('DEPLOY_HMAC_SECRET');
-  readonly githubToken: string = requireSecret('GITHUB_TOKEN');
+  readonly githubToken: string = ConfigService.resolveGithubToken();
   /**
    * Where per-release bundles + the durable deploy.log live. Defaults under the
    * home dir (NOT volatile /tmp) so it can be shared across deploy methods: the
@@ -65,5 +65,20 @@ export class ConfigService {
       join(homedir(), '.git-flow-deploy-service');
     process.env['DEPLOY_HOST_ROOT'] = root;
     return root;
+  }
+
+  /**
+   * Read the GitHub token from its secret file and seed it into process.env, so
+   * every deploy child process and supervisor (which inherit process.env) can
+   * `docker login ghcr.io` before `docker stack deploy --with-registry-auth` —
+   * the baked swarm/compose deploy command reads it as $GITHUB_TOKEN and pulls
+   * fail ("No such image") for private images without it. Only the mounted
+   * secret file is authoritative; persisted deploy state stores the request env,
+   * not process.env, so the token is never written to disk.
+   */
+  private static resolveGithubToken(): string {
+    const token = requireSecret('GITHUB_TOKEN');
+    process.env['GITHUB_TOKEN'] = token;
+    return token;
   }
 }
