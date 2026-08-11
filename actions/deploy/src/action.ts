@@ -318,6 +318,10 @@ async function run(): Promise<void> {
   // 2. Stream logs with reconnect
   let cursor = 0;
   let exitCode: number | null = null;
+  // The gateway prefixes every fatal deploy step with '▸ Error:' immediately
+  // before finishing the record. Track it so a buggy/older gateway that streams
+  // a fatal error but then reports EXIT:0 cannot make us report success.
+  let sawFatalError = false;
   const summaryLines: string[] = [];
 
   const RECONNECT_PAUSE_MS = 2_000;
@@ -337,12 +341,22 @@ async function run(): Promise<void> {
             return true; // stop
           }
 
+          if (line.startsWith('▸ Error:')) sawFatalError = true;
+
           core.info(line);
           summaryLines.push(line);
           cursor++;
           return false;
         },
       );
+      // streamLines resolved without an EXIT marker: the gateway closed the
+      // connection before the deploy finished. Count it as a reconnect (with a
+      // pause) so we don't tight-loop, and so we eventually fail via the
+      // 'ended without EXIT marker' path instead of spinning forever.
+      if (exitCode === null) {
+        reconnects++;
+        await new Promise((r) => setTimeout(r, RECONNECT_PAUSE_MS));
+      }
     } catch {
       // Connection dropped — reconnect
       reconnects++;
@@ -367,6 +381,11 @@ async function run(): Promise<void> {
   } else if (exitCode !== 0) {
     if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
     core.setFailed(`Deploy failed (EXIT:${exitCode})`);
+  } else if (sawFatalError) {
+    // The gateway streamed a fatal '▸ Error:' line but still reported EXIT:0
+    // (e.g. an older gateway build). Never treat that as a successful deploy.
+    if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
+    core.setFailed('Deploy reported success but a fatal error was logged');
   } else {
     // 4. Status check — confirm service came back up after any restart
     core.info('Waiting for service status check...');

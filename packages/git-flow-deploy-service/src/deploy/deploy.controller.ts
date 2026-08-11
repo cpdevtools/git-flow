@@ -183,6 +183,14 @@ export class DeployController {
     record.signal.on('line', onLine);
     record.signal.on('done', onDone);
 
+    // Close the race window: if the record finalized between the status check
+    // above and attaching these listeners, the 'done' event was already emitted
+    // and would be lost, hanging the client. Re-check and finalize now.
+    if (record.status !== 'running') {
+      onDone();
+      return;
+    }
+
     res.on('close', cleanup);
   }
 
