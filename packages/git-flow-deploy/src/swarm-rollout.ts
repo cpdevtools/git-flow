@@ -150,3 +150,128 @@ function inspectService(service: string, run: DockerRunner): SwarmServiceRollout
     message: status.Message,
   };
 }
+
+/** Running vs desired task count, the way `docker service ls` reports it. */
+export interface SwarmServiceReplicas {
+  running: number;
+  desired: number;
+}
+
+/**
+ * Read a service's running/desired replica count.
+ *
+ * Needed alongside `serviceRollout` because a service's FIRST deploy has no
+ * `UpdateStatus` at all (swarm only records one on an update), so a brand-new
+ * service would look `unknown` forever. Its tasks coming up is the only "is it
+ * running?" signal available then. `docker service ls` prints the count as
+ * `running/desired` for both replicated (`2/3`) and global (`2/2`) services.
+ */
+export function serviceReplicas(
+  service: string,
+  run: DockerRunner = defaultRunner,
+): SwarmServiceReplicas | null {
+  if (!SWARM_NAME.test(service)) return null;
+  const res = run([
+    'service',
+    'ls',
+    '--filter',
+    `name=${service}`,
+    '--format',
+    '{{.Name}} {{.Replicas}}',
+  ]);
+  if (res.status !== 0) return null;
+
+  for (const line of res.stdout.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const sep = trimmed.indexOf(' ');
+    if (sep === -1) continue;
+    // `--filter name=` is a prefix match, so a stack with `svc` and `svc-v2`
+    // both match; require the exact name before trusting the count.
+    if (trimmed.slice(0, sep) !== service) continue;
+    const match = /^(\d+)\/(\d+)/.exec(trimmed.slice(sep + 1).trim());
+    if (!match) return null;
+    return { running: Number(match[1]), desired: Number(match[2]) };
+  }
+  return null;
+}
+
+export interface ConvergenceResult {
+  service: string;
+  state: SwarmRolloutState;
+  /** Swarm's raw `UpdateStatus.State`, when it reported one. */
+  raw?: string;
+  /** Swarm's own explanation — for a rollback, the reason. */
+  message?: string;
+  /** True when the wait ended on the deadline rather than a terminal state. */
+  timedOut: boolean;
+}
+
+export interface ConvergenceWaitOptions {
+  /** Give up after this long. Default 10 minutes (image pulls on workers). */
+  timeoutMs?: number;
+  /** Time between polls. Default 5 seconds. */
+  intervalMs?: number;
+  /** Progress sink, one line per poll. */
+  onLine?: (line: string) => void;
+  /** Injected clock, for tests. */
+  now?: () => number;
+  /** Injected delay, for tests. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const DEFAULT_CONVERGENCE_TIMEOUT_MS = 600_000;
+const DEFAULT_CONVERGENCE_INTERVAL_MS = 5_000;
+
+/**
+ * Block until a swarm rolling update converges, rolls back, or the deadline
+ * passes — the wait `docker stack deploy` never does. Polls `UpdateStatus`, and
+ * for a first-time create (which has none) falls back to replica health so an
+ * initial deploy resolves instead of hanging as `unknown`.
+ */
+export async function waitForSwarmConvergence(
+  service: string,
+  options: ConvergenceWaitOptions = {},
+  run: DockerRunner = defaultRunner,
+): Promise<ConvergenceResult> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_CONVERGENCE_TIMEOUT_MS;
+  const intervalMs = options.intervalMs ?? DEFAULT_CONVERGENCE_INTERVAL_MS;
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const onLine = options.onLine ?? ((): void => {});
+  const deadline = now() + timeoutMs;
+
+  for (;;) {
+    const rollout = serviceRollout(service, run).services[0] ?? {
+      service,
+      state: 'unknown' as SwarmRolloutState,
+    };
+
+    if (rollout.state === 'converged' || rollout.state === 'rolled-back') {
+      return { ...rollout, timedOut: false };
+    }
+
+    const replicas = serviceReplicas(service, run);
+
+    // No UpdateStatus means a first create; its tasks reaching the desired count
+    // is the only "it's up" it can give. A service mid-update keeps waiting for
+    // swarm's own verdict instead — replicas can read full before it converges.
+    if (
+      rollout.state === 'unknown' &&
+      replicas &&
+      replicas.desired > 0 &&
+      replicas.running >= replicas.desired
+    ) {
+      return { service, state: 'converged', timedOut: false };
+    }
+
+    onLine(
+      `  … ${service}: ${rollout.raw ?? (replicas ? `${replicas.running}/${replicas.desired} running` : rollout.state)}`,
+    );
+
+    if (now() >= deadline) {
+      return { ...rollout, timedOut: true };
+    }
+    await sleep(intervalMs);
+  }
+}

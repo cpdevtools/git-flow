@@ -69,6 +69,13 @@ export async function parseDeployYml(path: string): Promise<DeployManifest> {
   if (raw['service'] !== undefined && raw['service'] !== null && raw['service'] !== '') {
     manifest.service = String(raw['service']);
   }
+  if (
+    raw['swarmService'] !== undefined &&
+    raw['swarmService'] !== null &&
+    raw['swarmService'] !== ''
+  ) {
+    manifest.swarmService = String(raw['swarmService']);
+  }
   if (raw['method'] !== undefined && raw['method'] !== null && raw['method'] !== '') {
     manifest.method = String(raw['method']);
   }
