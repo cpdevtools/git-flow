@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   aggregateRollout,
   rolloutStateOf,
+  serviceReplicas,
   serviceRollout,
   stackRollout,
+  waitForSwarmConvergence,
   type DockerResult,
   type DockerRunner,
 } from './swarm-rollout.js';
@@ -202,5 +204,123 @@ describe('serviceRollout', () => {
     });
     expect(r.state).toBe('unknown');
     expect(r.error).toContain('invalid service name');
+  });
+});
+
+describe('serviceReplicas', () => {
+  const lsRunner = (line: string): DockerRunner => (args) => {
+    expect(args[0]).toBe('service');
+    expect(args[1]).toBe('ls');
+    return ok(line);
+  };
+
+  it('parses running/desired from docker service ls', () => {
+    expect(serviceReplicas('webservice_gw-v1', lsRunner('webservice_gw-v1 2/3\n'))).toEqual({
+      running: 2,
+      desired: 3,
+    });
+  });
+
+  it('matches the exact service, not a prefix sibling', () => {
+    // `--filter name=` is a prefix match: gw-v1 also lists gw-v10.
+    const runner = lsRunner('webservice_gw-v10 1/1\nwebservice_gw-v1 3/3\n');
+    expect(serviceReplicas('webservice_gw-v1', runner)).toEqual({ running: 3, desired: 3 });
+  });
+
+  it('is null when the service is not listed', () => {
+    expect(serviceReplicas('webservice_gw-v1', lsRunner('webservice_other 1/1\n'))).toBeNull();
+  });
+
+  it('is null when docker fails', () => {
+    expect(serviceReplicas('webservice_gw-v1', () => fail('boom'))).toBeNull();
+  });
+
+  it('rejects a service name that could be read as a flag', () => {
+    expect(
+      serviceReplicas('--help', () => {
+        throw new Error('docker must not be invoked');
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('waitForSwarmConvergence', () => {
+  /** A fake clock the injected sleep advances, so the loop never really waits. */
+  function clock(): { now: () => number; sleep: (ms: number) => Promise<void> } {
+    let t = 0;
+    return { now: () => t, sleep: async (ms) => void (t += ms) };
+  }
+
+  /** Scripts UpdateStatus per inspect call (repeating the last) plus a replica line. */
+  function scripted(inspects: (string | null)[], replicas?: string): DockerRunner {
+    let i = 0;
+    return (args) => {
+      if (args[0] === 'service' && args[1] === 'inspect') {
+        const s = inspects[Math.min(i++, inspects.length - 1)];
+        return ok(s === null ? 'null' : s);
+      }
+      if (args[0] === 'service' && args[1] === 'ls') {
+        if (!replicas) return ok('');
+        const name = String(args[3]).slice('name='.length);
+        return ok(`${name} ${replicas}\n`);
+      }
+      return fail('unexpected docker call');
+    };
+  }
+
+  it('returns once the rolling update completes', async () => {
+    const { now, sleep } = clock();
+    const result = await waitForSwarmConvergence(
+      'webservice_gw-v1',
+      { now, sleep },
+      scripted([update('updating'), update('completed')]),
+    );
+    expect(result).toMatchObject({ state: 'converged', timedOut: false });
+  });
+
+  it('fails as soon as swarm rolls the update back', async () => {
+    const { now, sleep } = clock();
+    const result = await waitForSwarmConvergence(
+      'webservice_gw-v1',
+      { now, sleep },
+      scripted([update('rollback_completed', 'task failed health check')]),
+    );
+    expect(result.state).toBe('rolled-back');
+    expect(result.timedOut).toBe(false);
+    expect(result.message).toBe('task failed health check');
+  });
+
+  it('converges a first create off replica health when there is no UpdateStatus', async () => {
+    const { now, sleep } = clock();
+    const result = await waitForSwarmConvergence(
+      'webservice_gw-v1',
+      { now, sleep },
+      scripted([null], '1/1'),
+    );
+    expect(result).toMatchObject({ state: 'converged', timedOut: false });
+  });
+
+  it('keeps waiting on a create until its tasks are all up', async () => {
+    const { now, sleep } = clock();
+    // desired not yet met → not converged on the first look.
+    let listed = 0;
+    const runner: DockerRunner = (args) => {
+      if (args[1] === 'inspect') return ok('null');
+      listed += 1;
+      return ok(`webservice_gw-v1 ${listed >= 2 ? '2/2' : '1/2'}\n`);
+    };
+    const result = await waitForSwarmConvergence('webservice_gw-v1', { now, sleep }, runner);
+    expect(result.state).toBe('converged');
+  });
+
+  it('gives up at the deadline and reports the timeout', async () => {
+    const { now, sleep } = clock();
+    const result = await waitForSwarmConvergence(
+      'webservice_gw-v1',
+      { now, sleep, timeoutMs: 12_000, intervalMs: 5_000 },
+      scripted([update('updating')]),
+    );
+    expect(result.timedOut).toBe(true);
+    expect(result.state).toBe('in-progress');
   });
 });

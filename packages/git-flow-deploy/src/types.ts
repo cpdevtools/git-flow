@@ -25,6 +25,14 @@ export interface DeployManifest {
    */
   service?: string;
   /**
+   * Fully-qualified swarm service name (the STACK_SERVICE_ID token, e.g.
+   * `webservice_deploy-gateway_v0`) — exactly what `docker service ls` shows.
+   * Baked at pack time for the swarm method so the deploy side can wait for the
+   * rolling update to converge without reconstructing the name. Absent for
+   * non-swarm bundles.
+   */
+  swarmService?: string;
+  /**
    * Deploy method this bundle was packed for (e.g. 'node', 'compose', 'swarm').
    * Used to detect a mode change on redeploy. Optional for legacy bundles.
    */

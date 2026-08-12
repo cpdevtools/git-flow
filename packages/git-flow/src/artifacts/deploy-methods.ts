@@ -265,6 +265,9 @@ registerDeployMethod('docker', 'swarm', {
         // private/internal image pull fails on every worker while the deploy
         // itself reports success.
         deployCommand: SWARM_DEPLOY_COMMAND,
+        // The docker service name (`docker service ls`), rendered at pack time.
+        // The deploy side waits on this for the rolling update to converge.
+        swarmService: `@{ STACK_SERVICE_ID }`,
         // A shared stack holds other services, so removing it would take them
         // down too; drop just this service instead.
         teardownCommand: stack

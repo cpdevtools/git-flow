@@ -104,6 +104,13 @@ describe('docker.swarm generateDeployYml', () => {
     expect(m.teardownCommand).toBe('docker service rm @{ STACK_SERVICE_ID }');
   });
 
+  it('bakes the swarm service name so the deploy side can wait for convergence', async () => {
+    await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
+    const m = await readDeployYml();
+    // @{ STACK_SERVICE_ID } is resolved to the docker service name at pack time.
+    expect(m.swarmService).toBe('@{ STACK_SERVICE_ID }');
+  });
+
   it('deployCommand merges stack.$DEPLOY_STACK_ENV.yml and fails when it is missing', () => {
     expect(SWARM_DEPLOY_COMMAND).toContain('STACK_FILES="-c stack.yml"');
     expect(SWARM_DEPLOY_COMMAND).toContain('if [ -n "$DEPLOY_STACK_ENV" ]');

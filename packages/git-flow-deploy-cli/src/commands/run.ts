@@ -9,6 +9,7 @@ import {
   declaresSeedStorage,
   prepareSeedStorage,
   prepareStorageMigrations,
+  waitForSwarmConvergence,
 } from '@cpdevtools/git-flow-deploy';
 import { readSecret } from '../secrets.js';
 
@@ -84,6 +85,34 @@ export default class Run extends Command {
       },
       deployEnv,
     );
+
+    // `docker stack deploy` returns the moment the manager accepts the new spec,
+    // long before any task is replaced — its exit code says nothing about whether
+    // the new version actually came up. For swarm, wait for the rolling update to
+    // converge (or roll back) so a failed rollout fails the deploy instead of
+    // reporting success at "Updating service …".
+    if (exitCode === 0 && manifest.method === 'swarm' && manifest.swarmService) {
+      this.log(`\u25b8 Waiting for ${manifest.swarmService} to converge\u2026`);
+      const result = await waitForSwarmConvergence(manifest.swarmService, {
+        onLine: (line) => {
+          process.stdout.write(line + '\n');
+        },
+      });
+      if (result.state === 'converged') {
+        this.log(`\u2713 ${manifest.swarmService} is running v${manifest.version}.`);
+      } else if (result.timedOut) {
+        this.log(
+          `\u2717 ${manifest.swarmService} did not converge within the timeout ` +
+            `(last: ${result.raw ?? result.state}).`,
+        );
+        this.exit(1);
+      } else {
+        this.log(
+          `\u2717 ${manifest.swarmService} rolled back${result.message ? `: ${result.message}` : ''}.`,
+        );
+        this.exit(1);
+      }
+    }
 
     this.exit(exitCode);
   }
