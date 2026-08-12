@@ -12,6 +12,8 @@ import {
   isDeployable,
   defaultMethod,
   parseWorkflowEnvironment,
+  majorFromVersionBranch,
+  filterReleasesByMajor,
   type GHRelease,
 } from './deploy-helpers.js';
 
@@ -146,6 +148,59 @@ describe('groupByPackage', () => {
     const groups = groupByPackage(releases);
     const svcVersions = groups['@org/svc'].map((r) => versionFromTag(r.tag_name));
     expect(svcVersions).toEqual(['1.1.0', '1.0.0']);
+  });
+});
+
+// ─── majorFromVersionBranch ───────────────────────────────────────────────────
+
+describe('majorFromVersionBranch', () => {
+  it('extracts the major from a versioned release branch', () => {
+    expect(majorFromVersionBranch('release/v0')).toBe(0);
+    expect(majorFromVersionBranch('release/v1')).toBe(1);
+    expect(majorFromVersionBranch('release/v12')).toBe(12);
+  });
+
+  it('extracts the major from a bare version branch', () => {
+    expect(majorFromVersionBranch('v0')).toBe(0);
+    expect(majorFromVersionBranch('v3')).toBe(3);
+  });
+
+  it('returns null for non-versioned branches', () => {
+    expect(majorFromVersionBranch('release/main')).toBeNull();
+    expect(majorFromVersionBranch('main')).toBeNull();
+    expect(majorFromVersionBranch('release/v1.2')).toBeNull();
+    expect(majorFromVersionBranch('release/feature-v2-thing')).toBeNull();
+  });
+});
+
+// ─── filterReleasesByMajor ────────────────────────────────────────────────────
+
+describe('filterReleasesByMajor', () => {
+  const releases = [
+    release(1, '@org/svc/v0.2.2'),
+    release(2, '@org/svc/v1.0.0'),
+    release(3, '@org/svc/v1.2.0-alpha.0'),
+    release(4, '@org/svc/v2.0.0'),
+    release(5, 'not-a-gitflow-tag'),
+  ];
+
+  it('keeps only releases matching the given major', () => {
+    const v1 = filterReleasesByMajor(releases, 1).map((r) => versionFromTag(r.tag_name));
+    expect(v1).toEqual(['1.0.0', '1.2.0-alpha.0']);
+  });
+
+  it('matches major 0', () => {
+    const v0 = filterReleasesByMajor(releases, 0).map((r) => versionFromTag(r.tag_name));
+    expect(v0).toEqual(['0.2.2']);
+  });
+
+  it('excludes releases with unparseable versions', () => {
+    const v1 = filterReleasesByMajor(releases, 1);
+    expect(v1.some((r) => r.tag_name === 'not-a-gitflow-tag')).toBe(false);
+  });
+
+  it('returns empty when no release matches', () => {
+    expect(filterReleasesByMajor(releases, 9)).toEqual([]);
   });
 });
 

@@ -34,6 +34,8 @@ import {
   releaseDeployMethods,
   defaultMethod,
   parseWorkflowEnvironment,
+  majorFromVersionBranch,
+  filterReleasesByMajor,
 } from './deploy-helpers.js';
 
 interface DeployTarget {
@@ -381,7 +383,22 @@ export default class Deploy extends Command {
       );
     }
 
-    const byPackage = groupByPackage(releases);
+    // On a versioned release branch (e.g. release/v0), restrict the selectable
+    // versions to that major so the operator isn't scrolling past other majors.
+    const branchMajor = majorFromVersionBranch(branch);
+    const scopedReleases =
+      branchMajor === null ? releases : filterReleasesByMajor(releases, branchMajor);
+    if (branchMajor !== null) {
+      this.log(`Restricting to v${branchMajor}.x releases (versioned branch ${branch}).`);
+      if (scopedReleases.length === 0) {
+        this.error(
+          `No deployable v${branchMajor}.x releases found. ` +
+            `Use --branch to target a different release branch.`,
+        );
+      }
+    }
+
+    const byPackage = groupByPackage(scopedReleases);
     const packageNames = Object.keys(byPackage).sort();
 
     // ── 6. Select packages ───────────────────────────────────────────────────
