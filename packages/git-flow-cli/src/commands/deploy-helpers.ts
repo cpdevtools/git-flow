@@ -61,6 +61,25 @@ export function isPrerelease(release: GHRelease): boolean {
   return semver.prerelease(versionFromTag(release.tag_name)) !== null;
 }
 
+/**
+ * Extract the major version pinned by a versioned release branch.
+ * Recognizes the git-flow versioned-branch convention where the branch's final
+ * segment is `v<major>` (e.g. `release/v0`, `v1`). Returns the major as a
+ * number, or `null` when the branch isn't versioned (e.g. `release/main`).
+ */
+export function majorFromVersionBranch(branch: string): number | null {
+  const m = branch.match(/(?:^|\/)v(\d+)$/);
+  return m ? Number(m[1]) : null;
+}
+
+/** Keep only releases whose semver major matches `major`. */
+export function filterReleasesByMajor(releases: GHRelease[], major: number): GHRelease[] {
+  return releases.filter((r) => {
+    const v = versionFromTag(r.tag_name);
+    return semver.valid(v) ? semver.major(v) === major : false;
+  });
+}
+
 // ─── release grouping ─────────────────────────────────────────────────────────
 
 /**
