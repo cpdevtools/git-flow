@@ -13,7 +13,6 @@
     "lint": "pnpm -r lint",
     "prepare": "husky || true",
     "reset": "git reset --hard && pnpm install && pnpm build && ln -sf ../../packages/git-flow-cli/dist/bin.js node_modules/.bin/gitflow",
-    "set-version": "gitflow version",
     "test": "wireit",
     "typecheck": "wireit"
   },
