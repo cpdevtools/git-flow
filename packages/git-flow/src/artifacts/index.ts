@@ -31,6 +31,7 @@ export {
   type DeployMethodRegistration,
 } from './plugin.js';
 export { ProviderConflictError, type PluginAnchor } from './provider-registry.js';
+export type { DotnetLibArtifact, NgLibArtifact } from './builtin-plugins.js';
 export {
   loadPlugins,
   findWorkspaceRoot,
@@ -72,6 +73,7 @@ import {
   type DockerRegistry,
 } from '../publishing/index.js';
 import { BUILTIN_PROVIDER, ProviderRegistry, type PluginAnchor } from './provider-registry.js';
+import { firstPartyPlugin } from './builtin-plugins.js';
 import type { ArtifactType } from './types.js';
 
 // Re-export artifact types so consumers of @cpdevtools/git-flow/artifacts
@@ -372,6 +374,12 @@ registerArtifactType('nuget', nuget);
 registerArtifactType('docker', docker);
 registerArtifactType('release-attachment', releaseAttachment);
 registerArtifactType('deploy', deploy);
+
+// dotnet-lib and ng-lib ship with git-flow but are written as a plugin, so the
+// contract third parties use is the one first-party code uses too.
+for (const [type, handler] of Object.entries(firstPartyPlugin.artifactTypes ?? {})) {
+  registerArtifactType(type, handler as ArtifactType<any>);
+}
 
 /**
  * Register an artifact type handler.
