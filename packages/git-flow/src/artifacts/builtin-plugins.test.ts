@@ -135,6 +135,23 @@ describe('ng-lib', () => {
     expect((artifact as { path: string }).path).toMatch(/\.tgz$/);
   });
 
+  // A gitignored dist survives between releases, so "exists" says nothing about
+  // it being this release's build — a stale one must trigger the rebuild.
+  it('rebuilds when the existing output carries a stale version', async () => {
+    await writeClient('0.7.30-rc.4');
+    const fresh = JSON.stringify({ name: '@org/ngclient', version: '1.2.3' });
+
+    const artifact = {
+      type: 'ng-lib',
+      name: '@org/ngclient',
+      directory: 'client',
+      build: `printf '%s' '${fresh}' > dist/package.json`,
+    } as never;
+
+    await getArtifactType('ng-lib').pack(artifact, ctx());
+    expect((artifact as { path: string }).path).toMatch(/\.tgz$/);
+  });
+
   it('honours a custom packDir', async () => {
     await writeClient('1.2.3', 'build-output');
 

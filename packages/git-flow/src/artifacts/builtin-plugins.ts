@@ -87,16 +87,27 @@ const dotnetLib: ArtifactType<DotnetLibArtifact> = {
     const configuration = artifact.configuration ?? 'Release';
     const project = artifact.project ? join(ctx.projectCwd, artifact.project) : ctx.projectCwd;
 
-    // -p:Version rather than a prior `dotnet build`: the release version is only
-    // known here, and a package whose version drifts from the release fails
-    // post-publish verification, which looks it up as name@releaseVersion.
+    // Build first, then pack --no-build. A single `dotnet pack` relies on its
+    // implicit build, and with GeneratePackageOnBuild / EF design-time
+    // references in the csproj that evaluates the pack file list before
+    // runtimeconfig.json exists on disk — NU5026. The version is stamped at
+    // build so the assembly and the package agree, and a drifted package
+    // version fails post-publish verification, which looks it up as
+    // name@releaseVersion.
     await $({
       cwd: ctx.projectCwd,
-    })`dotnet pack ${project} -c ${configuration} -o ${ctx.artifactOutputDir} -p:Version=${ctx.version} -p:PackageVersion=${ctx.version}`;
+    })`dotnet build ${project} -c ${configuration} -p:Version=${ctx.version} -p:PackageVersion=${ctx.version}`;
+    await $({
+      cwd: ctx.projectCwd,
+    })`dotnet pack ${project} -c ${configuration} --no-build -o ${ctx.artifactOutputDir} -p:Version=${ctx.version} -p:PackageVersion=${ctx.version}`;
 
     // Read the produced filename rather than reconstructing it: the id can differ
     // from the assembly name, and NuGet normalises versions (1.2.3.0 -> 1.2.3).
-    const produced = (await readdir(ctx.artifactOutputDir)).filter((f) => f.endsWith('.nupkg'));
+    // .snupkg symbol packages also end with '.nupkg' — exclude them, they ride
+    // along to the same registry via push, not as the primary artifact.
+    const produced = (await readdir(ctx.artifactOutputDir)).filter(
+      (f) => f.endsWith('.nupkg') && !f.endsWith('.snupkg'),
+    );
     const match =
       produced.find((f) => f.toLowerCase() === `${artifact.name}.${ctx.version}.nupkg`.toLowerCase()) ??
       produced.find((f) => f.toLowerCase().startsWith(`${artifact.name.toLowerCase()}.`));
@@ -152,7 +163,22 @@ const ngLib: ArtifactType<NgLibArtifact> = {
 
     const packDir = join(sourceDir, artifact.packDir ?? 'dist');
 
-    if (artifact.build && !existsSync(packDir)) {
+    const distVersion = async (): Promise<string | undefined> => {
+      try {
+        const parsed = JSON.parse(await readFile(join(packDir, 'package.json'), 'utf-8')) as {
+          version?: string;
+        };
+        return parsed.version;
+      } catch {
+        return undefined;
+      }
+    };
+
+    // Rebuild not only when the output is missing but when it carries the wrong
+    // version: generated-client dist directories are gitignored and survive on
+    // disk between releases, so "dist exists" says nothing about it being THIS
+    // release's build.
+    if (artifact.build && (await distVersion()) !== ctx.version) {
       // Handed to a shell explicitly: zx quotes every interpolation, so a bare
       // `${artifact.build}` would become a single argv[0] token and fail with
       // "npm ci && npm run build: command not found".
