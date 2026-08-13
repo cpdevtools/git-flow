@@ -1,98 +1,130 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# @cpdevtools/git-flow-deploy-service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The **reference implementation** of the git-flow deploy gateway: a NestJS HTTP service that runs on a
+deploy host, receives signed deploy requests from GitHub Actions, and executes them.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+> This package is a reference, not a mandate. It is a complete, working gateway — and it is also the
+> most demanding consumer of its own pipeline, because it can deploy *itself*. A client
+> implementation does not have to be a fork of this service, or even be written in TypeScript; it has
+> to honour the same HTTP contract and the same `deploy.yml` bundle shape. `IdealSupply`'s gateway,
+> for example, is a C# service that delegates every deploy decision to
+> [`@cpdevtools/git-flow-deploy-cli`](../git-flow-deploy-cli).
 
-## Description
+## What it does
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+`actions/deploy` POSTs a signed webhook naming a repo and a GitHub Release id. The service downloads
+that release's `deploy-<method>.zip` bundle, prepares shared storage, and runs the bundle's own
+`deployCommand` — streaming every log line back to the workflow until a terminal `EXIT:<code>`.
 
-## Project setup
+Bundles never carry container images. `deploy.zip` is an **orchestration bundle only**; images always
+come from the registry.
+
+## Install
+
+Bootstrap onto a host with the packaged CLI rather than by hand:
 
 ```bash
-$ pnpm install
+npx @cpdevtools/git-flow-deploy-service \
+  --method swarm \          # node | compose | swarm
+  --latest \                # or --version <x> / --next
+  --token "$GITHUB_TOKEN" \
+  --hmac-secret "$SECRET"
 ```
 
-## Compile and run the project
+It resolves versions by listing releases tagged `@cpdevtools/git-flow-deploy-service/v*`, downloads
+the bundle, derives the slot exactly as the bundle's own `deployCommand` does, records initial state,
+and installs via npm+pm2, `docker compose -p <slot>`, or `docker stack deploy`.
+
+## HTTP API
+
+| Route | Auth | Purpose |
+|---|---|---|
+| `GET /status` | none | `{ ok, name, version }`. The version is what a self-update reads to confirm itself. |
+| `POST /deploy` | HMAC | Start a deploy. `202` accepted · `200` already running (attaches an observer) · `400` bad manifest · `403` repo not allowed. |
+| `GET /deploy/:id` | none | Status record. |
+| `GET /deploy/:id/logs?from=N` | none | Chunked `text/plain` live stream. `from` may be negative to count back from the end. |
+
+Request body is `DeployRequest { repo, release_id, bundle?, env? }`. Idempotency key is `release_id`.
+
+**Signing.** `X-Deploy-Signature-256` is an HMAC-SHA256 over `"<timestamp>.<rawBody>"`, with
+`X-Deploy-Timestamp` inside a ±60 s window. The algorithm lives in
+[`@cpdevtools/git-flow-deploy`](../git-flow-deploy) so signer and verifier can never drift.
+
+**Log framing.** Lines stream as they are produced, `:hb` every 5 s so proxies don't idle out, and a
+terminal `EXIT:<code>` sentinel. Reconnect with `from` to resume at an offset.
+
+> ⚠ The read endpoints are **anonymous**, matching the client, which sends no credentials when
+> streaming logs. Deploy logs are readable by anything that can reach the gateway.
+
+## Configuration
+
+Read by `ConfigService`. Every secret resolves from the environment **or** `/run/secrets/<NAME>`, so
+swarm secrets work unchanged.
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `DEPLOY_HMAC_SECRET` | yes | Shared secret for request signatures |
+| `GITHUB_TOKEN` | yes | Reads Releases and pulls from ghcr |
+| `DEPLOY_WORK_DIR` | no | Default `~/.git-flow-deploy-service/work` |
+| `DEPLOY_STATE_DIR` | no | Default `~/.git-flow-deploy-service/state` |
+| `SHARED_STORAGE_BASE_DIR` | no | Base for `prepareSharedStorage` |
+| `DEPLOY_HOST_ROOT` | no | Host-side path prefix for bind mounts |
+| `PORT` / `HOST` | no | Default `3700` / `0.0.0.0` |
+
+`GITHUB_TOKEN` and `DEPLOY_HOST_ROOT` are seeded back into `process.env` so child deploy processes
+inherit them.
+
+The repo allow/deny list is hot-reloaded via `fs.watch` and **fails closed** — a read error keeps the
+previous config rather than opening up. Matching rules live in `@cpdevtools/git-flow-deploy`, so the
+service and the CLI always agree on what a pattern means.
+
+## Deploying itself
+
+Most of the complexity here exists because the service can be the thing being replaced. Four paths:
+
+1. **Normal deploy** — run `deployCommand` inline; persist state on success; roll back to the prior
+   mode if a mode change failed.
+2. **Self mode-change** (e.g. node → compose) — hand a `SupervisorPlan` to a supervisor. A
+   `container → host` transition is refused *before* anything is torn down, printing the manual
+   recovery command.
+3. **Containerized self redeploy** (compose/swarm) — hand off to a **sibling container**. A `setsid`
+   supervisor would share this container's PID namespace and cgroup and be torn down with it.
+4. **Node self update** — run inline; pm2 restarts the process, and the bundle's restart supervisor
+   appends the terminal `EXIT` to the shared `deploy.log`, which the restarted process tails — or
+   short-circuits by confirming it already runs `targetVersion`.
+
+Self-container identification queries the Docker daemon **by label**
+(`com.docker.compose.project` / `com.docker.stack.namespace`) rather than hostname, mountinfo, or
+cgroup — all of which lie under `network_mode: container:<other>`. Override with
+`DEPLOY_SELF_CONTAINER`.
+
+### The one invariant you must not break
+
+`SupervisorPlan` (`src/supervisor/plan.ts`) is **additive-only and optional-only**. During a
+self-update the *outgoing* release's supervisor executes the plan written by the *incoming* one, so a
+required new field, a renamed field, or a changed meaning breaks upgrades from every existing
+version. Add optional fields; never repurpose one.
+
+## Durability
+
+`DeployStore` keeps a per-release record plus a durable append-only `deploy.log`. On boot it restores
+in-flight records, reconciles terminal state from an `EXIT:` line, and tails the log for lines
+appended by another process (500 ms poll, 5 min safety timeout). `DeploymentStateService` keeps
+per-slot state at `<stateDir>/<slot>/state.json` alongside a retained copy of the running bundle, so
+a future mode change can tear the old mode down using the old bundle's own files. State commits are
+atomic: staged as `state.new.json`, then renamed.
+
+## Development
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm build          # nest build + a second tsup pass for the CLI
+pnpm test           # jest
+pnpm build:docker   # prod bundle → node:24-alpine image
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Tests are **Jest** here (the rest of the monorepo is vitest), aliasing
+`@cpdevtools/git-flow-deploy` straight to the sibling package's source.
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT
