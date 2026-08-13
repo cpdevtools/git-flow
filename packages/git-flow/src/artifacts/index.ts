@@ -72,7 +72,10 @@ import {
   type NugetRegistry,
   type DockerRegistry,
 } from '../publishing/index.js';
-import { BUILTIN_PROVIDER, ProviderRegistry, type PluginAnchor } from './provider-registry.js';
+import { BUILTIN_PROVIDER } from './provider-registry.js';
+import { applyPlugin } from './apply-plugin.js';
+import { builtinDeployMethods } from './deploy-methods.js';
+import type { GitFlowPlugin } from './plugin.js';
 import { firstPartyPlugin } from './builtin-plugins.js';
 import type { ArtifactType } from './types.js';
 
@@ -364,72 +367,38 @@ const deploy: ArtifactType<DeployArtifact> = {
 // Registry & lookup
 // ---------------------------------------------------------------------------
 
-const artifactTypeRegistry = new ProviderRegistry<ArtifactType<any>>('artifact type');
-
-// Built-ins go through the same registration everything else does, so there is
-// one precedence rule rather than a privileged set seeded behind the registry's
-// back. They register at the lowest rung: anything installed outranks them.
-registerArtifactType('npm', npm);
-registerArtifactType('nuget', nuget);
-registerArtifactType('docker', docker);
-registerArtifactType('release-attachment', releaseAttachment);
-registerArtifactType('deploy', deploy);
-
-// dotnet-lib and ng-lib ship with git-flow but are written as a plugin, so the
-// contract third parties use is the one first-party code uses too.
-for (const [type, handler] of Object.entries(firstPartyPlugin.artifactTypes ?? {})) {
-  registerArtifactType(type, handler as ArtifactType<any>);
-}
-
 /**
- * Register an artifact type handler.
+ * Everything git-flow ships with, expressed as a plugin.
  *
- * Built-in types register at module load under the git-flow provider. Plugins
- * are registered by the loader from their exported manifest — see plugin.ts for
- * why a plugin does not call this itself.
+ * Not a privileged set seeded behind the registry's back: the built-ins declare
+ * themselves the same way an installed package does, reach the registry through
+ * the same applyPlugin, and sit at the lowest rung of the same ladder — so
+ * anything a repo installs outranks them. It also means the published plugin
+ * contract is exercised by first-party code, and cannot quietly rot.
  */
-export function registerArtifactType(
-  type: string,
-  handler: ArtifactType<any>,
-  provider: string = BUILTIN_PROVIDER,
-  anchor: PluginAnchor = 'builtin',
-): void {
-  artifactTypeRegistry.register(type, handler, provider, anchor);
-}
+export const builtinPlugin: GitFlowPlugin = {
+  name: BUILTIN_PROVIDER,
+  artifactTypes: {
+    npm: npm as unknown as ArtifactType<Artifact>,
+    nuget: nuget as unknown as ArtifactType<Artifact>,
+    docker: docker as unknown as ArtifactType<Artifact>,
+    'release-attachment': releaseAttachment as unknown as ArtifactType<Artifact>,
+    deploy: deploy as unknown as ArtifactType<Artifact>,
+    ...(firstPartyPlugin.artifactTypes ?? {}),
+  },
+  deployMethods: builtinDeployMethods,
+};
 
-/** Every registered artifact type name, sorted. */
-export function listArtifactTypes(): string[] {
-  return artifactTypeRegistry.keys();
-}
+// Registered at module load, before anything can dispatch an artifact.
+void applyPlugin(builtinPlugin, BUILTIN_PROVIDER, 'builtin');
 
-/**
- * The provider an artifact pins itself to, if any.
- *
- * `provider:` is only needed when two installed plugins supply the same type —
- * it is how one artifact can use one of them while another uses the other.
- */
-export function providerOf(artifact: Artifact): string | undefined {
-  const pinned = (artifact as { provider?: unknown }).provider;
-  return typeof pinned === 'string' ? pinned : undefined;
-}
+// Registry accessors live in registry.ts so applyPlugin can use them without
+// importing this module back.
+export {
+  registerArtifactType,
+  getArtifactType,
+  listArtifactTypes,
+  listArtifactTypeProviders,
+  providerOf,
+} from './registry.js';
 
-/** Packages supplying a given artifact type — for disambiguation messages. */
-export function listArtifactTypeProviders(type: string): string[] {
-  return artifactTypeRegistry.providersOf(type);
-}
-
-/**
- * Resolve the handler for an artifact type.
- *
- * `provider` pins the choice when more than one plugin supplies the type; without
- * it, the most local registration wins and a same-level tie throws.
- */
-export function getArtifactType(type: string, provider?: string): ArtifactType {
-  const handler = artifactTypeRegistry.resolve(type, provider);
-  if (!handler) {
-    throw new Error(
-      `Unknown artifact type: '${type}'. Registered types: ${listArtifactTypes().join(', ')}`,
-    );
-  }
-  return handler;
-}

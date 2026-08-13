@@ -23,9 +23,8 @@ import { createRequire } from 'node:module';
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { registerArtifactType } from './index.js';
-import { registerDeployMethod } from './deploy-methods.js';
-import { isGitFlowPlugin, type GitFlowPlugin, type PluginApi } from './plugin.js';
+import { applyPlugin } from './apply-plugin.js';
+import { isGitFlowPlugin } from './plugin.js';
 import type { PluginAnchor } from './provider-registry.js';
 
 const PLUGIN_NAME_PATTERN = /^(@[^/]+\/)?git-flow-plugin-/;
@@ -97,37 +96,6 @@ function declaredDependencies(manifest: Manifest): string[] {
       ...Object.keys(manifest.devDependencies ?? {}),
     ]),
   ];
-}
-
-/**
- * Apply a manifest's declarations to the registries.
- *
- * git-flow registers on the plugin's behalf: the plugin exports data and never
- * imports git-flow at runtime, so it cannot register into the wrong copy of the
- * registry. See plugin.ts.
- */
-async function applyPlugin(
-  plugin: GitFlowPlugin,
-  provider: string,
-  anchor: PluginAnchor,
-): Promise<void> {
-  for (const [type, handler] of Object.entries(plugin.artifactTypes ?? {})) {
-    registerArtifactType(type, handler as never, provider, anchor);
-  }
-
-  for (const { artifactType, method, handler } of plugin.deployMethods ?? []) {
-    registerDeployMethod(artifactType, method, handler, provider, anchor);
-  }
-
-  if (typeof plugin.register === 'function') {
-    const api: PluginApi = {
-      registerArtifactType: (type, handler) =>
-        registerArtifactType(type, handler, provider, anchor),
-      registerDeployMethod: (artifactType, method, handler) =>
-        registerDeployMethod(artifactType, method, handler, provider, anchor),
-    };
-    await plugin.register(api);
-  }
 }
 
 async function loadOne(

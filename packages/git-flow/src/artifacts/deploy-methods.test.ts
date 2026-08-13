@@ -3,6 +3,10 @@ import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse } from 'yaml';
+// Via index.js on purpose: deploy-methods.js only *defines* the built-in
+// handlers now — registering them is index.js applying the built-in plugin
+// manifest, the same path an installed plugin takes.
+import './index.js';
 import {
   getDeployMethod,
   SWARM_DEPLOY_COMMAND,

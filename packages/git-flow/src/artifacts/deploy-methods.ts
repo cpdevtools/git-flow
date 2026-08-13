@@ -177,10 +177,13 @@ export function listDeployMethodProviders(artifactType: string, method: string):
 
 // ---------------------------------------------------------------------------
 // Built-in handlers
+//
+// Exported as manifest entries rather than self-registering, so they reach the
+// registry through applyPlugin exactly like an installed plugin's do.
 // ---------------------------------------------------------------------------
 
 // ── docker.compose ─────────────────────────────────────────────────────────
-registerDeployMethod('docker', 'compose', {
+const dockerCompose: DeployMethodHandler = {
   supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const composeFile = join(projectCwd, 'docker-compose.yml');
@@ -228,7 +231,7 @@ registerDeployMethod('docker', 'compose', {
       }),
     );
   },
-});
+};
 
 // ── docker.swarm ───────────────────────────────────────────────────────────
 
@@ -255,7 +258,7 @@ export const SWARM_DEPLOY_COMMAND = [
   'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK }',
 ].join(' ');
 
-registerDeployMethod('docker', 'swarm', {
+const dockerSwarm: DeployMethodHandler = {
   supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const stackFile = join(projectCwd, 'stack.yml');
@@ -310,7 +313,7 @@ registerDeployMethod('docker', 'swarm', {
       }),
     );
   },
-});
+};
 
 // ── npm.node ───────────────────────────────────────────────────────────────
 
@@ -338,7 +341,7 @@ function loadRestartScript(): string {
   return cachedRestartScript;
 }
 
-registerDeployMethod('npm', 'node', {
+const npmNode: DeployMethodHandler = {
   async copyFiles({ projectCwd, deployOutputDir }) {
     const ecoFile = join(projectCwd, 'ecosystem.config.js');
     if (!existsSync(ecoFile)) {
@@ -382,4 +385,22 @@ registerDeployMethod('npm', 'node', {
       }),
     );
   },
-});
+};
+
+/**
+ * The deploy methods git-flow ships with, as a manifest fragment.
+ *
+ * compose and swarm derive every shared identity — service name, volumes,
+ * config objects — from the deployment slot, so two majors can run side by side.
+ * node does not: pm2 process identity and port binding are author-controlled, so
+ * a second major would collide with the first.
+ */
+export const builtinDeployMethods: Array<{
+  artifactType: string;
+  method: string;
+  handler: DeployMethodHandler;
+}> = [
+  { artifactType: 'docker', method: 'compose', handler: dockerCompose },
+  { artifactType: 'docker', method: 'swarm', handler: dockerSwarm },
+  { artifactType: 'npm', method: 'node', handler: npmNode },
+];

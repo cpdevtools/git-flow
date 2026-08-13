@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { getArtifactType, listArtifactTypes, type PackContext } from './index.js';
+import {
+  BUILTIN_PROVIDER,
+  builtinPlugin,
+  getArtifactType,
+  listArtifactTypeProviders,
+  listArtifactTypes,
+  type PackContext,
+} from './index.js';
 
 let root: string;
 let outDir: string;
@@ -36,6 +43,36 @@ describe('first-party types are available without installing anything', () => {
     // The types they complement, not replace.
     expect(types).toContain('nuget');
     expect(types).toContain('npm');
+  });
+
+  // The point of the manifest: there is no privileged set seeded behind the
+  // registry's back. Everything git-flow ships declares itself the same way an
+  // installed package does.
+  it('declares every built-in type on the plugin manifest', () => {
+    expect(Object.keys(builtinPlugin.artifactTypes ?? {}).sort()).toEqual([
+      'deploy',
+      'docker',
+      'dotnet-lib',
+      'ng-lib',
+      'npm',
+      'nuget',
+      'release-attachment',
+    ]);
+  });
+
+  it('declares the built-in deploy methods on the same manifest', () => {
+    expect(
+      (builtinPlugin.deployMethods ?? []).map((m) => `${m.artifactType}.${m.method}`).sort(),
+    ).toEqual(['docker.compose', 'docker.swarm', 'npm.node']);
+  });
+
+  it('attributes them all to the git-flow provider, at the lowest rung', () => {
+    for (const type of Object.keys(builtinPlugin.artifactTypes ?? {})) {
+      expect(listArtifactTypeProviders(type)).toContain(BUILTIN_PROVIDER);
+      // Addressable by provider, which is what lets a plugin override a built-in
+      // while the original stays reachable.
+      expect(getArtifactType(type, BUILTIN_PROVIDER)).toBeDefined();
+    }
   });
 });
 
