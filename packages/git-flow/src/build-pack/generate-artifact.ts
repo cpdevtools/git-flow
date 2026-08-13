@@ -12,37 +12,18 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import {
-  getArtifactType,
-  registerArtifactType,
-  safeName,
-  type PackContext,
-} from '../artifacts/index.js';
+import { getArtifactType, providerOf, safeName, type PackContext } from '../artifacts/index.js';
 
 /**
- * A plugin entry in release-artifacts.yml.
- * The package is dynamically imported (it must be installed in the workspace);
- * its top-level code calls registerArtifactType to add or override type handlers.
- */
-export interface PluginConfig {
-  /** npm package name to import, e.g. '@myorg/gitflow-helm' */
-  package: string;
-  /** Artifact declarations that use this plugin's types */
-  artifacts?: Artifact[];
-}
-
-/**
- * Artifact configuration that can be provided in release-artifacts.* files
+ * Artifact configuration that can be provided in release-artifacts.* files.
+ *
+ * There is no `plugins:` key. A plugin is enabled by installing it — discovery
+ * happens once per process in loadPlugins(), before any artifact is dispatched.
+ * When two plugins supply the same type, the artifact names the one it wants
+ * with `provider:`; see artifacts/provider-registry.ts for the precedence rules.
  */
 export interface ArtifactConfig {
-  /**
-   * Plugin packages to load before dispatching artifacts.
-   * Plugins are imported in list order; later registrations override earlier ones.
-   * Built-in types (npm, nuget, docker, release-attachment, deploy) are always
-   * registered first and can be overridden by any plugin.
-   */
-  plugins?: PluginConfig[];
-  /** Artifact declarations using built-in or previously-loaded plugin types */
+  /** Artifact declarations using built-in or plugin-supplied types */
   artifacts?: Artifact[];
 }
 
@@ -81,10 +62,6 @@ function substituteEnvVars(
 ): ArtifactConfig {
   return {
     ...config,
-    plugins: config.plugins?.map((p) => ({
-      ...p,
-      artifacts: p.artifacts?.map((a) => substituteArtifact(a, envVars)),
-    })),
     artifacts: config.artifacts?.map((a) => substituteArtifact(a, envVars)),
   };
 }
@@ -126,31 +103,11 @@ export async function loadArtifactConfig(
       raw = (mod.default || mod) as ArtifactConfig;
     }
 
-    // Apply env-var substitution before loading plugins so ${VAR} in
-    // package names is also resolved (e.g. ${PLUGIN_SCOPE}/my-plugin)
     const config = substituteEnvVars(raw, envVars);
 
-    // Load plugins in order — each plugin calls registerArtifactType on import.
-    // Later registrations override earlier ones (last wins).
-    for (const plugin of config.plugins ?? []) {
-      try {
-        await import(plugin.package);
-        console.log(`  🔌 Loaded plugin: ${plugin.package}`);
-      } catch (err) {
-        throw new Error(
-          `Failed to load artifact plugin '${plugin.package}': ${err instanceof Error ? err.message : String(err)}\n` +
-            `Ensure the package is installed in the workspace devDependencies.`,
-        );
-      }
-    }
-
-    // Flatten: plugin artifacts first (in list order), then root artifacts
-    const allArtifacts: Artifact[] = [
-      ...(config.plugins ?? []).flatMap((p) => p.artifacts ?? []),
-      ...(config.artifacts ?? []),
-    ];
-
-    return { artifacts: allArtifacts };
+    // Plugins are not listed here — installing one is what enables it, and
+    // loadPlugins() has already run for this process. See artifacts/load-plugins.ts.
+    return { artifacts: config.artifacts ?? [] };
   }
 
   return null;
@@ -166,6 +123,7 @@ export async function generateArtifactDescriptor(
   packageDir: string,
   packageName: string,
   packageVersion: string,
+  workspaceRoot: string = process.cwd(),
 ): Promise<string> {
   const artifactFilename = safeName(packageName);
 
@@ -198,13 +156,14 @@ export async function generateArtifactDescriptor(
 
   const ctx: PackContext = {
     projectCwd: packageDir,
+    workspaceRoot,
     artifactOutputDir: ARTIFACT_OUTPUT_DIR,
     projectName: packageName,
     version: packageVersion,
   };
 
   for (const artifact of config.artifacts ?? []) {
-    await getArtifactType(artifact.type).pack(artifact, ctx);
+    await getArtifactType(artifact.type, providerOf(artifact)).pack(artifact, ctx);
   }
 
   const descriptor: ProjectArtifactDescriptor = {

@@ -13,15 +13,18 @@
  * deploy.yml, the orchestrator copies the folder then calls generateDeployYml
  * to supplement the missing manifest.
  *
- * Usage (from a plugin):
- *   import { registerDeployMethod } from '@cpdevtools/git-flow/artifacts';
- *   registerDeployMethod('docker', 'k8s', { copyFiles, generateDeployYml });
+ * Supplied from a plugin manifest:
+ *   export default {
+ *     name: '@org/git-flow-plugin-k8s',
+ *     deployMethods: [{ artifactType: 'docker-image', method: 'k8s', handler }],
+ *   } satisfies GitFlowPlugin;
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
+import { ProviderRegistry, type PluginAnchor } from './provider-registry.js';
 import { deploymentSlot, type VersioningStrategy } from './slot.js';
 
 /**
@@ -56,6 +59,11 @@ async function upsertDeployEnv(
 export interface DeployMethodContext {
   /** Absolute path to the project root */
   projectCwd: string;
+  /**
+   * Absolute path to the workspace root, so a handler can reach files outside
+   * its own project without guessing at `..` depth.
+   */
+  workspaceRoot: string;
   /** Absolute path to the deploy output directory for this method */
   deployOutputDir: string;
   /** Package name (e.g. '@org/my-app') */
@@ -93,45 +101,64 @@ export interface DeployMethodHandler {
    * override provided source files but no deploy.yml.
    */
   generateDeployYml(ctx: DeployMethodContext): Promise<void>;
+
+  /**
+   * Whether this method can run two majors of the same service side by side
+   * (`versioning: major`).
+   *
+   * A capability rather than a hardcoded method-name check in the orchestrator,
+   * so a plugin can support it without being added to a list inside git-flow.
+   * Defaults to false: parallel majors require the handler to derive every
+   * shared identity — service name, published ports, volume names — from the
+   * deployment slot, and one that has not done that work would silently collide
+   * with the major already deployed.
+   */
+  supportsParallelMajors?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
-// Map<artifactType, Map<method, DeployMethodHandler>>
-const deployMethodRegistry = new Map<string, Map<string, DeployMethodHandler>>();
+/**
+ * Keyed `artifactType.method`, because a deploy method is never global — 'swarm'
+ * means something different for a docker artifact than it would for any other.
+ * The provider dimension is handled by ProviderRegistry.
+ */
+const deployMethodRegistry = new ProviderRegistry<DeployMethodHandler>('deploy method');
+
+const methodKey = (artifactType: string, method: string) => `${artifactType}.${method}`;
 
 /**
- * Register (or override) a deploy method handler for a given artifact type.
+ * Register a deploy method handler for a given artifact type.
  *
- * Built-in handlers are registered at module load.  Call this from a plugin
- * package's top-level code to add new methods or replace existing ones.
- * Last registration wins.
- *
- * @example
- * import { registerDeployMethod } from '@cpdevtools/git-flow/artifacts';
- * registerDeployMethod('docker', 'k8s', { copyFiles, generateDeployYml });
+ * The low-level primitive applyPlugin calls; built-ins and installed plugins
+ * both arrive through a manifest. `provider` and `anchor` are required — an
+ * anonymous registration would impersonate git-flow and dodge conflict
+ * detection.
  */
 export function registerDeployMethod(
   artifactType: string,
   method: string,
   handler: DeployMethodHandler,
+  provider: string,
+  anchor: PluginAnchor,
 ): void {
-  if (!deployMethodRegistry.has(artifactType)) {
-    deployMethodRegistry.set(artifactType, new Map());
-  }
-  deployMethodRegistry.get(artifactType)!.set(method, handler);
+  deployMethodRegistry.register(methodKey(artifactType, method), handler, provider, anchor);
 }
 
 /**
- * Look up a registered deploy method handler.  Returns undefined if not found.
+ * Look up a deploy method handler.  Returns undefined if none is registered.
+ *
+ * Throws when two plugins at the same level supply the method and `provider`
+ * does not say which to use.
  */
 export function getDeployMethod(
   artifactType: string,
   method: string,
+  provider?: string,
 ): DeployMethodHandler | undefined {
-  return deployMethodRegistry.get(artifactType)?.get(method);
+  return deployMethodRegistry.resolve(methodKey(artifactType, method), provider);
 }
 
 /**
@@ -139,16 +166,28 @@ export function getDeployMethod(
  * Useful for error messages when a requested method is not registered.
  */
 export function listDeployMethods(artifactType: string): string[] {
-  const methods = deployMethodRegistry.get(artifactType);
-  return methods ? [...methods.keys()] : [];
+  const prefix = `${artifactType}.`;
+  return deployMethodRegistry
+    .keys()
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => k.slice(prefix.length));
+}
+
+/** Packages supplying a given method — for disambiguation error messages. */
+export function listDeployMethodProviders(artifactType: string, method: string): string[] {
+  return deployMethodRegistry.providersOf(methodKey(artifactType, method));
 }
 
 // ---------------------------------------------------------------------------
 // Built-in handlers
+//
+// Exported as manifest entries rather than self-registering, so they reach the
+// registry through applyPlugin exactly like an installed plugin's do.
 // ---------------------------------------------------------------------------
 
 // ── docker.compose ─────────────────────────────────────────────────────────
-registerDeployMethod('docker', 'compose', {
+export const dockerCompose: DeployMethodHandler = {
+  supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const composeFile = join(projectCwd, 'docker-compose.yml');
     if (!existsSync(composeFile)) {
@@ -195,7 +234,7 @@ registerDeployMethod('docker', 'compose', {
       }),
     );
   },
-});
+};
 
 // ── docker.swarm ───────────────────────────────────────────────────────────
 
@@ -222,7 +261,8 @@ export const SWARM_DEPLOY_COMMAND = [
   'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK }',
 ].join(' ');
 
-registerDeployMethod('docker', 'swarm', {
+export const dockerSwarm: DeployMethodHandler = {
+  supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const stackFile = join(projectCwd, 'stack.yml');
     if (!existsSync(stackFile)) {
@@ -276,7 +316,7 @@ registerDeployMethod('docker', 'swarm', {
       }),
     );
   },
-});
+};
 
 // ── npm.node ───────────────────────────────────────────────────────────────
 
@@ -304,7 +344,7 @@ function loadRestartScript(): string {
   return cachedRestartScript;
 }
 
-registerDeployMethod('npm', 'node', {
+const npmNode: DeployMethodHandler = {
   async copyFiles({ projectCwd, deployOutputDir }) {
     const ecoFile = join(projectCwd, 'ecosystem.config.js');
     if (!existsSync(ecoFile)) {
@@ -348,4 +388,22 @@ registerDeployMethod('npm', 'node', {
       }),
     );
   },
-});
+};
+
+/**
+ * The deploy methods git-flow ships with, as a manifest fragment.
+ *
+ * compose and swarm derive every shared identity — service name, volumes,
+ * config objects — from the deployment slot, so two majors can run side by side.
+ * node does not: pm2 process identity and port binding are author-controlled, so
+ * a second major would collide with the first.
+ */
+export const builtinDeployMethods: Array<{
+  artifactType: string;
+  method: string;
+  handler: DeployMethodHandler;
+}> = [
+  { artifactType: 'docker-image', method: 'compose', handler: dockerCompose },
+  { artifactType: 'docker-image', method: 'swarm', handler: dockerSwarm },
+  { artifactType: 'npm', method: 'node', handler: npmNode },
+];

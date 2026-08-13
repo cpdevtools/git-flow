@@ -5,6 +5,7 @@
 import type { Project as SchedulerProject } from '@cpdevtools/ts-dev-utilities/project';
 import { runScripts } from '@cpdevtools/ts-dev-utilities/runner';
 import { join } from 'path';
+import { loadPlugins } from '../artifacts/index.js';
 import type { Project } from '../lib/project';
 import { discoverProjects } from '../lib/project';
 import { applyVersion, executePack, executeUpload } from './execute.js';
@@ -35,6 +36,11 @@ export async function runBuildPack(
   prBody: string,
 ): Promise<BuildPackResult> {
   console.log('🚀 Starting Phase 2: Build & Pack\n');
+
+  // Registration has to happen before anything dispatches an artifact, and once
+  // per process rather than per config load — the deploy paths never read
+  // release-artifacts.yml at all.
+  await loadPlugins({ workspaceRoot: context.workspaceRoot });
 
   // Extract metadata from PR body
   const metadata = extractPRMetadata(prBody);

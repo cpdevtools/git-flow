@@ -5,7 +5,7 @@ artifacts:
     deploy:
       - node
 
-  - type: docker
+  - type: docker-image
     registries:
       - ghcr
     deploy:
