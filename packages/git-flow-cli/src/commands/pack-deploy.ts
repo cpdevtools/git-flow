@@ -23,8 +23,10 @@
 import { Args, Command, Flags } from '@oclif/core';
 import { mkdir } from 'node:fs/promises';
 import {
+  findWorkspaceRoot,
   getDeployMethod,
   listDeployMethods,
+  loadPlugins,
   type DeployMethodContext,
 } from '@cpdevtools/git-flow/artifacts';
 
@@ -88,8 +90,15 @@ export default class PackDeploy extends Command {
 
     await mkdir(deployOutputDir, { recursive: true });
 
+    // This command never registered plugins, so a plugin-supplied deploy method
+    // was unreachable here even though the orchestrator could find it.
+    const projectCwd = process.cwd();
+    const workspaceRoot = await findWorkspaceRoot(projectCwd);
+    await loadPlugins({ workspaceRoot, projectCwd });
+
     const ctx: DeployMethodContext = {
-      projectCwd: process.cwd(),
+      projectCwd,
+      workspaceRoot,
       deployOutputDir,
       projectName,
       version,

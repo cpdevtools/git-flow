@@ -208,11 +208,13 @@ describe('serviceRollout', () => {
 });
 
 describe('serviceReplicas', () => {
-  const lsRunner = (line: string): DockerRunner => (args) => {
-    expect(args[0]).toBe('service');
-    expect(args[1]).toBe('ls');
-    return ok(line);
-  };
+  const lsRunner =
+    (line: string): DockerRunner =>
+    (args) => {
+      expect(args[0]).toBe('service');
+      expect(args[1]).toBe('ls');
+      return ok(line);
+    };
 
   it('parses running/desired from docker service ls', () => {
     expect(serviceReplicas('webservice_gw-v1', lsRunner('webservice_gw-v1 2/3\n'))).toEqual({

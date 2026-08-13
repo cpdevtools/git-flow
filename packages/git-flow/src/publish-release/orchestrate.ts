@@ -7,7 +7,12 @@ import { parseDocument } from 'yaml';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { getOctokit as getActionsOctokit } from '@actions/github';
-import { getArtifactType, type PublishContext } from '../artifacts/index.js';
+import {
+  getArtifactType,
+  loadPlugins,
+  providerOf,
+  type PublishContext,
+} from '../artifacts/index.js';
 import {
   loadRegistryConfig,
   getRegistry,
@@ -153,6 +158,12 @@ export async function runPublishRelease(
   };
 
   try {
+    // Publish dispatches through the same handler registry as pack, so plugin
+    // types have to be registered here too — this process never reads
+    // release-artifacts.yml, which is why a plugin artifact used to reach
+    // publish and fail with 'Unknown artifact type'.
+    await loadPlugins({ workspaceRoot: options.workspaceRoot });
+
     // Load registry configuration
     const registryConfig = await loadRegistryConfig(options.workspaceRoot);
 
@@ -368,7 +379,9 @@ async function publishProjectArtifacts(
     const publishCtx: PublishContext = { workspaceRoot, projectVersion };
 
     for (const artifact of descriptor.artifacts) {
-      const registries = getArtifactType(artifact.type).getRegistries(artifact);
+      const registries = getArtifactType(artifact.type, providerOf(artifact)).getRegistries(
+        artifact,
+      );
 
       for (const registryId of registries) {
         const registry = getRegistry(registryConfig, registryId);
@@ -384,7 +397,10 @@ async function publishProjectArtifacts(
         const token = getToken(registry);
 
         // Skip if already published
-        const artifactVersion = getArtifactType(artifact.type).getVersion(artifact, projectVersion);
+        const artifactVersion = getArtifactType(artifact.type, providerOf(artifact)).getVersion(
+          artifact,
+          projectVersion,
+        );
 
         const verification = await verifyPublication(
           artifact.name,
@@ -400,7 +416,11 @@ async function publishProjectArtifacts(
 
         // Publish to registry
         console.log(`  🚀 Publishing ${artifact.name} to ${registryId}...`);
-        await getArtifactType(artifact.type).publish(artifact, registry, publishCtx);
+        await getArtifactType(artifact.type, providerOf(artifact)).publish(
+          artifact,
+          registry,
+          publishCtx,
+        );
 
         // Verify publication
         const postVerification = await verifyPublication(

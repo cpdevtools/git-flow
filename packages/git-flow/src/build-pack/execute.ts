@@ -14,6 +14,7 @@ import {
   getArtifactType,
   getDeployMethod,
   listDeployMethods,
+  providerOf,
   type Artifact,
   type DeployMethodContext,
   type UploadContext,
@@ -27,11 +28,7 @@ import {
   type VersioningStrategy,
 } from '../artifacts/slot.js';
 import { findOrCreateDraftRelease, uploadArtifact, markReleasePublished } from './github.js';
-import {
-  generateArtifactDescriptor,
-  loadArtifactConfig,
-  ARTIFACT_OUTPUT_DIR,
-} from './generate-artifact.js';
+import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
 
@@ -177,7 +174,12 @@ export async function executePack(
       // If the pack script already produced it (e.g. `gitflow pack`), skip to
       // avoid re-running pack handlers (which would re-pack / re-push docker).
       if (!existsSync(artifactPath)) {
-        await generateArtifactDescriptor(project.cwd, project.name, project.version);
+        await generateArtifactDescriptor(
+          project.cwd,
+          project.name,
+          project.version,
+          context.workspaceRoot,
+        );
       }
     } catch (error) {
       console.error(`  ✗ Pack failed:`, error);
@@ -528,13 +530,19 @@ async function executePackDeploy(
         (artifact as { name?: string }).name ?? artifact.type,
       );
       for (const method of methods) {
-        // Parallel-major deploys are only supported for compose/swarm today
-        // (node's pm2 identity + port binding are author-controlled).
-        if (versioning === 'major' && method !== 'compose' && method !== 'swarm') {
-          throw new Error(
-            `versioning: major is only supported for compose/swarm deploy methods, not '${method}' ` +
-              `(artifact '${(artifact as { name?: string }).name ?? artifact.type}'). node multi-version is not yet supported.`,
-          );
+        // Asked of the handler rather than matched against a list of method
+        // names, so a plugin can support parallel majors without git-flow
+        // needing to know it exists.
+        if (versioning === 'major') {
+          const candidate = getDeployMethod(artifact.type, method, providerOf(artifact));
+          if (candidate && !candidate.supportsParallelMajors) {
+            throw new Error(
+              `versioning: major is not supported by the '${artifact.type}.${method}' deploy method ` +
+                `(artifact '${(artifact as { name?: string }).name ?? artifact.type}').\n` +
+                `Running two majors side by side requires the method to derive service names, ports ` +
+                `and volumes from the deployment slot; this handler does not declare that it does.`,
+            );
+          }
         }
         console.log(`  \ud83d\ude80 ${project.name}: pack-deploy-${method}...`);
 
@@ -543,6 +551,7 @@ async function executePackDeploy(
 
         const deployCtx: DeployMethodContext = {
           projectCwd: project.cwd,
+          workspaceRoot: context.workspaceRoot,
           deployOutputDir,
           projectName: project.name,
           version: project.version,
@@ -570,7 +579,7 @@ async function executePackDeploy(
           await cp(folderPath, deployOutputDir, { recursive: true });
           // Fall through for deploy.yml if the folder didn't include one
           if (!existsSync(join(deployOutputDir, 'deploy.yml'))) {
-            const handler = getDeployMethod(artifact.type, method);
+            const handler = getDeployMethod(artifact.type, method, providerOf(artifact));
             if (!handler) {
               throw new Error(
                 `No deploy method handler for ${artifact.type}.${method} \u2014 needed to generate deploy.yml.\n` +
@@ -587,14 +596,7 @@ async function executePackDeploy(
         }
         // ── Step 3: Registry handler ─────────────────────────────────────────
         else {
-          // Load artifact config to trigger plugin side-effects in this process
-          await loadArtifactConfig(project.cwd, {
-            PROJECT_NAME: project.name,
-            ARTIFACT_OUTPUT_DIR,
-            PACKAGE_NAME: project.name,
-            PACKAGE_VERSION: project.version,
-          });
-          const handler = getDeployMethod(artifact.type, method);
+          const handler = getDeployMethod(artifact.type, method, providerOf(artifact));
           if (!handler) {
             throw new Error(
               `No deploy handler found for ${artifact.type}.${method}.\n` +
@@ -783,7 +785,7 @@ export async function executeUpload(
     for (const artifact of uploadDescriptor.artifacts) {
       // Convention deploy bundles are already uploaded inside executePackDeploy; skip type:deploy entries
       if (artifact.type === 'deploy' && hasConventionDeploy) continue;
-      await getArtifactType(artifact.type).upload(artifact, uploadCtx);
+      await getArtifactType(artifact.type, providerOf(artifact)).upload(artifact, uploadCtx);
     }
 
     console.log(`✓ ${project.name}: Upload completed`);

@@ -26,6 +26,7 @@ function ctx(
 ): DeployMethodContext {
   return {
     projectCwd: dir,
+    workspaceRoot: dir,
     deployOutputDir: dir,
     projectName: '@org/svc',
     version: '2.3.5',

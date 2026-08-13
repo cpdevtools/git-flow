@@ -17,9 +17,36 @@ export {
   registerDeployMethod,
   getDeployMethod,
   listDeployMethods,
+  listDeployMethodProviders,
   type DeployMethodHandler,
   type DeployMethodContext,
 } from './deploy-methods.js';
+
+// The plugin contract and the registry that backs precedence.
+export {
+  BUILTIN_PROVIDER,
+  isGitFlowPlugin,
+  type GitFlowPlugin,
+  type PluginApi,
+  type DeployMethodRegistration,
+} from './plugin.js';
+export { ProviderConflictError, type PluginAnchor } from './provider-registry.js';
+export {
+  loadPlugins,
+  findWorkspaceRoot,
+  type LoadedPlugin,
+  type LoadPluginsOptions,
+} from './load-plugins.js';
+
+// Context and handler types moved to types.ts so the plugin contract can
+// reference them without importing this module back.
+export type {
+  PackContext,
+  PackDeployContext,
+  UploadContext,
+  PublishContext,
+  ArtifactType,
+} from './types.js';
 
 import type {
   Artifact,
@@ -43,8 +70,9 @@ import {
   type NpmRegistry,
   type NugetRegistry,
   type DockerRegistry,
-  type Registry,
 } from '../publishing/index.js';
+import { BUILTIN_PROVIDER, ProviderRegistry, type PluginAnchor } from './provider-registry.js';
+import type { ArtifactType } from './types.js';
 
 // Re-export artifact types so consumers of @cpdevtools/git-flow/artifacts
 // don't need a direct dependency on @cpdevtools/ts-dev-utilities
@@ -58,74 +86,6 @@ export type {
 } from '@cpdevtools/ts-dev-utilities/artifacts';
 export type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/artifacts';
 export { writeArtifact } from '@cpdevtools/ts-dev-utilities/artifacts';
-
-// ---------------------------------------------------------------------------
-// Context types
-// ---------------------------------------------------------------------------
-
-export interface PackContext {
-  /** Absolute path to the project directory */
-  projectCwd: string;
-  /** Absolute path to the shared artifact output directory */
-  artifactOutputDir: string;
-  /** Package name (e.g. '@org/my-app') */
-  projectName: string;
-  /** Release version string */
-  version: string;
-}
-
-export interface PackDeployContext {
-  /** Absolute path to the project directory */
-  projectCwd: string;
-  /** Absolute path to the shared artifact output directory */
-  artifactOutputDir: string;
-  /**
-   * Absolute path to the directory the project's pack-deploy script wrote to.
-   * Set from the DEPLOY_OUTPUT_DIR env var which the orchestrator provides.
-   * Convention: <projectCwd>/.deploy-output/<safeName(artifact.name)>
-   */
-  deployOutputDir: string;
-  /** Package name */
-  projectName: string;
-  /** Release version string */
-  version: string;
-  /** GitHub Release ID (numeric) */
-  releaseId: number;
-  /** owner/repo (from GITHUB_REPOSITORY) */
-  githubRepository: string;
-}
-
-export interface UploadContext {
-  githubToken: string;
-  owner: string;
-  repo: string;
-  releaseId: number;
-  uploadUrl: string;
-  /** Workspace root for resolving relative artifact paths */
-  workspaceRoot: string;
-}
-
-export interface PublishContext {
-  /** Workspace root — artifact files are expected at <workspaceRoot>/.artifacts/<filename> */
-  workspaceRoot: string;
-  /** Project release version */
-  projectVersion: string;
-}
-
-// ---------------------------------------------------------------------------
-// ArtifactType interface
-// ---------------------------------------------------------------------------
-
-export interface ArtifactType<T extends Artifact = Artifact> {
-  pack(artifact: T, ctx: PackContext): Promise<void>;
-  packDeploy(artifact: T, ctx: PackDeployContext): Promise<void>;
-  upload(artifact: T, ctx: UploadContext): Promise<void>;
-  publish(artifact: T, registry: Registry, ctx: PublishContext): Promise<void>;
-  /** Registry IDs to publish to.  Empty array = this type has no external publishing. */
-  getRegistries(artifact: T): string[];
-  /** Version string to use for verification/tagging.  Docker uses finalTag. */
-  getVersion(artifact: T, projectVersion: string): string;
-}
 
 // ---------------------------------------------------------------------------
 // Utility
@@ -402,34 +362,66 @@ const deploy: ArtifactType<DeployArtifact> = {
 // Registry & lookup
 // ---------------------------------------------------------------------------
 
-const artifactTypeRegistry: Record<string, ArtifactType<any>> = {
-  npm,
-  nuget,
-  docker,
-  'release-attachment': releaseAttachment,
-  deploy,
-};
+const artifactTypeRegistry = new ProviderRegistry<ArtifactType<any>>('artifact type');
+
+// Built-ins go through the same registration everything else does, so there is
+// one precedence rule rather than a privileged set seeded behind the registry's
+// back. They register at the lowest rung: anything installed outranks them.
+registerArtifactType('npm', npm);
+registerArtifactType('nuget', nuget);
+registerArtifactType('docker', docker);
+registerArtifactType('release-attachment', releaseAttachment);
+registerArtifactType('deploy', deploy);
 
 /**
- * Register (or override) an artifact type handler.
+ * Register an artifact type handler.
  *
- * Built-in types are registered at module load.  Call this from a plugin
- * package's top-level code to add new types or replace existing ones.
- * When multiple plugins register the same type, the last call wins.
- *
- * @example
- * // In a plugin package's index.ts:
- * import { registerArtifactType } from '@cpdevtools/git-flow/artifacts';
- * registerArtifactType('helm-chart', helmChartHandler);
+ * Built-in types register at module load under the git-flow provider. Plugins
+ * are registered by the loader from their exported manifest — see plugin.ts for
+ * why a plugin does not call this itself.
  */
-export function registerArtifactType(type: string, handler: ArtifactType): void {
-  artifactTypeRegistry[type] = handler;
+export function registerArtifactType(
+  type: string,
+  handler: ArtifactType<any>,
+  provider: string = BUILTIN_PROVIDER,
+  anchor: PluginAnchor = 'builtin',
+): void {
+  artifactTypeRegistry.register(type, handler, provider, anchor);
 }
 
-export function getArtifactType(type: string): ArtifactType {
-  const handler = artifactTypeRegistry[type];
+/** Every registered artifact type name, sorted. */
+export function listArtifactTypes(): string[] {
+  return artifactTypeRegistry.keys();
+}
+
+/**
+ * The provider an artifact pins itself to, if any.
+ *
+ * `provider:` is only needed when two installed plugins supply the same type —
+ * it is how one artifact can use one of them while another uses the other.
+ */
+export function providerOf(artifact: Artifact): string | undefined {
+  const pinned = (artifact as { provider?: unknown }).provider;
+  return typeof pinned === 'string' ? pinned : undefined;
+}
+
+/** Packages supplying a given artifact type — for disambiguation messages. */
+export function listArtifactTypeProviders(type: string): string[] {
+  return artifactTypeRegistry.providersOf(type);
+}
+
+/**
+ * Resolve the handler for an artifact type.
+ *
+ * `provider` pins the choice when more than one plugin supplies the type; without
+ * it, the most local registration wins and a same-level tie throws.
+ */
+export function getArtifactType(type: string, provider?: string): ArtifactType {
+  const handler = artifactTypeRegistry.resolve(type, provider);
   if (!handler) {
-    throw new Error(`Unknown artifact type: '${type}'`);
+    throw new Error(
+      `Unknown artifact type: '${type}'. Registered types: ${listArtifactTypes().join(', ')}`,
+    );
   }
   return handler;
 }

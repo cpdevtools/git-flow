@@ -22,6 +22,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
+import { BUILTIN_PROVIDER, ProviderRegistry, type PluginAnchor } from './provider-registry.js';
 import { deploymentSlot, type VersioningStrategy } from './slot.js';
 
 /**
@@ -56,6 +57,11 @@ async function upsertDeployEnv(
 export interface DeployMethodContext {
   /** Absolute path to the project root */
   projectCwd: string;
+  /**
+   * Absolute path to the workspace root, so a handler can reach files outside
+   * its own project without guessing at `..` depth.
+   */
+  workspaceRoot: string;
   /** Absolute path to the deploy output directory for this method */
   deployOutputDir: string;
   /** Package name (e.g. '@org/my-app') */
@@ -93,45 +99,63 @@ export interface DeployMethodHandler {
    * override provided source files but no deploy.yml.
    */
   generateDeployYml(ctx: DeployMethodContext): Promise<void>;
+
+  /**
+   * Whether this method can run two majors of the same service side by side
+   * (`versioning: major`).
+   *
+   * A capability rather than a hardcoded method-name check in the orchestrator,
+   * so a plugin can support it without being added to a list inside git-flow.
+   * Defaults to false: parallel majors require the handler to derive every
+   * shared identity — service name, published ports, volume names — from the
+   * deployment slot, and one that has not done that work would silently collide
+   * with the major already deployed.
+   */
+  supportsParallelMajors?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
-// Map<artifactType, Map<method, DeployMethodHandler>>
-const deployMethodRegistry = new Map<string, Map<string, DeployMethodHandler>>();
+/**
+ * Keyed `artifactType.method`, because a deploy method is never global — 'swarm'
+ * means something different for a docker artifact than it would for any other.
+ * The provider dimension is handled by ProviderRegistry.
+ */
+const deployMethodRegistry = new ProviderRegistry<DeployMethodHandler>('deploy method');
+
+const methodKey = (artifactType: string, method: string) => `${artifactType}.${method}`;
 
 /**
- * Register (or override) a deploy method handler for a given artifact type.
+ * Register a deploy method handler for a given artifact type.
  *
- * Built-in handlers are registered at module load.  Call this from a plugin
- * package's top-level code to add new methods or replace existing ones.
- * Last registration wins.
- *
- * @example
- * import { registerDeployMethod } from '@cpdevtools/git-flow/artifacts';
- * registerDeployMethod('docker', 'k8s', { copyFiles, generateDeployYml });
+ * Built-in handlers register at module load under the git-flow provider.
+ * Plugins are registered by the loader from their exported manifest — see
+ * plugin.ts for why a plugin does not call this itself.
  */
 export function registerDeployMethod(
   artifactType: string,
   method: string,
   handler: DeployMethodHandler,
+  provider: string = BUILTIN_PROVIDER,
+  anchor: PluginAnchor = 'builtin',
 ): void {
-  if (!deployMethodRegistry.has(artifactType)) {
-    deployMethodRegistry.set(artifactType, new Map());
-  }
-  deployMethodRegistry.get(artifactType)!.set(method, handler);
+  deployMethodRegistry.register(methodKey(artifactType, method), handler, provider, anchor);
 }
 
 /**
- * Look up a registered deploy method handler.  Returns undefined if not found.
+ * Look up a deploy method handler.  Returns undefined if none is registered.
+ *
+ * Throws when two plugins at the same level supply the method and `provider`
+ * does not say which to use.
  */
 export function getDeployMethod(
   artifactType: string,
   method: string,
+  provider?: string,
 ): DeployMethodHandler | undefined {
-  return deployMethodRegistry.get(artifactType)?.get(method);
+  return deployMethodRegistry.resolve(methodKey(artifactType, method), provider);
 }
 
 /**
@@ -139,8 +163,16 @@ export function getDeployMethod(
  * Useful for error messages when a requested method is not registered.
  */
 export function listDeployMethods(artifactType: string): string[] {
-  const methods = deployMethodRegistry.get(artifactType);
-  return methods ? [...methods.keys()] : [];
+  const prefix = `${artifactType}.`;
+  return deployMethodRegistry
+    .keys()
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => k.slice(prefix.length));
+}
+
+/** Packages supplying a given method — for disambiguation error messages. */
+export function listDeployMethodProviders(artifactType: string, method: string): string[] {
+  return deployMethodRegistry.providersOf(methodKey(artifactType, method));
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +181,7 @@ export function listDeployMethods(artifactType: string): string[] {
 
 // ── docker.compose ─────────────────────────────────────────────────────────
 registerDeployMethod('docker', 'compose', {
+  supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const composeFile = join(projectCwd, 'docker-compose.yml');
     if (!existsSync(composeFile)) {
@@ -223,6 +256,7 @@ export const SWARM_DEPLOY_COMMAND = [
 ].join(' ');
 
 registerDeployMethod('docker', 'swarm', {
+  supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const stackFile = join(projectCwd, 'stack.yml');
     if (!existsSync(stackFile)) {
