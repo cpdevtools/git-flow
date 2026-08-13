@@ -179,17 +179,30 @@ const nuget: ArtifactType<NuGetArtifact> = {
 /** Docker — save the built image to a tarball artifact; publish loads & pushes it */
 const docker: ArtifactType<DockerArtifact> = {
   async pack(artifact, ctx) {
-    // Derive image name if absent: ghcr.io/{owner}/{unscoped-project-name}
+    // The name is the image's BARE repository name — no registry host, no
+    // namespace. `registries:` is a list: the same image can publish to ghcr
+    // and ACR in one release, so the host/namespace cannot live on the
+    // artifact. Each registry entry in .publish/registries.yml carries its own
+    // `registry:` + `namespace:`, and resolveDockerImageBase composes
+    // `<registry>/<namespace>/<name>` per destination at publish and verify.
     //
-    // The npm scope must be DROPPED, not flattened. The registry path already
-    // carries the org, so `safeName('@cpdevtools/git-flow-deploy-service')`
-    // would produce ghcr.io/cpdevtools/cpdevtools-git-flow-deploy-service —
-    // the org repeated. Strip the scope so it stays
-    // ghcr.io/cpdevtools/git-flow-deploy-service.
+    // Default: the unscoped project name. The npm scope is DROPPED, not
+    // flattened — the registry namespace already carries the org, so
+    // safeName('@cpdevtools/git-flow-deploy-service') would repeat it.
+    // Override `name:` when the historical image name differs from the
+    // package (e.g. webservice-deploy-gateway vs deploy-gateway-service).
     if (!artifact.name) {
-      const owner = process.env.GITHUB_REPOSITORY_OWNER ?? '';
-      const bareName = safeName(ctx.projectName.replace(/^@[^/]+\//, ''));
-      (artifact as { name: string }).name = `ghcr.io/${owner}/${bareName}`;
+      (artifact as { name: string }).name = safeName(ctx.projectName.replace(/^@[^/]+\//, ''));
+    }
+    if (artifact.name.includes('/')) {
+      throw new Error(
+        `docker-image '${artifact.name}': name must be the bare image name, without ` +
+          `registry host or namespace.\n` +
+          `Those come from the registry entries in .publish/registries.yml ` +
+          `(registry: + namespace:), composed per destination — a full path here would ` +
+          `pin every registry in 'registries:' to one host.\n` +
+          `Use name: ${artifact.name.split('/').pop()}`,
+      );
     }
     // localTag is the image as it was built locally (no registry prefix). This
     // one KEEPS the flattened scope (`cpdevtools-git-flow-deploy-service`)
@@ -197,7 +210,6 @@ const docker: ArtifactType<DockerArtifact> = {
     // match what the project's own `build:docker` script tagged.
     const source =
       (artifact as { localTag?: string }).localTag ?? `${safeName(ctx.projectName)}:latest`;
-    const registryHost = artifact.name.includes('/') ? artifact.name.split('/')[0] : 'docker.io';
     const archiveName = `${safeName(artifact.name)}.image.tar.gz`;
     const archivePath = join(ctx.artifactOutputDir, archiveName);
 
@@ -215,7 +227,8 @@ const docker: ArtifactType<DockerArtifact> = {
 
     artifact.finalTag = ctx.version;
     artifact.digest = digest;
-    artifact.registry = registryHost;
+    // No artifact.registry: the destination is a per-registry fact decided at
+    // publish, not a property of the image.
     artifact.pushedAt = new Date().toISOString();
     (artifact as { imageArchive?: string }).imageArchive = archivePath;
 

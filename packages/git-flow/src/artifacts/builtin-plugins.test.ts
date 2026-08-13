@@ -302,3 +302,55 @@ describe('docker-service', () => {
     );
   });
 });
+
+describe('docker-image naming', () => {
+  // `registries:` is a list — one image can publish to ghcr and ACR in the same
+  // release. The artifact therefore carries only the bare repository name, and
+  // each registry entry contributes its own host + namespace.
+  it('defaults to the unscoped project name — no host, scope dropped', async () => {
+    const artifact = { type: 'docker-image' } as never;
+
+    // Pack fails later (no such docker image in this environment), but the name
+    // is derived before that — which is what this asserts.
+    await getArtifactType('docker-image')
+      .pack(artifact, ctx())
+      .catch(() => {});
+
+    expect((artifact as { name: string }).name).toBe('thing');
+  });
+
+  it('rejects a name carrying a registry host', async () => {
+    const artifact = {
+      type: 'docker-image',
+      name: 'ghcr.io/idealsupply/webservice-thing',
+    } as never;
+
+    await expect(getArtifactType('docker-image').pack(artifact, ctx())).rejects.toThrow(
+      /bare image name.*Use name: webservice-thing/s,
+    );
+  });
+});
+
+describe('resolveDockerImageBase composition', () => {
+  it('composes host/namespace/name per registry from a bare name', async () => {
+    const { resolveDockerImageBase } = await import('../publishing/publishers.js');
+
+    const ghcr = { type: 'docker', registry: 'ghcr.io', namespace: 'idealsupply' } as never;
+    const acr = { type: 'docker', registry: 'ideal.azurecr.io', namespace: 'apps' } as never;
+
+    // The same artifact lands at a different path per destination — the whole
+    // point of keeping the name bare.
+    expect(resolveDockerImageBase('webservice-deploy-gateway', ghcr)).toBe(
+      'ghcr.io/idealsupply/webservice-deploy-gateway',
+    );
+    expect(resolveDockerImageBase('webservice-deploy-gateway', acr)).toBe(
+      'ideal.azurecr.io/apps/webservice-deploy-gateway',
+    );
+  });
+
+  it('a registry without a namespace prepends only its host', async () => {
+    const { resolveDockerImageBase } = await import('../publishing/publishers.js');
+    const bare = { type: 'docker', registry: 'registry.example.com' } as never;
+    expect(resolveDockerImageBase('thing', bare)).toBe('registry.example.com/thing');
+  });
+});
