@@ -72,8 +72,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.7
+        specifier: ^0.4.1-rc.1
+        version: 0.4.1-rc.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -111,8 +111,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.7
+        specifier: ^0.4.1-rc.1
+        version: 0.4.1-rc.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -123,8 +123,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.7
+        specifier: ^0.4.1-rc.1
+        version: 0.4.1-rc.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -138,8 +138,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^0.4.0-dev.3
-        version: 0.4.0-dev.7
+        specifier: ^0.4.1-rc.1
+        version: 0.4.1-rc.1
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -636,8 +636,8 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@cpdevtools/ts-dev-utilities@0.4.0-dev.7':
-    resolution: {integrity: sha512-xJkijCEAMW04RZeMnNu4Y14fElOzT9zHiOaf9vVa4fxysiu0Oh8Ow0NhBpJV6URzENLfHB9i4dID4yTl8UfR6A==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.4.0-dev.7/c7f0a35760a78bd02aa76dec8353db7f90739628}
+  '@cpdevtools/ts-dev-utilities@0.4.1-rc.1':
+    resolution: {integrity: sha512-BgvHBg1R0AsZf7I/ns2VZGabiUGLEvud4APO4V/p/pSJiJlz8+vruMDGX8EOkwwKWnnHOw7m5mVej7POAdWgJA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/0.4.1-rc.1/64154ffe7ad92049586c82ca1fa89fdb1f61fa3f}
     engines: {node: '>=24'}
 
   '@cspotcode/source-map-support@0.8.1':
@@ -4987,7 +4987,7 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@cpdevtools/ts-dev-utilities@0.4.0-dev.7':
+  '@cpdevtools/ts-dev-utilities@0.4.1-rc.1':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
