@@ -60,7 +60,6 @@ export {
   loadArtifactConfig,
   ARTIFACT_OUTPUT_DIR,
   type ArtifactConfig,
-  type PluginConfig,
 } from './generate-artifact.js';
 
 // Workspace dependency rewriting (for Phase 2)

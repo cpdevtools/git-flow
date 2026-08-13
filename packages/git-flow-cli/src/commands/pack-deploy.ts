@@ -12,19 +12,21 @@
  *   docker.swarm   — copies stack.yml + overlays; deploy.yml = docker stack deploy --with-registry-auth -c stack.yml ...
  *   npm.node       — copies ecosystem.config.js; deploy.yml = pm2 reload ecosystem.config.js
  *
- * Plugins can register additional handlers via registerDeployMethod().
+ * Installed git-flow plugins supply additional methods via their manifest.
  *
  * Required env vars:
  *   DEPLOY_OUTPUT_DIR  — destination directory (the orchestrator sets this per method)
- *   ARTIFACT_TYPE      — artifact type (the orchestrator sets this; defaults to 'docker')
+ *   ARTIFACT_TYPE      — artifact type (the orchestrator sets this; defaults to 'docker-image')
  *   PROJECT_NAME       — package name (used for swarm stack name derivation)
  */
 
 import { Args, Command, Flags } from '@oclif/core';
 import { mkdir } from 'node:fs/promises';
 import {
+  findWorkspaceRoot,
   getDeployMethod,
   listDeployMethods,
+  loadPlugins,
   type DeployMethodContext,
 } from '@cpdevtools/git-flow/artifacts';
 
@@ -57,7 +59,7 @@ export default class PackDeploy extends Command {
     'artifact-type': Flags.string({
       char: 't',
       description:
-        "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker')",
+        "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker-image')",
     }),
     version: Flags.string({
       char: 'v',
@@ -79,17 +81,24 @@ export default class PackDeploy extends Command {
     }
 
     // Orchestrator sets ARTIFACT_TYPE before running project scripts; default to 'docker'
-    const artifactType = artifactTypeFlag ?? 'docker';
+    const artifactType = artifactTypeFlag ?? 'docker-image';
     if (!artifactTypeFlag) {
       this.warn(
-        `ARTIFACT_TYPE not set; defaulting to 'docker'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`,
+        `ARTIFACT_TYPE not set; defaulting to 'docker-image'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`,
       );
     }
 
     await mkdir(deployOutputDir, { recursive: true });
 
+    // This command never registered plugins, so a plugin-supplied deploy method
+    // was unreachable here even though the orchestrator could find it.
+    const projectCwd = process.cwd();
+    const workspaceRoot = await findWorkspaceRoot(projectCwd);
+    await loadPlugins({ workspaceRoot, projectCwd });
+
     const ctx: DeployMethodContext = {
-      projectCwd: process.cwd(),
+      projectCwd,
+      workspaceRoot,
       deployOutputDir,
       projectName,
       version,
@@ -102,7 +111,7 @@ export default class PackDeploy extends Command {
       this.error(
         `No deploy method handler registered for ${artifactType}.${method}.\n` +
           `Registered methods for '${artifactType}': ${known.join(', ') || '(none)'}.\n` +
-          `Register one with: registerDeployMethod('${artifactType}', '${method}', { copyFiles, generateDeployYml })`,
+          `Install a git-flow plugin whose manifest supplies ${artifactType}.${method}.`,
       );
     }
 

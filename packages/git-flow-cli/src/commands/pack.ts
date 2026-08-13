@@ -16,7 +16,10 @@
 import { Command, Flags } from '@oclif/core';
 import { join } from 'node:path';
 import {
+  findWorkspaceRoot,
   getArtifactType,
+  loadPlugins,
+  providerOf,
   safeName,
   writeArtifact,
   type PackContext,
@@ -74,6 +77,11 @@ export default class Pack extends Command {
     process.env.ARTIFACT_OUTPUT_DIR = outputDir;
     process.env.PROJECT_NAME = artifactFilename;
 
+    // Discovery is per-process and must precede any dispatch. The workspace root
+    // is where a repo's shared plugins are declared; the project dir may add more.
+    const workspaceRoot = await findWorkspaceRoot(cwd);
+    await loadPlugins({ workspaceRoot, projectCwd: cwd });
+
     const config = await loadArtifactConfig(cwd, envVars);
     if (!config) {
       this.error(
@@ -84,13 +92,14 @@ export default class Pack extends Command {
 
     const ctx: PackContext = {
       projectCwd: cwd,
+      workspaceRoot,
       artifactOutputDir: outputDir,
       projectName,
       version,
     };
 
     for (const artifact of config.artifacts ?? []) {
-      await getArtifactType(artifact.type).pack(artifact, ctx);
+      await getArtifactType(artifact.type, providerOf(artifact)).pack(artifact, ctx);
     }
 
     const descriptor: ProjectArtifactDescriptor = {
