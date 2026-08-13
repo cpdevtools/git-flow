@@ -1,7 +1,6 @@
 npm:
   '@actions/core': '^1.11.1'
   '@actions/github': '^6.0.0'
-  '@cpdevtools/git-flow': '^0.4.0-dev.4'
   '@cpdevtools/ts-dev-utilities': '^0.4.0-dev.3'
   '@oclif/core': '^4.8.0'
   '@oclif/plugin-autocomplete': '^3.2.40'
