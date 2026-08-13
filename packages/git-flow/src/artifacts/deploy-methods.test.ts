@@ -50,7 +50,7 @@ async function readEnv(): Promise<string> {
 
 describe('docker.compose generateDeployYml', () => {
   it('singleton: slot = safeName and pins a stable -p project on up + down', async () => {
-    await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose'));
+    await getDeployMethod('docker-image', 'compose')!.generateDeployYml(ctx('compose'));
     const m = await readDeployYml();
     expect(m.method).toBe('compose');
     expect(m.slot).toBe('org-svc');
@@ -62,7 +62,7 @@ describe('docker.compose generateDeployYml', () => {
   });
 
   it('major: slot includes -v<major> in both commands', async () => {
-    await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose', 'major'));
+    await getDeployMethod('docker-image', 'compose')!.generateDeployYml(ctx('compose', 'major'));
     const m = await readDeployYml();
     expect(m.slot).toBe('org-svc-v2');
     expect(m.versioning).toBe('major');
@@ -71,20 +71,20 @@ describe('docker.compose generateDeployYml', () => {
   });
 
   it('pins the image to the release version via .env', async () => {
-    await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose'));
+    await getDeployMethod('docker-image', 'compose')!.generateDeployYml(ctx('compose'));
     expect(await readEnv()).toBe('DEPLOY_IMAGE_TAG=2.3.5\n');
   });
 
   it('preserves unrelated .env lines and replaces a stale tag', async () => {
     await writeFile(join(dir, '.env'), 'FOO=bar\nDEPLOY_IMAGE_TAG=0.0.1\n');
-    await getDeployMethod('docker', 'compose')!.generateDeployYml(ctx('compose'));
+    await getDeployMethod('docker-image', 'compose')!.generateDeployYml(ctx('compose'));
     expect(await readEnv()).toBe('FOO=bar\nDEPLOY_IMAGE_TAG=2.3.5\n');
   });
 });
 
 describe('docker.swarm generateDeployYml', () => {
   it('singleton: deployCommand and teardownCommand use the @{ STACK } placeholder', async () => {
-    await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm'));
+    await getDeployMethod('docker-image', 'swarm')!.generateDeployYml(ctx('swarm'));
     const m = await readDeployYml();
     expect(m.method).toBe('swarm');
     expect(m.slot).toBe('org-svc');
@@ -93,7 +93,7 @@ describe('docker.swarm generateDeployYml', () => {
   });
 
   it('major: slot is versioned, @{ STACK } placeholder is present for rendering', async () => {
-    await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
+    await getDeployMethod('docker-image', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
     const m = await readDeployYml();
     expect(m.slot).toBe('org-svc-v2');
     // @{ STACK } is resolved to slotStack(slot) by renderDeployTemplates at pack time
@@ -102,7 +102,7 @@ describe('docker.swarm generateDeployYml', () => {
   });
 
   it('shared stack: tears down only this service, leaving its siblings up', async () => {
-    await getDeployMethod('docker', 'swarm')!.generateDeployYml(
+    await getDeployMethod('docker-image', 'swarm')!.generateDeployYml(
       ctx('swarm', 'major', 'webservice'),
     );
     const m = await readDeployYml();
@@ -110,7 +110,7 @@ describe('docker.swarm generateDeployYml', () => {
   });
 
   it('bakes the swarm service name so the deploy side can wait for convergence', async () => {
-    await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
+    await getDeployMethod('docker-image', 'swarm')!.generateDeployYml(ctx('swarm', 'major'));
     const m = await readDeployYml();
     // @{ STACK_SERVICE_ID } is resolved to the docker service name at pack time.
     expect(m.swarmService).toBe('@{ STACK_SERVICE_ID }');
@@ -127,7 +127,7 @@ describe('docker.swarm generateDeployYml', () => {
   });
 
   it('pins the image to the release version via .env', async () => {
-    await getDeployMethod('docker', 'swarm')!.generateDeployYml(ctx('swarm'));
+    await getDeployMethod('docker-image', 'swarm')!.generateDeployYml(ctx('swarm'));
     expect(await readEnv()).toBe('DEPLOY_IMAGE_TAG=2.3.5\n');
   });
 });

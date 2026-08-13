@@ -134,7 +134,7 @@ describe('loadPlugins discovery', () => {
       `module.exports = {
          name: ${JSON.stringify(name)},
          deployMethods: [{
-           artifactType: 'docker',
+           artifactType: 'docker-image',
            method: 'k8s-test',
            handler: { async copyFiles() {}, async generateDeployYml() {} },
          }],
@@ -143,7 +143,7 @@ describe('loadPlugins discovery', () => {
 
     await loadPlugins({ workspaceRoot: root });
 
-    expect(getDeployMethod('docker', 'k8s-test')).toBeDefined();
+    expect(getDeployMethod('docker-image', 'k8s-test')).toBeDefined();
     // Scoped, not global — the same method name on another type is unrelated.
     expect(getDeployMethod('npm', 'k8s-test')).toBeUndefined();
   });

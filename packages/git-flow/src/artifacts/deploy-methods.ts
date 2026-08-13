@@ -16,7 +16,7 @@
  * Supplied from a plugin manifest:
  *   export default {
  *     name: '@org/git-flow-plugin-k8s',
- *     deployMethods: [{ artifactType: 'docker', method: 'k8s', handler }],
+ *     deployMethods: [{ artifactType: 'docker-image', method: 'k8s', handler }],
  *   } satisfies GitFlowPlugin;
  */
 
@@ -186,7 +186,7 @@ export function listDeployMethodProviders(artifactType: string, method: string):
 // ---------------------------------------------------------------------------
 
 // ── docker.compose ─────────────────────────────────────────────────────────
-const dockerCompose: DeployMethodHandler = {
+export const dockerCompose: DeployMethodHandler = {
   supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const composeFile = join(projectCwd, 'docker-compose.yml');
@@ -261,7 +261,7 @@ export const SWARM_DEPLOY_COMMAND = [
   'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK }',
 ].join(' ');
 
-const dockerSwarm: DeployMethodHandler = {
+export const dockerSwarm: DeployMethodHandler = {
   supportsParallelMajors: true,
   async copyFiles({ projectCwd, deployOutputDir }) {
     const stackFile = join(projectCwd, 'stack.yml');
@@ -403,7 +403,7 @@ export const builtinDeployMethods: Array<{
   method: string;
   handler: DeployMethodHandler;
 }> = [
-  { artifactType: 'docker', method: 'compose', handler: dockerCompose },
-  { artifactType: 'docker', method: 'swarm', handler: dockerSwarm },
+  { artifactType: 'docker-image', method: 'compose', handler: dockerCompose },
+  { artifactType: 'docker-image', method: 'swarm', handler: dockerSwarm },
   { artifactType: 'npm', method: 'node', handler: npmNode },
 ];

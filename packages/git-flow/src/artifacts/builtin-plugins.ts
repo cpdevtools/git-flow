@@ -24,6 +24,7 @@ import {
   type NpmRegistry,
   type NugetRegistry,
 } from '../publishing/index.js';
+import { dockerCompose, dockerSwarm } from './deploy-methods.js';
 import type { GitFlowPlugin } from './plugin.js';
 import type { ArtifactType } from './types.js';
 
@@ -223,11 +224,73 @@ const ngLib: ArtifactType<NgLibArtifact> = {
   },
 };
 
+/**
+ * A deployable set of services with no image of its own — third-party
+ * infrastructure like traefik or mysql, where the repo's whole product is the
+ * deploy bundle: stack/compose files referencing upstream images.
+ *
+ * `docker-image` minus the image: nothing is packed, uploaded or published to a
+ * registry; the compose/swarm deploy methods are the same ones docker-image
+ * uses, since they only ever operated on the deploy files.
+ */
+export interface DockerServiceArtifact {
+  type: 'docker-service';
+  /**
+   * Service name — drives the deployment slot and the shared-storage directory,
+   * exactly as it does for docker-image. Backfilled with the project name at
+   * pack time when the YAML omits it (required here only because the Artifact
+   * union's CustomArtifact member demands it, as with NpmArtifact).
+   */
+  name: string;
+  /** See DotnetLibArtifact — satisfies the Artifact union via CustomArtifact. */
+  [key: string]: unknown;
+}
+
+const dockerService: ArtifactType<DockerServiceArtifact> = {
+  async pack(artifact, ctx) {
+    // The registries field is the one docker-image habit that cannot carry
+    // over. Silently ignoring it would look like a publish that never happens.
+    const declared = (artifact as { registries?: unknown }).registries;
+    if (Array.isArray(declared) && declared.length > 0) {
+      throw new Error(
+        `docker-service '${artifact.name ?? ctx.projectName}' declares registries, but this ` +
+          `type produces nothing to publish — its product is the deploy bundle.\n` +
+          `Remove 'registries:', or use 'docker-image' if an image should be built and pushed.`,
+      );
+    }
+
+    if (!artifact.name) (artifact as { name: string }).name = ctx.projectName;
+    console.log(`  ✓ docker-service: ${artifact.name} (deploy bundle only)`);
+  },
+  async packDeploy() {
+    // The orchestrator builds the bundle through the deploy-method handlers.
+  },
+  async upload() {
+    // Nothing beyond the deploy-<method>.zip the orchestrator already uploads.
+  },
+  async publish() {
+    // Unreachable: getRegistries is always empty.
+  },
+  getRegistries() {
+    return [];
+  },
+  getVersion(_, projectVersion) {
+    return projectVersion;
+  },
+};
+
 /** Shipped with git-flow; registered alongside the other built-ins. */
 export const firstPartyPlugin: GitFlowPlugin = {
   name: '@cpdevtools/git-flow',
   artifactTypes: {
     'dotnet-lib': dotnetLib as unknown as ArtifactType<Artifact>,
     'ng-lib': ngLib as unknown as ArtifactType<Artifact>,
+    'docker-service': dockerService as unknown as ArtifactType<Artifact>,
   },
+  deployMethods: [
+    // The same handlers docker-image uses: they copy stack/compose files and
+    // write deploy.yml, and never needed an image to exist.
+    { artifactType: 'docker-service', method: 'compose', handler: dockerCompose },
+    { artifactType: 'docker-service', method: 'swarm', handler: dockerSwarm },
+  ],
 };

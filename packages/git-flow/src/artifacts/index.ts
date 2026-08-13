@@ -31,7 +31,7 @@ export {
   type DeployMethodRegistration,
 } from './plugin.js';
 export { ProviderConflictError, type PluginAnchor } from './provider-registry.js';
-export type { DotnetLibArtifact, NgLibArtifact } from './builtin-plugins.js';
+export type { DockerServiceArtifact, DotnetLibArtifact, NgLibArtifact } from './builtin-plugins.js';
 export {
   loadPlugins,
   findWorkspaceRoot,
@@ -381,12 +381,12 @@ export const builtinPlugin: GitFlowPlugin = {
   artifactTypes: {
     npm: npm as unknown as ArtifactType<Artifact>,
     nuget: nuget as unknown as ArtifactType<Artifact>,
-    docker: docker as unknown as ArtifactType<Artifact>,
+    'docker-image': docker as unknown as ArtifactType<Artifact>,
     'release-attachment': releaseAttachment as unknown as ArtifactType<Artifact>,
     deploy: deploy as unknown as ArtifactType<Artifact>,
     ...(firstPartyPlugin.artifactTypes ?? {}),
   },
-  deployMethods: builtinDeployMethods,
+  deployMethods: [...builtinDeployMethods, ...(firstPartyPlugin.deployMethods ?? [])],
 };
 
 // Registered at module load, before anything can dispatch an artifact.

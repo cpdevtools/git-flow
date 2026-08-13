@@ -16,7 +16,7 @@
  *
  * Required env vars:
  *   DEPLOY_OUTPUT_DIR  — destination directory (the orchestrator sets this per method)
- *   ARTIFACT_TYPE      — artifact type (the orchestrator sets this; defaults to 'docker')
+ *   ARTIFACT_TYPE      — artifact type (the orchestrator sets this; defaults to 'docker-image')
  *   PROJECT_NAME       — package name (used for swarm stack name derivation)
  */
 
@@ -59,7 +59,7 @@ export default class PackDeploy extends Command {
     'artifact-type': Flags.string({
       char: 't',
       description:
-        "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker')",
+        "Artifact type to look up handler for (overrides ARTIFACT_TYPE; defaults to 'docker-image')",
     }),
     version: Flags.string({
       char: 'v',
@@ -81,10 +81,10 @@ export default class PackDeploy extends Command {
     }
 
     // Orchestrator sets ARTIFACT_TYPE before running project scripts; default to 'docker'
-    const artifactType = artifactTypeFlag ?? 'docker';
+    const artifactType = artifactTypeFlag ?? 'docker-image';
     if (!artifactTypeFlag) {
       this.warn(
-        `ARTIFACT_TYPE not set; defaulting to 'docker'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`,
+        `ARTIFACT_TYPE not set; defaulting to 'docker-image'. Use --artifact-type or set ARTIFACT_TYPE to be explicit.`,
       );
     }
 

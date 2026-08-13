@@ -24,7 +24,7 @@
  * export default {
  *   name: '@org/git-flow-plugin-helm',
  *   artifactTypes: { 'helm-chart': helmHandler },
- *   deployMethods: [{ artifactType: 'docker', method: 'k8s', handler: k8sHandler }],
+ *   deployMethods: [{ artifactType: 'docker-image', method: 'k8s', handler: k8sHandler }],
  * } satisfies GitFlowPlugin;
  * ```
  *

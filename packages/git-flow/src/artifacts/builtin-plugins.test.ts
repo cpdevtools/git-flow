@@ -40,9 +40,11 @@ describe('first-party types are available without installing anything', () => {
     const types = listArtifactTypes();
     expect(types).toContain('dotnet-lib');
     expect(types).toContain('ng-lib');
+    expect(types).toContain('docker-service');
     // The types they complement, not replace.
     expect(types).toContain('nuget');
     expect(types).toContain('npm');
+    expect(types).toContain('docker-image');
   });
 
   // The point of the manifest: there is no privileged set seeded behind the
@@ -51,7 +53,8 @@ describe('first-party types are available without installing anything', () => {
   it('declares every built-in type on the plugin manifest', () => {
     expect(Object.keys(builtinPlugin.artifactTypes ?? {}).sort()).toEqual([
       'deploy',
-      'docker',
+      'docker-image',
+      'docker-service',
       'dotnet-lib',
       'ng-lib',
       'npm',
@@ -63,7 +66,18 @@ describe('first-party types are available without installing anything', () => {
   it('declares the built-in deploy methods on the same manifest', () => {
     expect(
       (builtinPlugin.deployMethods ?? []).map((m) => `${m.artifactType}.${m.method}`).sort(),
-    ).toEqual(['docker.compose', 'docker.swarm', 'npm.node']);
+    ).toEqual([
+      'docker-image.compose',
+      'docker-image.swarm',
+      'docker-service.compose',
+      'docker-service.swarm',
+      'npm.node',
+    ]);
+  });
+
+  it("does not register the old 'docker' name", () => {
+    expect(listArtifactTypes()).not.toContain('docker');
+    expect(() => getArtifactType('docker')).toThrow(/Unknown artifact type/);
   });
 
   it('attributes them all to the git-flow provider, at the lowest rung', () => {
@@ -225,5 +239,49 @@ describe('dotnet-lib', () => {
     await expect(
       getArtifactType('dotnet-lib').packDeploy({} as never, {} as never),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('docker-service', () => {
+  it('backfills the name from the project and produces no file artifact', async () => {
+    const artifact = { type: 'docker-service' } as never;
+
+    await getArtifactType('docker-service').pack(artifact, ctx());
+
+    expect((artifact as { name: string }).name).toBe('@org/thing');
+    expect((artifact as { path?: string }).path).toBeUndefined();
+  });
+
+  it('rejects a registries declaration — there is nothing to publish', async () => {
+    const artifact = {
+      type: 'docker-service',
+      name: 'traefik',
+      registries: ['ghcr'],
+    } as never;
+
+    await expect(getArtifactType('docker-service').pack(artifact, ctx())).rejects.toThrow(
+      /produces nothing to publish/,
+    );
+  });
+
+  it('never asks to publish', () => {
+    const handler = getArtifactType('docker-service');
+    expect(handler.getRegistries({ registries: ['ghcr'] } as never)).toEqual([]);
+    expect(handler.getVersion({} as never, '3.1.0')).toBe('3.1.0');
+  });
+
+  it('shares the compose and swarm deploy methods with docker-image', async () => {
+    const { getDeployMethod } = await import('./deploy-methods.js');
+    const viaService = getDeployMethod('docker-service', 'swarm');
+    const viaImage = getDeployMethod('docker-image', 'swarm');
+
+    // The same handler object, not a copy: these methods only ever operated on
+    // deploy files, so the image-less type reuses them outright.
+    expect(viaService).toBeDefined();
+    expect(viaService).toBe(viaImage);
+    expect(viaService?.supportsParallelMajors).toBe(true);
+    expect(getDeployMethod('docker-service', 'compose')).toBe(
+      getDeployMethod('docker-image', 'compose'),
+    );
   });
 });
