@@ -7,6 +7,7 @@ import { parseDocument } from 'yaml';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
 import { getOctokit as getActionsOctokit } from '@actions/github';
+import { discoverProjects } from '../lib/project.js';
 import {
   getArtifactType,
   loadPlugins,
@@ -161,8 +162,13 @@ export async function runPublishRelease(
     // Publish dispatches through the same handler registry as pack, so plugin
     // types have to be registered here too — this process never reads
     // release-artifacts.yml, which is why a plugin artifact used to reach
-    // publish and fail with 'Unknown artifact type'.
+    // publish and fail with 'Unknown artifact type'. Project directories are
+    // walked as well: the ladder's 'project' rung is a plugin declared in a
+    // member's own package.json, invisible from the workspace root.
     await loadPlugins({ workspaceRoot: options.workspaceRoot });
+    for (const projectDir of await discoverProjects(options.workspaceRoot)) {
+      await loadPlugins({ workspaceRoot: options.workspaceRoot, projectCwd: projectDir.directory });
+    }
 
     // Load registry configuration
     const registryConfig = await loadRegistryConfig(options.workspaceRoot);

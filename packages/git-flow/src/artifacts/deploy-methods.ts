@@ -13,16 +13,18 @@
  * deploy.yml, the orchestrator copies the folder then calls generateDeployYml
  * to supplement the missing manifest.
  *
- * Usage (from a plugin):
- *   import { registerDeployMethod } from '@cpdevtools/git-flow/artifacts';
- *   registerDeployMethod('docker', 'k8s', { copyFiles, generateDeployYml });
+ * Supplied from a plugin manifest:
+ *   export default {
+ *     name: '@org/git-flow-plugin-k8s',
+ *     deployMethods: [{ artifactType: 'docker', method: 'k8s', handler }],
+ *   } satisfies GitFlowPlugin;
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
-import { BUILTIN_PROVIDER, ProviderRegistry, type PluginAnchor } from './provider-registry.js';
+import { ProviderRegistry, type PluginAnchor } from './provider-registry.js';
 import { deploymentSlot, type VersioningStrategy } from './slot.js';
 
 /**
@@ -130,16 +132,17 @@ const methodKey = (artifactType: string, method: string) => `${artifactType}.${m
 /**
  * Register a deploy method handler for a given artifact type.
  *
- * Built-in handlers register at module load under the git-flow provider.
- * Plugins are registered by the loader from their exported manifest — see
- * plugin.ts for why a plugin does not call this itself.
+ * The low-level primitive applyPlugin calls; built-ins and installed plugins
+ * both arrive through a manifest. `provider` and `anchor` are required — an
+ * anonymous registration would impersonate git-flow and dodge conflict
+ * detection.
  */
 export function registerDeployMethod(
   artifactType: string,
   method: string,
   handler: DeployMethodHandler,
-  provider: string = BUILTIN_PROVIDER,
-  anchor: PluginAnchor = 'builtin',
+  provider: string,
+  anchor: PluginAnchor,
 ): void {
   deployMethodRegistry.register(methodKey(artifactType, method), handler, provider, anchor);
 }

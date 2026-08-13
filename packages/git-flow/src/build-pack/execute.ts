@@ -14,6 +14,7 @@ import {
   getArtifactType,
   getDeployMethod,
   listDeployMethods,
+  loadPlugins,
   providerOf,
   type Artifact,
   type DeployMethodContext,
@@ -133,6 +134,12 @@ export async function executePack(
   console.log(`📦 ${project.name}: Packing & generating artifact descriptor...`);
 
   try {
+    // Per project, not only once per run: the precedence ladder's 'project'
+    // rung is a plugin declared in the project's own package.json, and the
+    // workspace-level load in runBuildPack cannot see those. Idempotent, so
+    // repeated calls across projects are cheap.
+    await loadPlugins({ workspaceRoot: context.workspaceRoot, projectCwd: project.cwd });
+
     // Set environment variables
     const artifactFilename = project.name.replace(/@/g, '').replace(/\//g, '-');
     const env = {
@@ -521,6 +528,10 @@ async function executePackDeploy(
           `Invalid service on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected a non-empty string.`,
         );
       }
+      // Same reason as executePack: project-anchored deploy plugins must be
+      // registered before any handler lookup below.
+      await loadPlugins({ workspaceRoot: context.workspaceRoot, projectCwd: project.cwd });
+
       const sharedStorage = normalizeSharedStorage(
         (artifact as unknown as WithDeploy).sharedStorage,
         (artifact as { name?: string }).name ?? artifact.type,
@@ -601,7 +612,7 @@ async function executePackDeploy(
             throw new Error(
               `No deploy handler found for ${artifact.type}.${method}.\n` +
                 `Options: add a .deploy/${method}/ folder, a github.actions.pack-deploy-${method} script, ` +
-                `or register a handler via registerDeployMethod('${artifact.type}', '${method}', ...).\n` +
+                `or install a git-flow plugin whose manifest supplies ${artifact.type}.${method}.\n` +
                 `Registered methods for '${artifact.type}': ${listDeployMethods(artifact.type).join(', ') || '(none)'}`,
             );
           }

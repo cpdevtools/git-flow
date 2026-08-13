@@ -8,7 +8,7 @@
  */
 
 import type { Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
-import { BUILTIN_PROVIDER, ProviderRegistry, type PluginAnchor } from './provider-registry.js';
+import { ProviderRegistry, type PluginAnchor } from './provider-registry.js';
 import type { ArtifactType } from './types.js';
 
 const artifactTypeRegistry = new ProviderRegistry<ArtifactType<any>>('artifact type');
@@ -16,14 +16,17 @@ const artifactTypeRegistry = new ProviderRegistry<ArtifactType<any>>('artifact t
 /**
  * Register an artifact type handler.
  *
- * Prefer declaring types on a plugin manifest — this is the low-level primitive
- * that applyPlugin calls, and the built-ins reach it the same way.
+ * The low-level primitive applyPlugin calls; everything — built-ins included —
+ * arrives through a plugin manifest, so `provider` and `anchor` are required.
+ * There is no default: an anonymous registration would be attributed to
+ * git-flow itself, silently replace a built-in, and be invisible to conflict
+ * detection.
  */
 export function registerArtifactType(
   type: string,
   handler: ArtifactType<any>,
-  provider: string = BUILTIN_PROVIDER,
-  anchor: PluginAnchor = 'builtin',
+  provider: string,
+  anchor: PluginAnchor,
 ): void {
   artifactTypeRegistry.register(type, handler, provider, anchor);
 }

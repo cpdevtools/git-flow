@@ -61,11 +61,41 @@ export class ProviderConflictError extends Error {
   }
 }
 
+/**
+ * Registry state lives on globalThis, keyed by a registered Symbol, NOT as a
+ * module-private Map.
+ *
+ * tsup builds this package as CJS with `splitting: false` and seven entry
+ * points, so provider-registry.ts is inlined into `index`, `artifacts`,
+ * `build-pack` and `publish-release` — four independent module instances. A
+ * module-private Map would mean four independent registries, and a process that
+ * touches two entry points (the CLI already imports from both `artifacts` and
+ * `build-pack`) would register into one and dispatch from another — the exact
+ * dual-instance failure the plugin contract exists to prevent, reintroduced
+ * inside our own package. `Symbol.for` gives every copy the same store.
+ */
+const STORE_KEY = Symbol.for('@cpdevtools/git-flow:provider-registries');
+
+type Store = Map<string, Map<string, Map<string, Registration<unknown>>>>;
+
+function sharedStore(): Store {
+  const holder = globalThis as { [STORE_KEY]?: Store };
+  return (holder[STORE_KEY] ??= new Map());
+}
+
 export class ProviderRegistry<T> {
   /** key → provider → registration */
-  private readonly entries = new Map<string, Map<string, Registration<T>>>();
+  private readonly entries: Map<string, Map<string, Registration<T>>>;
 
-  constructor(private readonly what: string) {}
+  constructor(private readonly what: string) {
+    const store = sharedStore();
+    let entries = store.get(what);
+    if (!entries) {
+      entries = new Map();
+      store.set(what, entries);
+    }
+    this.entries = entries as Map<string, Map<string, Registration<T>>>;
+  }
 
   register(key: string, value: T, provider: string, anchor: PluginAnchor): void {
     let byProvider = this.entries.get(key);

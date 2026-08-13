@@ -10,8 +10,8 @@
  *   getVersion    — returns the version string to use (docker uses finalTag)
  */
 
-// Import deploy-methods first so built-in handlers are registered before any
-// artifact-type code runs.  Side-effect import only.
+// Definitions only — registration happens once, at the bottom of this module,
+// where the built-in manifest is applied through the same path as any plugin.
 import './deploy-methods.js';
 export {
   registerDeployMethod,

@@ -102,6 +102,25 @@ describe('ng-lib', () => {
     expect(path.startsWith(outDir)).toBe(true);
   });
 
+  // Regression: zx quotes interpolations, so the build command must be handed
+  // to a shell explicitly — the naive form ran the whole string as argv[0] and
+  // died with "command not found". A compound command proves the shell parses it.
+  it('runs the build command when the output is missing', async () => {
+    const clientDir = join(root, 'client');
+    await mkdir(clientDir, { recursive: true });
+    const pkg = JSON.stringify({ name: '@org/ngclient', version: '1.2.3' });
+
+    const artifact = {
+      type: 'ng-lib',
+      name: '@org/ngclient',
+      directory: 'client',
+      build: `mkdir -p dist && printf '%s' '${pkg}' > dist/package.json`,
+    } as never;
+
+    await getArtifactType('ng-lib').pack(artifact, ctx());
+    expect((artifact as { path: string }).path).toMatch(/\.tgz$/);
+  });
+
   it('honours a custom packDir', async () => {
     await writeClient('1.2.3', 'build-output');
 

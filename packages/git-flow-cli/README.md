@@ -51,9 +51,9 @@ descriptor. Usually invoked by a project's `github.actions.pack` script rather t
 ### `gitflow pack-deploy`
 
 Convention-driven deploy-bundle builder: delegates to the registered `DeployMethodHandler` for the
-artifact type, producing `deploy-<method>.zip` with its `deploy.yml` manifest. Extend by registering
-a handler — `registerDeployMethod(artifactType, method, { copyFiles, generateDeployYml })` from
-`@cpdevtools/git-flow/artifacts` — rather than by patching this command.
+artifact type, producing `deploy-<method>.zip` with its `deploy.yml` manifest. Extend by installing
+a git-flow plugin whose manifest declares the method (`deployMethods` on a `GitFlowPlugin` export)
+rather than by patching this command.
 
 ### `gitflow apply-version`
 

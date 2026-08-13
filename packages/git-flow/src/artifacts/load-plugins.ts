@@ -181,9 +181,11 @@ export async function loadPlugins(options: LoadPluginsOptions): Promise<LoadedPl
       }
       if (!candidate) continue;
 
-      seen.add(dep);
       const result = await loadOne(dep, dir, anchor);
       if (result) {
+        // Marked seen only on success, so a dep that fails to resolve from this
+        // anchor can still be picked up from the next one.
+        seen.add(dep);
         loaded.push(result);
         console.log(
           `  🔌 Loaded plugin: ${result.name}${result.version ? `@${result.version}` : ''} (${anchor})`,

@@ -152,7 +152,10 @@ const ngLib: ArtifactType<NgLibArtifact> = {
     const packDir = join(sourceDir, artifact.packDir ?? 'dist');
 
     if (artifact.build && !existsSync(packDir)) {
-      await $({ cwd: sourceDir, shell: true })`${artifact.build}`;
+      // Handed to a shell explicitly: zx quotes every interpolation, so a bare
+      // `${artifact.build}` would become a single argv[0] token and fail with
+      // "npm ci && npm run build: command not found".
+      await $({ cwd: sourceDir })`sh -c ${artifact.build}`;
     }
 
     if (!existsSync(packDir)) {

@@ -12,7 +12,7 @@
  *   docker.swarm   — copies stack.yml + overlays; deploy.yml = docker stack deploy --with-registry-auth -c stack.yml ...
  *   npm.node       — copies ecosystem.config.js; deploy.yml = pm2 reload ecosystem.config.js
  *
- * Plugins can register additional handlers via registerDeployMethod().
+ * Installed git-flow plugins supply additional methods via their manifest.
  *
  * Required env vars:
  *   DEPLOY_OUTPUT_DIR  — destination directory (the orchestrator sets this per method)
@@ -111,7 +111,7 @@ export default class PackDeploy extends Command {
       this.error(
         `No deploy method handler registered for ${artifactType}.${method}.\n` +
           `Registered methods for '${artifactType}': ${known.join(', ') || '(none)'}.\n` +
-          `Register one with: registerDeployMethod('${artifactType}', '${method}', { copyFiles, generateDeployYml })`,
+          `Install a git-flow plugin whose manifest supplies ${artifactType}.${method}.`,
       );
     }
 
