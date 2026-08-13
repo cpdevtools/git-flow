@@ -166,6 +166,71 @@ describe('loadPlugins discovery', () => {
     expect(listArtifactTypes()).toContain('dynamic-type');
   });
 
+  // Regression for the silent-skip bug: an exports map that does not list
+  // ./package.json makes require.resolve(pkg + '/package.json') throw for a
+  // healthy, importable package — which the old code classified as "not
+  // installed" and dropped without a word.
+  it('loads a plugin whose exports map hides its package.json', async () => {
+    const name = '@org/git-flow-plugin-strict-exports';
+    await writeManifest(root, { name: 'root', devDependencies: { [name]: '1.0.0' } });
+    await installPlugin(
+      root,
+      name,
+      `${handlerSource('strict')}
+       module.exports = { name: ${JSON.stringify(name)}, artifactTypes: { 'strict-exports': handler } };`,
+      { exports: { '.': './index.cjs' } },
+    );
+
+    const loaded = await loadPlugins({ workspaceRoot: root });
+
+    expect(loaded.map((p) => p.name)).toContain(name);
+    expect(loaded.find((p) => p.name === name)?.version).toBe('1.0.0');
+    expect(listArtifactTypes()).toContain('strict-exports');
+  });
+
+  it('discovers a gitflow-key opt-in behind a strict exports map', async () => {
+    const name = '@org/quiet-package';
+    await writeManifest(root, { name: 'root', devDependencies: { [name]: '1.0.0' } });
+    await installPlugin(
+      root,
+      name,
+      `${handlerSource('quiet')}
+       module.exports = { name: ${JSON.stringify(name)}, artifactTypes: { 'quiet-type': handler } };`,
+      { exports: { '.': './index.cjs' }, gitflow: { plugin: true } },
+    );
+
+    await loadPlugins({ workspaceRoot: root });
+
+    expect(listArtifactTypes()).toContain('quiet-type');
+  });
+
+  // Dual-format packages plant bare {"type":"commonjs"} stubs next to their
+  // built output; the walk-up must keep going to the manifest that names the
+  // package instead of stopping at the stub.
+  it('walks past a dist-stub package.json to the real manifest', async () => {
+    const name = '@org/git-flow-plugin-stubbed';
+    await writeManifest(root, { name: 'root', devDependencies: { [name]: '1.0.0' } });
+
+    const pkgDir = join(root, 'node_modules', ...name.split('/'));
+    await mkdir(join(pkgDir, 'dist'), { recursive: true });
+    await writeFile(
+      join(pkgDir, 'package.json'),
+      JSON.stringify({ name, version: '2.5.0', main: 'dist/index.cjs' }),
+    );
+    await writeFile(join(pkgDir, 'dist', 'package.json'), JSON.stringify({ type: 'commonjs' }));
+    await writeFile(
+      join(pkgDir, 'dist', 'index.cjs'),
+      `${handlerSource('stubbed')}
+       module.exports = { name: ${JSON.stringify(name)}, artifactTypes: { 'stubbed-type': handler } };`,
+    );
+
+    const loaded = await loadPlugins({ workspaceRoot: root });
+
+    // Version must come from the real manifest, not the stub (which has none).
+    expect(loaded.find((p) => p.name === name)?.version).toBe('2.5.0');
+    expect(listArtifactTypes()).toContain('stubbed-type');
+  });
+
   it('rejects a package that looks like a plugin but exports something else', async () => {
     const name = '@org/git-flow-plugin-broken';
     await writeManifest(root, { name: 'root', devDependencies: { [name]: '1.0.0' } });

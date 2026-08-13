@@ -88,6 +88,39 @@ async function readManifest(dir: string): Promise<Manifest | undefined> {
   }
 }
 
+/**
+ * Locate a resolved package's manifest by walking up from its entry file.
+ *
+ * Deliberately NOT `require.resolve(name + '/package.json')`: a package with an
+ * `exports` map only exposes the subpaths it lists, and most authors do not
+ * list `./package.json` — the resolve throws ERR_PACKAGE_PATH_NOT_EXPORTED for
+ * a perfectly healthy, importable package. The filesystem does not care about
+ * exports maps, and the entry always lives under the directory that owns the
+ * manifest.
+ *
+ * Prefers the first package.json whose `name` matches: dual-format packages
+ * plant bare `{"type": "commonjs"}` stubs in their dist directories, and the
+ * nearest file is not always the real manifest.
+ */
+async function manifestAbove(
+  entryFile: string,
+  packageName: string,
+): Promise<Manifest | undefined> {
+  let dir = dirname(entryFile);
+  let firstFound: Manifest | undefined;
+
+  for (;;) {
+    const manifest = await readManifest(dir);
+    if (manifest) {
+      if (manifest.name === packageName) return manifest;
+      firstFound ??= manifest;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return firstFound;
+    dir = parent;
+  }
+}
+
 /** Dependency names declared by a manifest, deduped. */
 function declaredDependencies(manifest: Manifest): string[] {
   return [
@@ -106,16 +139,22 @@ async function loadOne(
   const require = createRequire(join(anchorDir, 'package.json'));
 
   let entry: string;
-  let manifestPath: string;
   try {
     entry = require.resolve(packageName);
-    manifestPath = require.resolve(`${packageName}/package.json`);
   } catch {
     // Declared but not installed — normal for an optional or filtered install.
     return undefined;
   }
 
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf-8')) as Manifest;
+  // Past this point the package IS installed, so failures must be loud: the
+  // old subpath-resolve here classified an exports-map package as "not
+  // installed" and silently skipped a working plugin.
+  const manifest = await manifestAbove(entry, packageName);
+  if (!manifest) {
+    throw new Error(
+      `'${packageName}' resolved to ${entry} but no package.json was found above it.`,
+    );
+  }
   const mod = (await import(pathToFileURL(entry).href)) as { default?: unknown };
   const exported = mod.default ?? mod;
 
@@ -169,15 +208,17 @@ export async function loadPlugins(options: LoadPluginsOptions): Promise<LoadedPl
       // has to be inspected for the gitflow key.
       let candidate = PLUGIN_NAME_PATTERN.test(dep);
       if (!candidate) {
+        // Same two-step split as loadOne: only "cannot resolve the entry" may
+        // stay silent, because subpath-resolving package.json throws for any
+        // package whose exports map does not list it — which would silently
+        // drop every gitflow-key opt-in written that way.
+        let depEntry: string;
         try {
-          const depManifestPath = createRequire(join(dir, 'package.json')).resolve(
-            `${dep}/package.json`,
-          );
-          const depManifest = JSON.parse(await readFile(depManifestPath, 'utf-8')) as Manifest;
-          candidate = isCandidate(dep, depManifest);
+          depEntry = createRequire(join(dir, 'package.json')).resolve(dep);
         } catch {
           continue;
         }
+        candidate = isCandidate(dep, await manifestAbove(depEntry, dep));
       }
       if (!candidate) continue;
 
