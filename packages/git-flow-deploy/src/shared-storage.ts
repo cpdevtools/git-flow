@@ -1,13 +1,26 @@
-import { mkdir, copyFile, access, cp, readFile, readdir, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  copyFile,
+  access,
+  cp,
+  readFile,
+  readdir,
+  writeFile,
+  appendFile,
+  rm,
+  stat,
+} from 'node:fs/promises';
 import { isAbsolute, resolve, join, sep, dirname } from 'node:path';
 import { parse } from 'yaml';
 import { safeName, majorVersion } from './slot.js';
 import type { DeployManifest, SharedStorageSpec } from './types.js';
 
-/** File dropped in a migrated target dir so a migration runs exactly once. */
+/** File dropped in a migrated target dir so a mapping copies exactly once. */
 const MIGRATION_MARKER = '.migrated-from';
-/** Bundle-relative name of the optional migration mapping file. */
-const MIGRATIONS_FILE = 'storage-migrations.yml';
+/** Bundle-relative folder holding ordered migration files. */
+const MIGRATIONS_DIR = 'storage-migrations';
+/** Ledger of applied migration files, kept in the service's shared storage root. */
+const MIGRATIONS_LEDGER = '.storage-migrations.yml';
 
 /**
  * Whether a manifest asks for shared storage at all.
@@ -192,32 +205,152 @@ interface StorageMigration {
   to: string;
 }
 
-async function readStorageMigrations(bundleDir: string): Promise<StorageMigration[]> {
-  let content: string;
-  try {
-    content = await readFile(join(bundleDir, MIGRATIONS_FILE), 'utf-8');
-  } catch {
-    return [];
-  }
+function parseStorageMigrations(content: string, label: string): StorageMigration[] {
   const raw = parse(content) as { migrations?: unknown } | null;
   const list = raw?.migrations;
   if (list === undefined || list === null) return [];
   if (!Array.isArray(list)) {
-    throw new Error(`${MIGRATIONS_FILE}: 'migrations' must be an array`);
+    throw new Error(`${label}: 'migrations' must be an array`);
   }
   return list.map((entry, i) => {
     if (typeof entry !== 'object' || entry === null) {
-      throw new Error(`${MIGRATIONS_FILE} migrations[${i}] must be an object with 'from' and 'to'`);
+      throw new Error(`${label} migrations[${i}] must be an object with 'from' and 'to'`);
     }
     const { from, to } = entry as { from?: unknown; to?: unknown };
     if (typeof from !== 'string' || from === '') {
-      throw new Error(`${MIGRATIONS_FILE} migrations[${i}].from must be a non-empty string`);
+      throw new Error(`${label} migrations[${i}].from must be a non-empty string`);
     }
     if (typeof to !== 'string' || to === '') {
-      throw new Error(`${MIGRATIONS_FILE} migrations[${i}].to must be a non-empty string`);
+      throw new Error(`${label} migrations[${i}].to must be a non-empty string`);
     }
     return { from, to };
   });
+}
+
+/** Migration files in the bundle's storage-migrations/ folder, in execution order. */
+async function listMigrationFiles(bundleDir: string): Promise<string[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(join(bundleDir, MIGRATIONS_DIR));
+  } catch {
+    return []; // No folder → no migrations.
+  }
+  // Alphabetical byte order IS the execution order — name files to sort
+  // (0001-..., 0002-...), like EF Core's timestamp-prefixed migrations.
+  return entries.filter((e) => e.endsWith('.yml') || e.endsWith('.yaml')).sort();
+}
+
+interface AppliedMigration {
+  file: string;
+  at: string;
+  version: string;
+}
+
+/**
+ * Applied files, as a set of filenames. The ledger is append-only, so a file may
+ * legitimately appear more than once (two racers can both note it before the
+ * dedupe below matters) — the set semantics absorb that.
+ */
+async function readLedger(ledgerPath: string): Promise<Set<string>> {
+  let content: string;
+  try {
+    content = await readFile(ledgerPath, 'utf-8');
+  } catch {
+    return new Set();
+  }
+  const raw = parse(content) as { applied?: unknown } | null;
+  const list = Array.isArray(raw?.applied) ? (raw.applied as AppliedMigration[]) : [];
+  return new Set(list.map((a) => a.file));
+}
+
+const LEDGER_HEADER = `# Applied storage migrations — maintained by the deploy CLI, one entry per
+# migration file ever run for this service. Do not edit; to change what a
+# migration did, ship a NEW file (applied files are never re-run, like EF Core).
+# Append-only on purpose: appends stay visible across NFS clients where a
+# rewrite-by-rename can serve another replica a stale cached inode.
+applied:
+`;
+
+/**
+ * Record one applied file. Append-only — the ledger is never rewritten, for the
+ * same reason deploy.log is tailed rather than replaced: appends to one inode
+ * are what NFS close-to-open consistency makes reliably visible to the other
+ * replicas.
+ */
+async function appendLedgerEntry(
+  ledgerPath: string,
+  entry: AppliedMigration,
+  isNew: boolean,
+): Promise<void> {
+  const line = `  - file: ${entry.file}\n    at: ${entry.at}\n    version: '${entry.version}'\n`;
+  await appendFile(ledgerPath, isNew ? LEDGER_HEADER + line : line, 'utf-8');
+}
+
+/** Lock file guarding a service's migration run across replicas. */
+const MIGRATIONS_LOCK = '.storage-migrations.lock';
+
+export interface MigrationLockOptions {
+  /** How long to wait for another replica's run before giving up. */
+  waitMs?: number;
+  /** Poll interval while waiting. */
+  pollMs?: number;
+  /** A lock older than this is a crashed holder and may be broken. */
+  staleMs?: number;
+}
+
+/**
+ * Serialize migration runs per SERVICE. The deploy claim only serializes per
+ * release — two releases of the same service deploying concurrently (three
+ * gateway replicas make that real) would otherwise interleave on one ledger.
+ * Same mechanism as deploy.claim: O_EXCL create on shared storage is the one
+ * primitive every replica can see. A fresh lock is waited on (the holder is
+ * running the very migrations we came to run); a stale one is broken.
+ */
+async function withMigrationLock(
+  root: string,
+  opts: MigrationLockOptions,
+  run: () => Promise<void>,
+): Promise<void> {
+  const { waitMs = 120_000, pollMs = 2_000, staleMs = 600_000 } = opts;
+  const lockPath = join(root, MIGRATIONS_LOCK);
+  const deadline = Date.now() + waitMs;
+
+  for (;;) {
+    try {
+      await writeFile(lockPath, `${process.pid}\n${new Date().toISOString()}\n`, { flag: 'wx' });
+      break;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+
+      let age = 0;
+      try {
+        age = Date.now() - (await stat(lockPath)).mtimeMs;
+      } catch {
+        continue; // Holder released between our create and stat — retry immediately.
+      }
+
+      if (age > staleMs) {
+        // Crashed holder. Remove and retry the exclusive create — if two
+        // replicas break it at once, the create still admits only one.
+        await rm(lockPath, { force: true });
+        continue;
+      }
+
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `storage-migrations: another replica holds ${lockPath} (age ${Math.round(age / 1000)}s); ` +
+            `gave up after ${waitMs / 1000}s`,
+        );
+      }
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+  }
+
+  try {
+    await run();
+  } finally {
+    await rm(lockPath, { force: true });
+  }
 }
 
 async function isEmptyOrMissing(dir: string): Promise<boolean> {
@@ -230,38 +363,84 @@ async function isEmptyOrMissing(dir: string): Promise<boolean> {
 }
 
 /**
- * Copy legacy data into the new layout, one-shot, from a bundle's optional
- * `storage-migrations.yml`. Because naming across historical services is
- * inconsistent, each service declares its own explicit mappings:
+ * Apply the bundle's `storage-migrations/` folder — a simplified take on EF
+ * Core's migration mechanism. Each `.yml` file in the folder holds explicit
+ * mappings:
  *
  *   migrations:
  *     - from: /docker-nfs/.../old-service/repos-config   # may be absolute
  *       to: shared/repos-config                          # service-relative bucket path
  *
- * Copy (not move) so a still-running older major keeps reading the old path;
- * migrate-if-empty so newer data is never clobbered; a `.migrated-from` marker in
- * the target makes it idempotent and auditable. No file → no-op.
+ * Files execute in alphabetical byte order (name them 0001-…, 0002-…), and a
+ * ledger in the service's shared storage root (`.storage-migrations.yml`)
+ * records each file that has completed — an applied file is NEVER run again,
+ * even if a later release ships it with different content; ship a new file
+ * instead. The ledger is written after every completed file, so a failure
+ * mid-sequence re-runs only the failed file and what follows it.
+ *
+ * Within a file, the mapping semantics are unchanged: copy (not move) so a
+ * still-running older major keeps reading the old path; migrate-if-empty so
+ * newer data is never clobbered; a `.migrated-from` marker in the target for
+ * audit. No folder → no-op.
+ *
+ * Concurrency: the gateway runs three replicas and the deploy claim is
+ * per-RELEASE, so two releases of the same service can deploy at once. Runs are
+ * serialized per service by an O_EXCL lock file, the ledger is re-read after
+ * the lock is won (the previous holder may have applied everything), and it is
+ * append-only so another replica never reads a stale rewrite.
  */
 export async function prepareStorageMigrations(
   manifest: DeployManifest,
   baseDir: string,
   bundleDir: string,
+  lockOpts: MigrationLockOptions = {},
 ): Promise<void> {
-  const migrations = await readStorageMigrations(bundleDir);
-  if (migrations.length === 0) return;
+  const files = await listMigrationFiles(bundleDir);
+  if (files.length === 0) return;
 
   const root = sharedStorageDir(manifest, baseDir);
+  await mkdir(root, { recursive: true }); // lock + ledger live here
 
-  for (const { from, to } of migrations) {
-    // `from` may be an absolute legacy path (inconsistent historical naming).
-    const src = resolve(from);
-    const dest = resolveTarget(manifest, root, to, "storageMigrations 'to'");
+  await withMigrationLock(root, lockOpts, async () => {
+    const ledgerPath = join(root, MIGRATIONS_LEDGER);
+    // Read INSIDE the lock: the holder we just waited out may have applied
+    // some or all of these files.
+    let done = await readLedger(ledgerPath);
+    let ledgerExists = done.size > 0 || (await pathExists(ledgerPath));
 
-    if (!(await pathExists(src))) continue; // nothing to migrate
-    if (!(await isEmptyOrMissing(dest))) continue; // migrate-if-empty; never clobber
+    for (const file of files) {
+      if (done.has(file)) continue;
 
-    await mkdir(dirname(dest), { recursive: true });
-    await cp(src, dest, { recursive: true });
-    await writeFile(join(dest, MIGRATION_MARKER), `${src}\n${new Date().toISOString()}\n`, 'utf-8');
-  }
+      const label = `${MIGRATIONS_DIR}/${file}`;
+      const migrations = parseStorageMigrations(
+        await readFile(join(bundleDir, MIGRATIONS_DIR, file), 'utf-8'),
+        label,
+      );
+
+      for (const { from, to } of migrations) {
+        // `from` may be an absolute legacy path (inconsistent historical naming).
+        const src = resolve(from);
+        const dest = resolveTarget(manifest, root, to, `${label} 'to'`);
+
+        if (!(await pathExists(src))) continue; // nothing to migrate
+        if (!(await isEmptyOrMissing(dest))) continue; // migrate-if-empty; never clobber
+
+        await mkdir(dirname(dest), { recursive: true });
+        await cp(src, dest, { recursive: true });
+        await writeFile(
+          join(dest, MIGRATION_MARKER),
+          `${src}\n${new Date().toISOString()}\n`,
+          'utf-8',
+        );
+      }
+
+      await appendLedgerEntry(
+        ledgerPath,
+        { file, at: new Date().toISOString(), version: manifest.version },
+        !ledgerExists,
+      );
+      ledgerExists = true;
+      done = done.add(file);
+    }
+  });
 }

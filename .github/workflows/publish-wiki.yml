@@ -1,0 +1,43 @@
+name: Publish Wiki
+
+on:
+  workflow_call:
+    inputs:
+      source:
+        description: 'Directory in the repository holding the wiki pages'
+        type: string
+        default: 'wiki'
+      message:
+        description: 'Commit message for the wiki commit'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Report what would change without pushing'
+        type: string
+        default: 'false'
+    secrets:
+      token:
+        description: 'GitHub token with contents:write'
+        required: false
+    outputs:
+      changed:
+        description: 'true when the wiki was updated'
+        value: ${{ jobs.publish-wiki.outputs.changed }}
+
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      changed: ${{ steps.publish.outputs.changed }}
+    steps:
+      # Must be a fully-qualified reference: when called via workflow_call the
+      # workspace contains the *caller's* repo, not git-flow.
+      - uses: cpdevtools/git-flow/actions/publish-wiki@main
+        id: publish
+        with:
+          source: ${{ inputs.source }}
+          message: ${{ inputs.message }}
+          dry-run: ${{ inputs.dry_run }}
+          token: ${{ secrets.token || github.token }}

@@ -1,0 +1,145 @@
+name: 'Publish Wiki'
+description: "Mirrors a directory in the repository into the repository's GitHub wiki"
+author: 'CPDevTools'
+
+branding:
+  icon: 'book-open'
+  color: 'blue'
+
+inputs:
+  source:
+    description: 'Directory in the repository holding the wiki pages'
+    required: false
+    default: 'wiki'
+
+  repository:
+    description: 'Repository whose wiki to publish to, as owner/repo'
+    required: false
+    default: ${{ github.repository }}
+
+  message:
+    description: 'Commit message for the wiki commit'
+    required: false
+    default: ''
+
+  checkout:
+    description: 'Check out the repository first. Set false when a previous step generated the source directory.'
+    required: false
+    default: 'true'
+
+  dry-run:
+    description: 'Report what would change without pushing'
+    required: false
+    default: 'false'
+
+  token:
+    description: 'GitHub token with contents:write'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  changed:
+    description: 'true when the wiki was updated, false when it was already in sync'
+    value: ${{ steps.sync.outputs.changed }}
+
+  pages:
+    description: 'Number of markdown pages in the source directory'
+    value: ${{ steps.sync.outputs.pages }}
+
+runs:
+  using: 'composite'
+  steps:
+    - if: inputs.checkout == 'true'
+      uses: actions/checkout@v7
+
+    - name: Sync wiki
+      id: sync
+      shell: bash
+      env:
+        INPUT_SOURCE: ${{ inputs.source }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_MESSAGE: ${{ inputs.message }}
+        INPUT_DRY_RUN: ${{ inputs.dry-run }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+
+        src="$GITHUB_WORKSPACE/$INPUT_SOURCE"
+
+        if [ ! -d "$src" ]; then
+          echo "::error::Source directory not found: $INPUT_SOURCE"
+          exit 1
+        fi
+
+        pages=$(find "$src" -type f -name '*.md' | wc -l | tr -d ' ')
+        echo "pages=$pages" >> "$GITHUB_OUTPUT"
+
+        # A source directory with no pages would mirror as "delete the entire wiki".
+        # Almost always a wrong path or a failed generation step, never an intent.
+        if [ "$pages" -eq 0 ]; then
+          echo "::error::No markdown files found in $INPUT_SOURCE — refusing to empty the wiki"
+          exit 1
+        fi
+
+        # Sent as a header rather than embedded in the remote URL, so the token is
+        # never written into the clone's .git/config.
+        auth=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+        echo "::add-mask::$auth"
+        header="AUTHORIZATION: basic $auth"
+
+        wiki_url="https://github.com/${INPUT_REPOSITORY}.wiki.git"
+        work=$(mktemp -d)
+
+        if ! git -c http.extraheader="$header" clone --quiet "$wiki_url" "$work" 2>/tmp/wiki-clone.err; then
+          # A wiki repository does not exist until its first page is saved, and an
+          # uninitialised one is reported as "not found" rather than "empty".
+          if grep -qi 'not found\|does not exist' /tmp/wiki-clone.err; then
+            echo "::error::The wiki for ${INPUT_REPOSITORY} has not been initialised. Create a first page at https://github.com/${INPUT_REPOSITORY}/wiki/_new, then re-run."
+          else
+            cat /tmp/wiki-clone.err >&2
+            echo "::error::Could not clone the wiki for ${INPUT_REPOSITORY}"
+          fi
+          exit 1
+        fi
+
+        # Wikis created before the default-branch rename are on master; newer ones
+        # follow the account default. Take whatever the clone came back with.
+        branch=$(git -C "$work" symbolic-ref --short HEAD)
+
+        # Mirror rather than copy over: pages deleted from source must disappear
+        # from the wiki too. The wiki's own .git survives; a stray .git inside the
+        # source directory is excluded so it can never overwrite it.
+        find "$work" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+        ( cd "$src" && tar -cf - --exclude='./.git' . ) | ( cd "$work" && tar -xf - )
+
+        cd "$work"
+        git add -A
+
+        if git diff --cached --quiet; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          echo "Wiki already in sync — $pages page(s), nothing to push."
+          exit 0
+        fi
+
+        echo "Changes to publish:"
+        git diff --cached --name-status
+
+        if [ "$INPUT_DRY_RUN" = "true" ]; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          echo "Dry run — not pushing."
+          exit 0
+        fi
+
+        message="$INPUT_MESSAGE"
+        if [ -z "$message" ]; then
+          message="docs: sync wiki from ${GITHUB_SHA:0:7}"
+        fi
+
+        git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit --quiet -m "$message"
+
+        git -c http.extraheader="$header" push --quiet origin "HEAD:$branch"
+
+        echo "changed=true" >> "$GITHUB_OUTPUT"
+        echo "Published $pages page(s) to https://github.com/${INPUT_REPOSITORY}/wiki"
