@@ -23,16 +23,6 @@ on:
 
 jobs:
   publish-wiki:
-    uses: cpdevtools/git-flow/.github/workflows/publish-wiki.yml@main
-    secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
-```
-
-Or call the action directly:
-
-```yaml
-jobs:
-  publish-wiki:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -41,6 +31,16 @@ jobs:
         with:
           source: wiki
           token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+A reusable workflow wrapper is also available for repositories that prefer to call it as a job:
+
+```yaml
+jobs:
+  publish-wiki:
+    uses: cpdevtools/git-flow/.github/workflows/publish-wiki.yml@main
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 To publish generated pages, do the generation first and turn off the action's own checkout:
