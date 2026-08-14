@@ -1,0 +1,38 @@
+name: Wiki
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'wiki/**'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Report what would change without pushing'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+        default: 'false'
+
+jobs:
+  publish-wiki:
+    name: Publish Wiki
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Local path rather than cpdevtools/git-flow/actions/publish-wiki@main:
+      # this repository owns the action, so its own wiki is published with the
+      # version on this branch.
+      - name: Publish Wiki
+        uses: ./actions/publish-wiki
+        with:
+          source: wiki
+          checkout: 'false'
+          dry-run: ${{ inputs.dry_run || 'false' }}
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -15,6 +15,11 @@ git add .pnpm-prod/pnpm-lock.yaml
 # node_modules against the ROOT lockfile, and a dev-mode (file:) lockfile there
 # fails the frozen install it triggers. --lockfile-only leaves node_modules
 # alone, so local DEV_LOCAL links keep working.
+# pnpm 11 keeps an install fingerprint in node_modules/.pnpm-workspace-state*.json
+# and skips resolution entirely when manifests and the pnpmfile bytes are
+# unchanged — it cannot see that the pnpmfile's behavior depends on DEV_LOCAL,
+# so without this the normalization below is a no-op against dev-linked state.
+rm -f node_modules/.pnpm-workspace-state*.json
 echo "pre-commit: normalizing root pnpm-lock.yaml to published mode..."
 if ! pnpm_out=$(DEV_LOCAL=false pnpm install --lockfile-only 2>&1); then
   printf '%s\n' "$pnpm_out" >&2
