@@ -9,3 +9,17 @@ if ! pnpm_out=$(DEV_LOCAL=false pnpm install --lockfile-dir .pnpm-prod --lockfil
 fi
 
 git add .pnpm-prod/pnpm-lock.yaml
+
+# The committed root pnpm-lock.yaml must also be in published (DEV_LOCAL=false)
+# mode: CI installs from .pnpm-prod, but any nested `pnpm run` in CI checks
+# node_modules against the ROOT lockfile, and a dev-mode (file:) lockfile there
+# fails the frozen install it triggers. --lockfile-only leaves node_modules
+# alone, so local DEV_LOCAL links keep working.
+echo "pre-commit: normalizing root pnpm-lock.yaml to published mode..."
+if ! pnpm_out=$(DEV_LOCAL=false pnpm install --lockfile-only 2>&1); then
+  printf '%s\n' "$pnpm_out" >&2
+  echo "" >&2
+  echo "pre-commit FAILED: could not normalize root pnpm-lock.yaml" >&2
+  exit 1
+fi
+git add pnpm-lock.yaml
