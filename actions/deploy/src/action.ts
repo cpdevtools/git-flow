@@ -263,6 +263,53 @@ function streamLines(
   });
 }
 
+/**
+ * Cross-checks a streamed EXIT:0 against the gateway's own deploy record.
+ *
+ * The deploy log is a shared append-only file, so two writers racing (a replica
+ * crash-marking a record it believes abandoned vs. the live owner finishing) can
+ * interleave EXIT lines, and the first one the stream delivers is not necessarily
+ * the verdict. GET /deploy/{id} reports the record's settled status; only
+ * 'completed' confirms the success the stream claimed.
+ *
+ * Returns true on confirmation — and also, with a loud warning, when the record
+ * cannot be read at all: the gateway may be mid-restart from a self-update, and a
+ * status blip must not fail a deploy two independent signals (EXIT:0 and the
+ * /status health check that follows) call good.
+ */
+async function recordConfirmsSuccess(releaseId: number): Promise<boolean> {
+  const CONFIRM_TIMEOUT_MS = 20_000;
+  const CONFIRM_POLL_MS = 2_000;
+  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+  let lastProblem = 'record not read yet';
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await makeRequest(`${deployUrl}/deploy/${releaseId}`, { method: 'GET', headers: {} });
+      if (res.statusCode === 200) {
+        const status = (JSON.parse(res.body) as { status?: string }).status;
+        if (status === 'completed') return true;
+        if (status === 'failed') {
+          core.error(`Gateway deploy record for release ${releaseId} reports status 'failed'.`);
+          return false;
+        }
+        lastProblem = `record still '${status ?? 'unknown'}'`; // settling — keep polling
+      } else {
+        lastProblem = `HTTP ${res.statusCode}`;
+      }
+    } catch (err) {
+      lastProblem = String(err);
+    }
+    await new Promise((r) => setTimeout(r, CONFIRM_POLL_MS));
+  }
+
+  core.warning(
+    `Could not confirm the deploy record for release ${releaseId} within ${CONFIRM_TIMEOUT_MS / 1000}s ` +
+      `(${lastProblem}); trusting the streamed EXIT:0 and the health check.`,
+  );
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -337,6 +384,11 @@ async function run(): Promise<void> {
           if (line === ':hb') return false; // heartbeat — skip
 
           if (line.startsWith('EXIT:')) {
+            // Print it: when a verdict is ever disputed (a crash-marked record racing a
+            // live owner's finish), the job log must show WHICH exit line the action
+            // acted on, not leave it to be inferred.
+            core.info(line);
+            summaryLines.push(line);
             exitCode = parseInt(line.slice(5), 10);
             return true; // stop
           }
@@ -386,6 +438,12 @@ async function run(): Promise<void> {
     // (e.g. an older gateway build). Never treat that as a successful deploy.
     if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
     core.setFailed('Deploy reported success but a fatal error was logged');
+  } else if (!(await recordConfirmsSuccess(releaseId))) {
+    // The stream said EXIT:0 but the gateway's own record disagrees. The log is
+    // shared between replicas, so a takeover racing the real owner can interleave
+    // two EXIT lines and the first one to stream is not necessarily the verdict.
+    if (deploymentId !== null) await setDeploymentStatus(deploymentId, 'failure');
+    core.setFailed("Stream reported EXIT:0 but the gateway's deploy record says the deploy failed");
   } else {
     // 4. Status check — confirm service came back up after any restart
     core.info('Waiting for service status check...');
