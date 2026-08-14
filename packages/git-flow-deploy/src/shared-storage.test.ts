@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, stat, mkdir, writeFile, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, stat, mkdir, writeFile, readFile, utimes } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -294,21 +294,25 @@ describe('prepareStorageMigrations', () => {
     await rm(legacyDir, { recursive: true, force: true });
   });
 
-  const writeMigrations = (to: string) =>
-    writeFile(
-      join(bundleDir, 'storage-migrations.yml'),
-      `migrations:\n  - from: ${legacyDir}\n    to: ${to}\n`,
+  const writeMigrationFile = async (name: string, from: string, to: string) => {
+    await mkdir(join(bundleDir, 'storage-migrations'), { recursive: true });
+    await writeFile(
+      join(bundleDir, 'storage-migrations', name),
+      `migrations:\n  - from: ${from}\n    to: ${to}\n`,
     );
+  };
 
-  it('is a no-op when the bundle has no storage-migrations.yml', async () => {
+  const serviceRoot = () => join(baseDir, 'webservice', 'org-my-service');
+
+  it('is a no-op when the bundle has no storage-migrations folder', async () => {
     await prepareStorageMigrations(stacked, baseDir, bundleDir);
-    expect(await dirExists(join(baseDir, 'webservice', 'org-my-service'))).toBe(false);
+    expect(await dirExists(serviceRoot())).toBe(false);
   });
 
   it('copies legacy data into the target bucket and writes a marker', async () => {
-    await writeMigrations('shared/repos-config');
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
     await prepareStorageMigrations(stacked, baseDir, bundleDir);
-    const target = join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config');
+    const target = join(serviceRoot(), 'shared', 'repos-config');
     expect(await readFile(join(target, 'repos.json'), 'utf-8')).toBe('LEGACY');
     expect(await readFile(join(target, '.migrated-from'), 'utf-8')).toContain(legacyDir);
     // Copy, not move: the source survives.
@@ -316,24 +320,147 @@ describe('prepareStorageMigrations', () => {
   });
 
   it('does not clobber a non-empty target (migrate-if-empty)', async () => {
-    const target = join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config');
+    const target = join(serviceRoot(), 'shared', 'repos-config');
     await mkdir(target, { recursive: true });
     await writeFile(join(target, 'repos.json'), 'NEWER');
-    await writeMigrations('shared/repos-config');
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
     await prepareStorageMigrations(stacked, baseDir, bundleDir);
     expect(await readFile(join(target, 'repos.json'), 'utf-8')).toBe('NEWER');
-    expect(await dirExists(join(target))).toBe(true);
     await expect(readFile(join(target, '.migrated-from'), 'utf-8')).rejects.toThrow();
   });
 
   it('skips when the source path does not exist', async () => {
-    await writeFile(
-      join(bundleDir, 'storage-migrations.yml'),
-      `migrations:\n  - from: /nonexistent/legacy/path\n    to: shared/repos-config\n`,
-    );
+    await writeMigrationFile('0001-repos.yml', '/nonexistent/legacy/path', 'shared/repos-config');
     await prepareStorageMigrations(stacked, baseDir, bundleDir);
-    expect(
-      await dirExists(join(baseDir, 'webservice', 'org-my-service', 'shared', 'repos-config')),
-    ).toBe(false);
+    expect(await dirExists(join(serviceRoot(), 'shared', 'repos-config'))).toBe(false);
+  });
+
+  it('executes files in alphabetical order', async () => {
+    // Both files target the same empty dir; migrate-if-empty means the first
+    // to run wins, so the surviving content proves the order.
+    const otherLegacy = await mkdtemp(join(tmpdir(), 'migrate-legacy2-'));
+    await writeFile(join(otherLegacy, 'repos.json'), 'SECOND');
+    try {
+      await writeMigrationFile('0002-later.yml', otherLegacy, 'shared/repos-config');
+      await writeMigrationFile('0001-first.yml', legacyDir, 'shared/repos-config');
+      await prepareStorageMigrations(stacked, baseDir, bundleDir);
+      const target = join(serviceRoot(), 'shared', 'repos-config');
+      expect(await readFile(join(target, 'repos.json'), 'utf-8')).toBe('LEGACY');
+    } finally {
+      await rm(otherLegacy, { recursive: true, force: true });
+    }
+  });
+
+  it('records applied files in the ledger and never re-runs them', async () => {
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+
+    const ledger = await readFile(join(serviceRoot(), '.storage-migrations.yml'), 'utf-8');
+    expect(ledger).toContain('0001-repos.yml');
+    expect(ledger).toContain(`version: '2.4.1'`);
+
+    // Empty the target — a re-run would repopulate it if the file executed
+    // again (the per-target marker is gone too). The ledger must prevent that.
+    await rm(join(serviceRoot(), 'shared', 'repos-config'), { recursive: true, force: true });
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+    expect(await dirExists(join(serviceRoot(), 'shared', 'repos-config'))).toBe(false);
+  });
+
+  it('runs a newly shipped file while skipping already-applied ones', async () => {
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+
+    const secondLegacy = await mkdtemp(join(tmpdir(), 'migrate-legacy3-'));
+    await writeFile(join(secondLegacy, 'extra.json'), 'EXTRA');
+    try {
+      await writeMigrationFile('0002-extra.yml', secondLegacy, 'shared/extra');
+      await prepareStorageMigrations(stacked, baseDir, bundleDir);
+      const extra = join(serviceRoot(), 'shared', 'extra');
+      expect(await readFile(join(extra, 'extra.json'), 'utf-8')).toBe('EXTRA');
+      const ledger = await readFile(join(serviceRoot(), '.storage-migrations.yml'), 'utf-8');
+      expect(ledger).toContain('0001-repos.yml');
+      expect(ledger).toContain('0002-extra.yml');
+    } finally {
+      await rm(secondLegacy, { recursive: true, force: true });
+    }
+  });
+
+  it('names the offending file in validation errors', async () => {
+    await mkdir(join(bundleDir, 'storage-migrations'), { recursive: true });
+    await writeFile(join(bundleDir, 'storage-migrations', '0001-bad.yml'), 'migrations: 42\n');
+    await expect(prepareStorageMigrations(stacked, baseDir, bundleDir)).rejects.toThrow(
+      /storage-migrations\/0001-bad\.yml/,
+    );
+  });
+
+  it('ignores non-yaml files in the folder', async () => {
+    await mkdir(join(bundleDir, 'storage-migrations'), { recursive: true });
+    await writeFile(join(bundleDir, 'storage-migrations', 'README.md'), '# notes\n');
+    await prepareStorageMigrations(stacked, baseDir, bundleDir);
+    expect(await dirExists(serviceRoot())).toBe(false);
+  });
+
+  // ── Concurrency: three gateway replicas; the deploy claim is per-release,
+  //    so two releases of one service can run migrations at the same time. ──
+
+  it('two concurrent runs apply a file exactly once', async () => {
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
+
+    await Promise.all([
+      prepareStorageMigrations(stacked, baseDir, bundleDir, { pollMs: 20 }),
+      prepareStorageMigrations(stacked, baseDir, bundleDir, { pollMs: 20 }),
+    ]);
+
+    const ledger = await readFile(join(serviceRoot(), '.storage-migrations.yml'), 'utf-8');
+    expect(ledger.match(/- file: 0001-repos\.yml/g)).toHaveLength(1);
+    // Lock released.
+    expect(await dirExists(join(serviceRoot(), '.storage-migrations.lock'))).toBe(false);
+    await expect(stat(join(serviceRoot(), '.storage-migrations.lock'))).rejects.toThrow();
+  });
+
+  it('waits for a live holder, then sees its ledger and skips', async () => {
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
+    await mkdir(serviceRoot(), { recursive: true });
+    // A "holder" that has already applied the file and releases the lock shortly.
+    await writeFile(join(serviceRoot(), '.storage-migrations.lock'), 'holder\n');
+    await writeFile(
+      join(serviceRoot(), '.storage-migrations.yml'),
+      `applied:\n  - file: 0001-repos.yml\n    at: now\n    version: '2.4.1'\n`,
+    );
+    setTimeout(() => {
+      void rm(join(serviceRoot(), '.storage-migrations.lock'), { force: true });
+    }, 100);
+
+    await prepareStorageMigrations(stacked, baseDir, bundleDir, { waitMs: 5_000, pollMs: 20 });
+
+    // Skipped: the target was never created because the ledger said applied.
+    expect(await dirExists(join(serviceRoot(), 'shared', 'repos-config'))).toBe(false);
+  });
+
+  it('gives up loudly when a live lock is never released', async () => {
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
+    await mkdir(serviceRoot(), { recursive: true });
+    await writeFile(join(serviceRoot(), '.storage-migrations.lock'), 'holder\n');
+
+    await expect(
+      prepareStorageMigrations(stacked, baseDir, bundleDir, { waitMs: 150, pollMs: 20 }),
+    ).rejects.toThrow(/another replica holds/);
+  });
+
+  it('breaks a stale lock from a crashed holder', async () => {
+    await writeMigrationFile('0001-repos.yml', legacyDir, 'shared/repos-config');
+    await mkdir(serviceRoot(), { recursive: true });
+    await writeFile(join(serviceRoot(), '.storage-migrations.lock'), 'crashed\n');
+    const old = new Date(Date.now() - 60_000);
+    await utimes(join(serviceRoot(), '.storage-migrations.lock'), old, old);
+
+    await prepareStorageMigrations(stacked, baseDir, bundleDir, {
+      waitMs: 5_000,
+      pollMs: 20,
+      staleMs: 30_000,
+    });
+
+    const target = join(serviceRoot(), 'shared', 'repos-config');
+    expect(await readFile(join(target, 'repos.json'), 'utf-8')).toBe('LEGACY');
   });
 });

@@ -73,8 +73,6 @@ export interface NgLibArtifact {
   directory: string;
   /** Subdirectory the build emits, packed instead of the root. Defaults to 'dist'. */
   packDir?: string;
-  /** Build command run inside `directory`. Skipped when packDir already exists. */
-  build?: string;
   /** Populated by pack. */
   path?: string;
   registries?: string[];
@@ -163,32 +161,15 @@ const ngLib: ArtifactType<NgLibArtifact> = {
 
     const packDir = join(sourceDir, artifact.packDir ?? 'dist');
 
-    const distVersion = async (): Promise<string | undefined> => {
-      try {
-        const parsed = JSON.parse(await readFile(join(packDir, 'package.json'), 'utf-8')) as {
-          version?: string;
-        };
-        return parsed.version;
-      } catch {
-        return undefined;
-      }
-    };
-
-    // Rebuild not only when the output is missing but when it carries the wrong
-    // version: generated-client dist directories are gitignored and survive on
-    // disk between releases, so "dist exists" says nothing about it being THIS
-    // release's build.
-    if (artifact.build && (await distVersion()) !== ctx.version) {
-      // Handed to a shell explicitly: zx quotes every interpolation, so a bare
-      // `${artifact.build}` would become a single argv[0] token and fail with
-      // "npm ci && npm run build: command not found".
-      await $({ cwd: sourceDir })`sh -c ${artifact.build}`;
-    }
-
+    // Building is the project's job, not this handler's: github.actions.build
+    // runs before pack, and whatever it produced is what ships. Pack only
+    // verifies — the checks below catch a build that never ran (missing dist)
+    // or a stale one left over from a previous release (version drift; dist
+    // directories are gitignored and survive on disk between releases).
     if (!existsSync(packDir)) {
       throw new Error(
         `ng-lib: build output '${artifact.packDir ?? 'dist'}' not found in ${sourceDir}.\n` +
-          `Either build it in github.actions.build, or set 'build:' on the artifact.`,
+          `The project's github.actions.build must build the client before pack runs.`,
       );
     }
 
@@ -206,7 +187,9 @@ const ngLib: ArtifactType<NgLibArtifact> = {
         `ng-lib: ${packDir}/package.json is version '${manifest.version}', but the release is ` +
           `'${ctx.version}'.\n` +
           `Publishing would succeed and then fail verification, which looks up ` +
-          `${artifact.name}@${ctx.version}. Stamp the generated package from PROJECT_VERSION.`,
+          `${artifact.name}@${ctx.version}. The dist is stale or mis-stamped: the project's ` +
+          `github.actions.build must regenerate and rebuild the client for every release, ` +
+          `stamping its version from PROJECT_VERSION.`,
       );
     }
 

@@ -116,36 +116,17 @@ describe('ng-lib', () => {
     expect(path.startsWith(outDir)).toBe(true);
   });
 
-  // Regression: zx quotes interpolations, so the build command must be handed
-  // to a shell explicitly — the naive form ran the whole string as argv[0] and
-  // died with "command not found". A compound command proves the shell parses it.
-  it('runs the build command when the output is missing', async () => {
-    const clientDir = join(root, 'client');
-    await mkdir(clientDir, { recursive: true });
-    const pkg = JSON.stringify({ name: '@org/ngclient', version: '1.2.3' });
+  // Building is the project's job (github.actions.build runs before pack), so a
+  // leftover `build:` key from an older config must be inert — pack verifies and
+  // packs, it never executes config-supplied commands.
+  it('ignores a build command instead of executing it', async () => {
+    await writeClient('1.2.3');
 
     const artifact = {
       type: 'ng-lib',
       name: '@org/ngclient',
       directory: 'client',
-      build: `mkdir -p dist && printf '%s' '${pkg}' > dist/package.json`,
-    } as never;
-
-    await getArtifactType('ng-lib').pack(artifact, ctx());
-    expect((artifact as { path: string }).path).toMatch(/\.tgz$/);
-  });
-
-  // A gitignored dist survives between releases, so "exists" says nothing about
-  // it being this release's build — a stale one must trigger the rebuild.
-  it('rebuilds when the existing output carries a stale version', async () => {
-    await writeClient('0.7.30-rc.4');
-    const fresh = JSON.stringify({ name: '@org/ngclient', version: '1.2.3' });
-
-    const artifact = {
-      type: 'ng-lib',
-      name: '@org/ngclient',
-      directory: 'client',
-      build: `printf '%s' '${fresh}' > dist/package.json`,
+      build: 'exit 1', // would fail the pack if it were ever run
     } as never;
 
     await getArtifactType('ng-lib').pack(artifact, ctx());

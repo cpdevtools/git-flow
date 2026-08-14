@@ -42,6 +42,7 @@ different tracks. Release tags are `{project}/v{version}` plus `{group}/v{versio
 | [`publish-release`](./actions/publish-release)       | Publishes to registries and finalises releases                        |
 | [`deploy`](./actions/deploy)                         | Sends a signed deploy request to a gateway and streams the log back   |
 | [`cleanup-old-builds`](./actions/cleanup-old-builds) | Prunes superseded prerelease builds                                   |
+| [`publish-wiki`](./actions/publish-wiki)             | Mirrors a repo directory into the repository's GitHub wiki            |
 
 ### `test` inputs
 
@@ -65,6 +66,8 @@ different tracks. Release tags are `{project}/v{version}` plus `{group}/v{versio
 - [`test.yml`](./.github/workflows/test.yml) — on every push
 - [`build-pack-publish.yml`](./.github/workflows/build-pack-publish.yml) — on a PR merged into `release/**`
 - [`cleanup-scheduled.yml`](./.github/workflows/cleanup-scheduled.yml) — daily
+- [`publish-wiki.yml`](./.github/workflows/publish-wiki.yml) — reusable; call it on push to your
+  wiki source directory
 
 ## Consuming this from a project
 
