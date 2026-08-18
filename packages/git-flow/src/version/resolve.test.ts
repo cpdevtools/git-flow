@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveVersion } from './resolve.js';
+import { resolveVersion, draftBodyConsumesVersion } from './resolve.js';
 
 // Each test calls resolveVersion which may run `git ls-remote --tags origin`
 // (itself capped at 10s). Give tests enough headroom for slow CI networks.
@@ -200,5 +200,48 @@ describe('resolveVersion - Quick Lookup Table Examples', { timeout: TEST_TIMEOUT
     });
     expect(result.version).toBe('2.0.0-feature.auth.beta.0');
     expect(result.isPreRelease).toBe(true);
+  });
+});
+
+describe('draftBodyConsumesVersion', () => {
+  const wrap = (yaml: string) =>
+    `📋 **Created from PR:** #102\n\n## Artifact Metadata\n\`\`\`yaml\n${yaml}\n\`\`\`\n`;
+
+  it('a fully-published draft is still resumable — the tag, not the draft, consumes the version', () => {
+    // The shop-in-shop 0.8.0-alpha.0 incident: npm+nuget published, docker
+    // bundle failed, next release PR bumped everything to .build.N.
+    expect(
+      draftBodyConsumesVersion(
+        wrap('project: "@x/spec"\nartifacts:\n  - type: ng-lib\n    published: true'),
+      ),
+    ).toBe(false);
+  });
+
+  it('a partially-published draft is resumable', () => {
+    expect(
+      draftBodyConsumesVersion(
+        wrap(
+          'project: "@x/svc"\nartifacts:\n  - type: docker-image\n    published: false\n  - type: deploy\n    published: true',
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('an unpublished draft is resumable', () => {
+    expect(
+      draftBodyConsumesVersion(
+        wrap('project: "@x/svc"\nartifacts:\n  - type: docker-image\n    published: false'),
+      ),
+    ).toBe(false);
+  });
+
+  it('a legacy draft with artifacts but no published flags is consumed', () => {
+    expect(
+      draftBodyConsumesVersion(wrap('project: "@x/svc"\nartifacts:\n  - type: docker-image')),
+    ).toBe(true);
+  });
+
+  it('a body without a yaml block proves nothing', () => {
+    expect(draftBodyConsumesVersion('just some prose')).toBe(false);
   });
 });

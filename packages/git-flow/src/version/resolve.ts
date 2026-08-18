@@ -28,6 +28,42 @@ function buildTagName(version: string, projectName?: string): string {
  * 1. Git tags (indicates a published release)
  * 2. GitHub release body - checks if ANY artifact has published:true or missing published field
  */
+/**
+ * Whether a DRAFT release's body proves its version is consumed.
+ *
+ * A draft is an in-flight release attempt, not a consumed version: the tag only
+ * comes into existence when the draft is finalized, and versionExists's tag
+ * checks are what detect that. A draft with published:true artifacts is a
+ * PARTIAL publish (e.g. npm/nuget landed, the docker bundle failed) — the
+ * version must stay resumable, or every failed pack burns the version and the
+ * next release PR silently bumps to .build.N. Resuming is safe: publish-release
+ * skips per artifact via registry verification, and per project via the
+ * finalized-release check.
+ *
+ * The one case treated as consumed: artifacts with no published flags at all —
+ * a draft from before the flag existed, where nothing can prove what shipped.
+ */
+export function draftBodyConsumesVersion(body: string): boolean {
+  const yamlMatch = body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
+  if (!yamlMatch) {
+    return false;
+  }
+
+  const yaml = yamlMatch[1];
+  const hasPublishedField = /published:\s*(true|false)/i.test(yaml);
+  const hasArtifacts = /artifacts:/i.test(yaml);
+
+  if (hasArtifacts && !hasPublishedField) {
+    console.log(
+      `[versionExists] Found artifacts without published field, assuming version taken`,
+    );
+    return true;
+  }
+
+  console.log(`[versionExists] Draft release is in-flight (resumable), version not consumed`);
+  return false;
+}
+
 export async function versionExists(version: string, projectName?: string): Promise<boolean> {
   try {
     console.log(
@@ -72,38 +108,8 @@ export async function versionExists(version: string, projectName?: string): Prom
         await $`gh api repos/${owner}/${repo}/releases --jq '.[] | select(.tag_name == "${tag}" or .name == "${projectName} ${version}") | select(.draft == true) | .body'`.nothrow();
 
       if (ghResult.exitCode === 0 && ghResult.stdout.trim()) {
-        const body = ghResult.stdout.trim();
-        // Extract YAML from markdown code block
-        const yamlMatch = body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
-
-        if (yamlMatch) {
-          const yaml = yamlMatch[1];
-          console.log(`[versionExists] Found release body YAML, checking published flags`);
-
-          // Check if any artifact has published:true or is missing published field
-          // Missing field = old release, assume published
-          // All published:false = can resume publishing
-          const hasPublishedTrue = /published:\s*true/i.test(yaml);
-          const hasArtifacts = /artifacts:/i.test(yaml);
-          const allPublishedFalse =
-            hasArtifacts && !hasPublishedTrue && /published:\s*false/i.test(yaml);
-
-          if (hasPublishedTrue) {
-            console.log(`[versionExists] Found artifact with published:true in release body`);
-            return true;
-          }
-
-          if (hasArtifacts && !allPublishedFalse) {
-            // Has artifacts but no published field = old release, assume taken
-            console.log(
-              `[versionExists] Found artifacts without published field, assuming version taken`,
-            );
-            return true;
-          }
-
-          console.log(
-            `[versionExists] All artifacts have published:false, version available for resume`,
-          );
+        if (draftBodyConsumesVersion(ghResult.stdout.trim())) {
+          return true;
         }
       }
     }

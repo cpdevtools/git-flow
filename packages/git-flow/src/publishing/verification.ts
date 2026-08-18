@@ -97,32 +97,64 @@ export async function isNpmPublished(
 }
 
 /**
- * Check if a package version is published to NuGet registry
+ * Check if a package version is published to a NuGet registry, via the NuGet
+ * v3 protocol: service index → PackageBaseAddress resource → the package's
+ * version list at `{base}/{lowercase-id}/index.json`.
+ *
+ * Auth matters: GitHub Packages returns 404 for ANONYMOUS requests to
+ * everything, including the service index — an unauthenticated check reads as
+ * "service not found" even when the registry is fine (this failed shop-in-shop's
+ * first-ever dotnet-lib publish). Basic auth with the token as password is the
+ * scheme `dotnet nuget push --api-key` maps to on GitHub Packages.
  */
 export async function isNugetPublished(
   packageId: string,
   version: string,
   registry: NugetRegistry,
+  token?: string,
 ): Promise<VerificationResult> {
   try {
-    // Use NuGet HTTP API to check if version exists
-    const serviceUrl = registry.url.endsWith('/v3/index.json')
+    const serviceUrl = registry.url.endsWith('/index.json')
       ? registry.url
-      : `${registry.url}/v3/index.json`;
+      : `${registry.url.replace(/\/$/, '')}/v3/index.json`;
 
-    const response = await fetch(serviceUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to query NuGet service: ${response.statusText}`);
+    const headers: Record<string, string> = token
+      ? { Authorization: `Basic ${Buffer.from(`token:${token}`).toString('base64')}` }
+      : {};
+
+    const indexResponse = await fetch(serviceUrl, { headers });
+    if (!indexResponse.ok) {
+      throw new Error(`Failed to query NuGet service index: ${indexResponse.statusText}`);
     }
 
-    // This is a simplified check - full implementation would follow NuGet protocol
-    // For now, we'll use dotnet CLI
-    const result = await $`dotnet list package --source ${registry.url} | grep ${packageId}`;
-
-    return {
-      published: result.stdout.includes(version),
-      version,
+    const index = (await indexResponse.json()) as {
+      resources?: { '@id': string; '@type': string }[];
     };
+    const baseResource = index.resources?.find((r) =>
+      r['@type'].startsWith('PackageBaseAddress/'),
+    );
+    if (!baseResource) {
+      throw new Error('NuGet service index has no PackageBaseAddress resource');
+    }
+
+    const base = baseResource['@id'].replace(/\/$/, '');
+    const versionsResponse = await fetch(
+      `${base}/${packageId.toLowerCase()}/index.json`,
+      { headers },
+    );
+
+    if (versionsResponse.status === 404) {
+      // The package has never been published — expected before a first publish.
+      return { published: false, error: 'Package not found in registry' };
+    }
+    if (!versionsResponse.ok) {
+      throw new Error(`Failed to query NuGet package versions: ${versionsResponse.statusText}`);
+    }
+
+    const { versions = [] } = (await versionsResponse.json()) as { versions?: string[] };
+    const published = versions.some((v) => v.toLowerCase() === version.toLowerCase());
+
+    return { published, version };
   } catch (error) {
     return {
       published: false,
@@ -185,7 +217,7 @@ export async function verifyPublication(
       return isNpmPublished(artifactName, version, registry, token);
 
     case 'nuget':
-      return isNugetPublished(artifactName, version, registry);
+      return isNugetPublished(artifactName, version, registry, token);
 
     case 'docker':
       return isDockerPublished(artifactName, version, registry, token);

@@ -58,8 +58,19 @@ const allowedMethods = (process.env['INPUT_ALLOWED_METHODS'] ?? '')
   .map((s) => s.trim())
   .filter(Boolean);
 
-if (!repo || !releaseIdRaw || !deployUrl || !deployToken) {
-  core.setFailed('Missing required inputs: repo, release_id, deploy_url, hmac_secret');
+const missingInputs = Object.entries({
+  repo,
+  release_id: releaseIdRaw,
+  deploy_url: deployUrl,
+  hmac_secret: deployToken,
+})
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
+if (missingInputs.length > 0) {
+  // Name only what is actually missing: an empty hmac_secret usually means the
+  // GitHub Environment lacks the secret the workflow references, and listing
+  // all four inputs sent that diagnosis in the wrong direction.
+  core.setFailed(`Missing required inputs: ${missingInputs.join(', ')}`);
   process.exit(1);
 }
 
@@ -246,6 +257,12 @@ function streamLines(
           pending = lines.pop() ?? '';
           for (const line of lines) {
             if (onLine(line)) {
+              // Resolve BEFORE destroying: a destroyed client response settles
+              // neither handler on every Node version, and an unsettled promise
+              // here lets the event loop drain — the process then exits 0 with
+              // the verdict code below never run, reporting SUCCESS for a
+              // deploy whose stream said EXIT:1 (observed in production).
+              resolve();
               res.destroy();
               return;
             }
