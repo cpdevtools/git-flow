@@ -1,0 +1,24 @@
+name: Cleanup Deleted Branch
+
+# Reusable: call from a consumer workflow triggered `on: delete` so that
+# deleting a work branch also removes the release/<branch> counterpart that
+# create-release-pr maintained for it. Guard the caller on
+# `github.event.ref_type == 'branch'` — the delete event also fires for tags.
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        description: 'GitHub token with contents:write'
+        required: false
+
+jobs:
+  cleanup-release-branch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # Fully-qualified: under workflow_call the workspace is the caller's repo.
+      - uses: cpdevtools/git-flow/actions/cleanup-deleted-branch@main
+        with:
+          token: ${{ secrets.token || github.token }}

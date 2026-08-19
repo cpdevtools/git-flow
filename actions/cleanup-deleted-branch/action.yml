@@ -1,0 +1,53 @@
+name: 'Cleanup Deleted Branch'
+description: "Deletes a branch's release/<branch> counterpart after the branch itself is deleted"
+author: 'CPDevTools'
+
+branding:
+  icon: 'trash-2'
+  color: 'red'
+
+inputs:
+  branch:
+    description: 'Name of the branch that was deleted (default: the delete event ref)'
+    required: false
+    default: ${{ github.event.ref }}
+
+  token:
+    description: 'GitHub token with contents:write'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Delete release branch counterpart
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        BRANCH: ${{ inputs.branch }}
+        REPO: ${{ github.repository }}
+      run: |
+        if [ -z "$BRANCH" ]; then
+          echo "No branch name provided — nothing to do."
+          exit 0
+        fi
+
+        # Deleting release/X must not recurse into release/release/X, and a
+        # release/* deletion has no counterpart of its own.
+        case "$BRANCH" in
+          release/*)
+            echo "Ignoring deletion of release branch '$BRANCH'."
+            exit 0
+            ;;
+        esac
+
+        counterpart="release/$BRANCH"
+
+        if ! gh api "/repos/$REPO/git/refs/heads/$counterpart" --silent 2>/dev/null; then
+          echo "No counterpart branch '$counterpart' — nothing to do."
+          exit 0
+        fi
+
+        echo "🗑️  Deleting '$counterpart' (its source branch '$BRANCH' was deleted)"
+        gh api --method DELETE "/repos/$REPO/git/refs/heads/$counterpart"
+        echo "✅ Deleted $counterpart"

@@ -1,0 +1,14 @@
+{
+  "name": "@cpdevtools/git-flow-action-cleanup-old-builds",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "description": "GitHub Action: delete old build releases, stale drafts, their tags and registry package versions",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "tsx": "^4.19.2",
+    "yaml": "^2.8.2"
+  },
+  "author": "CPDevTools",
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0"
+}
