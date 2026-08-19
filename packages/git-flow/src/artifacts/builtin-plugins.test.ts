@@ -90,7 +90,14 @@ describe('first-party types are available without installing anything', () => {
   });
 });
 
-describe('ng-lib', () => {
+// ng-lib and dotnet-lib pack tests shell out to real tooling (pnpm pack,
+// dotnet build/pack). On a cold CI runner the first dotnet invocation pays
+// NuGet restore + SDK warm-up, which regularly blows vitest's default 5s
+// per-test budget — the timeout here only guards against hangs, it is not a
+// performance assertion.
+const SUBPROCESS_TIMEOUT = 120_000;
+
+describe('ng-lib', { timeout: SUBPROCESS_TIMEOUT }, () => {
   async function writeClient(version: string, packDir = 'dist'): Promise<void> {
     const dir = join(root, 'client', packDir);
     await mkdir(dir, { recursive: true });
@@ -208,7 +215,7 @@ describe('ng-lib', () => {
   });
 });
 
-describe('dotnet-lib', () => {
+describe('dotnet-lib', { timeout: SUBPROCESS_TIMEOUT }, () => {
   it('reports what it produced when the package id does not match', async () => {
     // No dotnet SDK assumptions: an empty output dir exercises the same failure
     // path as a pack that produced nothing matching the declared name.

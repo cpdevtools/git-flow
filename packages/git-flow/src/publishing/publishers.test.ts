@@ -10,6 +10,15 @@ describe('isTransientRegistryError', () => {
     expect(isTransientRegistryError(output)).toBe(true);
   });
 
+  it('treats a GHCR mid-push BLOB_UNKNOWN as transient', () => {
+    // Observed on shop-in-shop's first image publish: several layers Pushed /
+    // "Layer already exists", then one blob fails with a bare "unknown blob".
+    const output =
+      'The push refers to repository [ghcr.io/idealsupply/webservice-shop-in-shop]\n' +
+      '5f432f4a79d4: Pushed\n5f70bf18a086: Layer already exists\nunknown blob';
+    expect(isTransientRegistryError(output)).toBe(true);
+  });
+
   it.each([
     'toomanyrequests: too many requests',
     'received unexpected HTTP status code 429',
