@@ -84,6 +84,12 @@ const TRANSIENT_PUSH_PATTERNS: RegExp[] = [
   /unexpected eof/i,
   /tls handshake timeout/i,
   /temporarily unavailable/i,
+  // ghcr intermittently fails a layer upload/cross-repo mount mid-push with
+  // BLOB_UNKNOWN ("unknown blob" / "blob unknown to registry") while other
+  // layers of the same push succeed; the re-push skips the uploaded layers and
+  // lands the missing one (observed on shop-in-shop's first image publish).
+  /unknown blob/i,
+  /blob unknown/i,
 ];
 
 /**
