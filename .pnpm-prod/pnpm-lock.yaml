@@ -84,8 +84,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.1
+        version: 1.0.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -123,8 +123,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.1
+        version: 1.0.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -135,8 +135,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.1
+        version: 1.0.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -150,8 +150,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.1
+        version: 1.0.1
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -648,8 +648,8 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@cpdevtools/ts-dev-utilities@1.0.0':
-    resolution: {integrity: sha512-KbjifRnuk6fk3Be7T/m4T++ilIc9SAzb9Tw5CHw7Ctg9FQ56KzoEc149x/76dC3IYtT/xPezZtZGFDu0QtBl+g==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/1.0.0/a34ee992edb47a18855cb965514089f1b4387d59}
+  '@cpdevtools/ts-dev-utilities@1.0.1':
+    resolution: {integrity: sha512-T41l6UHGW30jFZsL09UnJvQNmPyp7nM6TgicBgTi3PoIl3p8FetF42HltqP7RPkkKYyK/aRK+w6fhZyIpegYEw==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/1.0.1/b7dc21dfe3441c51437316089c4e6311d67adf27}
     engines: {node: '>=24'}
 
   '@cspotcode/source-map-support@0.8.1':
@@ -4999,7 +4999,7 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@cpdevtools/ts-dev-utilities@1.0.0':
+  '@cpdevtools/ts-dev-utilities@1.0.1':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
