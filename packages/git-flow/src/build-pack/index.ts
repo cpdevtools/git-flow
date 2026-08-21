@@ -42,6 +42,7 @@ export {
   updateDraftReleaseBody,
   findOrCreateDraftRelease,
   isArtifactUploaded,
+  findReleaseAssetId,
   uploadArtifact,
   getDraftReleaseMetadata,
   deleteDraftRelease,
