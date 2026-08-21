@@ -275,6 +275,19 @@ export async function isArtifactUploaded(
   releaseId: number,
   assetName: string,
 ): Promise<boolean> {
+  return (await findReleaseAssetId(githubToken, owner, repo, releaseId, assetName)) !== undefined;
+}
+
+/**
+ * Find the id of a release asset by name, or undefined if absent.
+ */
+export async function findReleaseAssetId(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  releaseId: number,
+  assetName: string,
+): Promise<number | undefined> {
   const octokit = getOctokit(githubToken);
 
   try {
@@ -284,10 +297,10 @@ export async function isArtifactUploaded(
       release_id: releaseId,
     });
 
-    return assets.some((asset) => asset.name === assetName);
+    return assets.find((asset) => asset.name === assetName)?.id;
   } catch (error) {
     console.error(`Error checking for asset ${assetName}:`, error);
-    return false;
+    return undefined;
   }
 }
 
@@ -308,12 +321,16 @@ export async function uploadArtifact(
   // dir); assetName overrides the name the asset is published under on the release.
   const fileName = assetName ?? basename(filePath);
 
-  // Check if already uploaded
-  const alreadyExists = await isArtifactUploaded(githubToken, owner, repo, releaseId, fileName);
-
-  if (alreadyExists) {
-    console.log(`  ⊘ ${fileName} already uploaded, skipping`);
-    return;
+  // Replace, never skip: on a resumed draft the artifacts were REBUILT this
+  // run (builds are not bit-reproducible — a docker image gets a new id), so a
+  // leftover asset from a previous attempt no longer matches the descriptor
+  // this run writes into the release body. Skipping here is how a draft ends
+  // up with a fresh digest pointing at stale bytes, which publish then fails
+  // with "Docker image digest mismatch".
+  const staleAssetId = await findReleaseAssetId(githubToken, owner, repo, releaseId, fileName);
+  if (staleAssetId !== undefined) {
+    console.log(`  ♻️  ${fileName} exists from a previous attempt — replacing`);
+    await octokit.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: staleAssetId });
   }
 
   // Read file content
