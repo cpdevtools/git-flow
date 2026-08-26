@@ -57,7 +57,11 @@ runs:
 
     - name: Configure registry auth
       shell: bash
-      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      # verifyDepsBeforeRun=false so per-project `pnpm run` doesn't each re-run a
+      # full install over the shared store in parallel and race. Matches actions/build-pack.
+      run: |
+        pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+        pnpm config set "verifyDepsBeforeRun" "false"
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 

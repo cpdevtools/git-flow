@@ -62,7 +62,15 @@ runs:
 
     - name: Configure registry auth
       shell: bash
-      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      # verifyDepsBeforeRun=false: its default is "install", so every workspace
+      # project's `pnpm run` otherwise shells a full `pnpm install` before its
+      # script. The setup step already installs once from .pnpm-prod; with
+      # projects running in parallel those redundant per-project installs race on
+      # the shared store and fail the job intermittently (pnpm `.bin` mkdir
+      # ENOENT, dotnet first-run NuGet-Migrations EEXIST). Matches actions/build-pack.
+      run: |
+        pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+        pnpm config set "verifyDepsBeforeRun" "false"
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 
