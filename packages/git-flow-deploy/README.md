@@ -39,7 +39,7 @@ import { parseDeployYml, type DeployManifest, type SharedStorageSpec } from '@cp
 ```
 
 Required: `name`, `version`, `repo`, `releaseId` (positive int), `deployCommand`.
-Optional: `stack`, `service`, `swarmService`, `method` (`node|compose|swarm`), `slot`,
+Optional: `stack`, `service`, `swarmService`, `method` (`node|compose|swarm|swarm-job`), `slot`,
 `versioning` (`singleton|major`), `teardownCommand`, `sharedStorage`, `seedStorage`.
 
 ### Bundle and execution
@@ -81,6 +81,7 @@ everywhere, or the directory a bundle mounts will not be the directory the gatew
 
 ```ts
 import { stackRollout, serviceRollout, serviceReplicas, waitForSwarmConvergence,
+         waitForSwarmJobCompletion, serviceJobStatus,
          rolloutStateOf, aggregateRollout, type SwarmRolloutState } from '@cpdevtools/git-flow-deploy';
 ```
 
@@ -90,6 +91,16 @@ to be observed separately.
 > **`converged` is not success.** It says the rollout finished, not that it installed what you asked
 > for. Only the running version proves that. Treat `rolled-back` as a definite failure, `converged`
 > and everything else as *not yet a decision*.
+
+**One-shot jobs (`method: swarm-job`).** A swarm job (`deploy.mode: global-job` / `replicated-job`)
+runs its tasks to completion and exits — it never reaches a running steady state, so
+`waitForSwarmConvergence` would sit until its timeout and false-report FAILURE. `waitForSwarmJobCompletion`
+polls the service's `.ServiceStatus` (`{ desired, running, completed }`) instead and returns
+`completed` when `running == 0 && completed >= desired`, `failed` when the tasks settle unmet and
+stop retrying, or `timed-out`. It is two-phase: a start-grace window first waits for the forced
+iteration to register, so a previous deploy's already-complete counts are never misread as this
+run's success. The CLI (`run.ts`) dispatches to it when `method === 'swarm-job'`; `completed` → the
+deploy succeeds, `failed`/`timed-out` → exit 1.
 
 ### Repo rules
 

@@ -275,3 +275,170 @@ export async function waitForSwarmConvergence(
     await sleep(intervalMs);
   }
 }
+
+// ── Swarm one-shot jobs (deploy.mode: global-job / replicated-job) ──────────
+//
+// A job's tasks run to completion and exit; the service never sits at "N
+// running healthy" and has no rolling UpdateStatus, so waitForSwarmConvergence
+// never resolves for one. Swarm exposes per-iteration progress through
+// `.ServiceStatus` ({DesiredTasks, RunningTasks, CompletedTasks}, Docker API
+// >= 1.41), which is the signal this waiter uses.
+
+/** `docker service inspect .ServiceStatus` — desired/running/completed task counts. */
+export interface SwarmJobStatus {
+  desired: number;
+  running: number;
+  completed: number;
+}
+
+export type SwarmJobState = 'completed' | 'failed' | 'timed-out';
+
+export interface JobCompletionResult {
+  service: string;
+  state: SwarmJobState;
+  /** The last observed status counts, for the failure/timeout message. */
+  status?: SwarmJobStatus;
+  timedOut: boolean;
+}
+
+/**
+ * Read a job service's task counts from `.ServiceStatus`. Returns null when the
+ * field is absent (older Docker, or the service was never a job) so callers can
+ * distinguish "no data" from a genuine zero.
+ */
+export function serviceJobStatus(
+  service: string,
+  run: DockerRunner = defaultRunner,
+): SwarmJobStatus | null {
+  if (!SWARM_NAME.test(service)) return null;
+  const res = run(['service', 'inspect', service, '--format', '{{json .ServiceStatus}}']);
+  if (res.status !== 0) return null;
+  let raw: { DesiredTasks?: number; RunningTasks?: number; CompletedTasks?: number } | null;
+  try {
+    raw = JSON.parse(res.stdout.trim() || 'null') as typeof raw;
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  return {
+    desired: raw.DesiredTasks ?? 0,
+    running: raw.RunningTasks ?? 0,
+    completed: raw.CompletedTasks ?? 0,
+  };
+}
+
+export interface JobWaitOptions {
+  /** Give up after this long. Default 10 minutes. */
+  timeoutMs?: number;
+  /** Time between polls. Default 5 seconds. */
+  intervalMs?: number;
+  /**
+   * How long to wait for the run to be observed active (RunningTasks > 0, or
+   * desired-but-not-yet-complete) before Phase B. Guards against reading a
+   * PREVIOUS iteration's already-complete counts as this run's success right
+   * after the deploy forces a new iteration. Default 30 seconds.
+   */
+  startGraceMs?: number;
+  /**
+   * Consecutive polls of `running == 0 && completed < desired` before the job
+   * is declared failed. A task retry momentarily shows 0 running; requiring a
+   * few stable polls lets an in-flight retry re-register instead of a false
+   * failure. Jobs with `restart_policy: condition: none` fail after this many
+   * polls. Default 3.
+   */
+  failStabilityPolls?: number;
+  /** Progress sink, one line per poll. */
+  onLine?: (line: string) => void;
+  /** Injected clock, for tests. */
+  now?: () => number;
+  /** Injected delay, for tests. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const DEFAULT_JOB_TIMEOUT_MS = 600_000;
+const DEFAULT_JOB_INTERVAL_MS = 5_000;
+const DEFAULT_JOB_START_GRACE_MS = 30_000;
+const DEFAULT_JOB_FAIL_STABILITY_POLLS = 3;
+
+/**
+ * Block until a swarm job's current iteration completes, fails, or the deadline
+ * passes.
+ *
+ * Verdict is driven entirely by `.ServiceStatus` (iteration-scoped, so a prior
+ * run's tasks never leak in):
+ *   completed → running == 0 && completed >= desired (desired > 0)
+ *   failed    → running == 0 && completed < desired, stable for
+ *               failStabilityPolls consecutive polls (swarm settled with unmet
+ *               completions and is not actively retrying)
+ * A live task (running > 0) resets the failure counter, so retries are waited
+ * through rather than misread as failure.
+ */
+export async function waitForSwarmJobCompletion(
+  service: string,
+  options: JobWaitOptions = {},
+  run: DockerRunner = defaultRunner,
+): Promise<JobCompletionResult> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_JOB_TIMEOUT_MS;
+  const intervalMs = options.intervalMs ?? DEFAULT_JOB_INTERVAL_MS;
+  const startGraceMs = options.startGraceMs ?? DEFAULT_JOB_START_GRACE_MS;
+  const failStabilityPolls = options.failStabilityPolls ?? DEFAULT_JOB_FAIL_STABILITY_POLLS;
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const onLine = options.onLine ?? ((): void => {});
+
+  const start = now();
+  const deadline = start + timeoutMs;
+  const graceDeadline = start + startGraceMs;
+  let started = false;
+  let unmetStreak = 0;
+  let last: SwarmJobStatus | undefined;
+
+  for (;;) {
+    const status = serviceJobStatus(service, run);
+    if (status) {
+      last = status;
+      const active = status.running > 0 || (status.desired > 0 && status.completed < status.desired);
+
+      // Phase A: wait for the run to register before trusting completion counts.
+      if (!started) {
+        if (active) started = true;
+        else if (status.desired > 0 && status.completed >= status.desired && now() < graceDeadline) {
+          // Counts already complete but the forced iteration may not have started
+          // yet — hold until it registers or the grace window closes.
+          onLine(`  … ${service}: waiting for job run to start`);
+          if (now() >= deadline) return { service, state: 'timed-out', status, timedOut: true };
+          await sleep(intervalMs);
+          continue;
+        } else {
+          started = true; // grace elapsed; treat current counts as this run.
+        }
+      }
+
+      // Phase B: terminal checks.
+      if (status.desired > 0 && status.running === 0 && status.completed >= status.desired) {
+        onLine(`  ✓ ${service}: job complete (${status.completed}/${status.desired})`);
+        return { service, state: 'completed', status, timedOut: false };
+      }
+      if (status.desired > 0 && status.running === 0 && status.completed < status.desired) {
+        unmetStreak += 1;
+        if (unmetStreak >= failStabilityPolls) {
+          onLine(
+            `  ✗ ${service}: job failed (${status.completed}/${status.desired} complete, none running)`,
+          );
+          return { service, state: 'failed', status, timedOut: false };
+        }
+      } else {
+        unmetStreak = 0;
+      }
+
+      onLine(`  … ${service}: job ${status.completed}/${status.desired} complete, ${status.running} running`);
+    } else {
+      onLine(`  … ${service}: waiting for job status`);
+    }
+
+    if (now() >= deadline) {
+      return { service, state: 'timed-out', status: last, timedOut: true };
+    }
+    await sleep(intervalMs);
+  }
+}

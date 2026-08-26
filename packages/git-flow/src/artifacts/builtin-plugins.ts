@@ -24,7 +24,7 @@ import {
   type NpmRegistry,
   type NugetRegistry,
 } from '../publishing/index.js';
-import { dockerCompose, dockerSwarm } from './deploy-methods.js';
+import { dockerCompose, dockerSwarm, dockerSwarmJob } from './deploy-methods.js';
 import type { GitFlowPlugin } from './plugin.js';
 import type { ArtifactType } from './types.js';
 
@@ -301,5 +301,6 @@ export const firstPartyPlugin: GitFlowPlugin = {
     // write deploy.yml, and never needed an image to exist.
     { artifactType: 'docker-service', method: 'compose', handler: dockerCompose },
     { artifactType: 'docker-service', method: 'swarm', handler: dockerSwarm },
+    { artifactType: 'docker-service', method: 'swarm-job', handler: dockerSwarmJob },
   ],
 };
