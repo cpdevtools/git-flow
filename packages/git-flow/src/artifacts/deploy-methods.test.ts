@@ -10,6 +10,7 @@ import './index.js';
 import {
   getDeployMethod,
   SWARM_DEPLOY_COMMAND,
+  SWARM_JOB_DEPLOY_COMMAND,
   type DeployMethodContext,
 } from './deploy-methods.js';
 
@@ -129,6 +130,47 @@ describe('docker.swarm generateDeployYml', () => {
   it('pins the image to the release version via .env', async () => {
     await getDeployMethod('docker-image', 'swarm')!.generateDeployYml(ctx('swarm'));
     expect(await readEnv()).toBe('DEPLOY_IMAGE_TAG=2.3.5\n');
+  });
+});
+
+describe('docker.swarm-job generateDeployYml', () => {
+  it('emits method: swarm-job and the one-shot job deployCommand', async () => {
+    await getDeployMethod('docker-image', 'swarm-job')!.generateDeployYml(ctx('swarm-job'));
+    const m = await readDeployYml();
+    expect(m.method).toBe('swarm-job');
+    expect(m.deployCommand).toBe(SWARM_JOB_DEPLOY_COMMAND);
+  });
+
+  it('bakes the job service name so the deploy side can poll .ServiceStatus', async () => {
+    await getDeployMethod('docker-image', 'swarm-job')!.generateDeployYml(ctx('swarm-job', 'major'));
+    const m = await readDeployYml();
+    expect(m.swarmService).toBe('@{ STACK_SERVICE_ID }');
+  });
+
+  it('re-runs exactly one fresh iteration on an existing service, none on first create', () => {
+    // First create: stack deploy runs the job once; no forced update.
+    expect(SWARM_JOB_DEPLOY_COMMAND).toContain(
+      'if docker service inspect @{ STACK_SERVICE_ID } >/dev/null 2>&1; then PRE=1; else PRE=0; fi',
+    );
+    // Existing service: force exactly one new iteration after reconciling the spec.
+    expect(SWARM_JOB_DEPLOY_COMMAND).toContain(
+      '[ "$PRE" = 1 ] && docker service update --force --detach @{ STACK_SERVICE_ID } || true',
+    );
+    expect(SWARM_JOB_DEPLOY_COMMAND).toContain(
+      'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK }',
+    );
+  });
+
+  it('shared stack: tears down only this job service', async () => {
+    await getDeployMethod('docker-image', 'swarm-job')!.generateDeployYml(
+      ctx('swarm-job', 'major', 'webservice'),
+    );
+    const m = await readDeployYml();
+    expect(m.teardownCommand).toBe('docker service rm @{ STACK_SERVICE_ID }');
+  });
+
+  it('is registered as a docker-image deploy method', () => {
+    expect(getDeployMethod('docker-image', 'swarm-job')).toBeTruthy();
   });
 });
 

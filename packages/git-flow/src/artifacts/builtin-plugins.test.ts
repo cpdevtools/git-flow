@@ -69,8 +69,10 @@ describe('first-party types are available without installing anything', () => {
     ).toEqual([
       'docker-image.compose',
       'docker-image.swarm',
+      'docker-image.swarm-job',
       'docker-service.compose',
       'docker-service.swarm',
+      'docker-service.swarm-job',
       'npm.node',
     ]);
   });

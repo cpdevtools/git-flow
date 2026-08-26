@@ -10,6 +10,7 @@ import {
   prepareSeedStorage,
   prepareStorageMigrations,
   waitForSwarmConvergence,
+  waitForSwarmJobCompletion,
 } from '@cpdevtools/git-flow-deploy';
 import { readSecret } from '../secrets.js';
 
@@ -109,6 +110,31 @@ export default class Run extends Command {
       } else {
         this.log(
           `\u2717 ${manifest.swarmService} rolled back${result.message ? `: ${result.message}` : ''}.`,
+        );
+        this.exit(1);
+      }
+    } else if (exitCode === 0 && manifest.method === 'swarm-job' && manifest.swarmService) {
+      // A one-shot job runs its tasks to completion and exits \u2014 it never
+      // "converges" to a running steady state. Wait for the current iteration's
+      // tasks to complete (exit 0) instead, so a failed job fails the deploy.
+      this.log(`\u25b8 Waiting for ${manifest.swarmService} job to complete\u2026`);
+      const result = await waitForSwarmJobCompletion(manifest.swarmService, {
+        onLine: (line) => {
+          process.stdout.write(line + '\n');
+        },
+      });
+      if (result.state === 'completed') {
+        this.log(`\u2713 ${manifest.swarmService} job completed (v${manifest.version}).`);
+      } else if (result.timedOut) {
+        this.log(
+          `\u2717 ${manifest.swarmService} job did not complete within the timeout ` +
+            `(last: ${result.status ? `${result.status.completed}/${result.status.desired} complete` : 'no status'}).`,
+        );
+        this.exit(1);
+      } else {
+        this.log(
+          `\u2717 ${manifest.swarmService} job failed` +
+            `${result.status ? ` (${result.status.completed}/${result.status.desired} complete)` : ''}.`,
         );
         this.exit(1);
       }

@@ -318,6 +318,60 @@ export const dockerSwarm: DeployMethodHandler = {
   },
 };
 
+/**
+ * Deploy command for a one-shot swarm job (`deploy.mode: global-job` /
+ * `replicated-job`). Same as SWARM_DEPLOY_COMMAND, but re-runs the job on every
+ * deploy with no double-run on first create:
+ *   - a brand-new service: `docker stack deploy` starts the job once;
+ *   - an existing service: `docker stack deploy` reconciles the spec (which
+ *     alone does NOT re-run a completed job), then `docker service update
+ *     --force` starts exactly one fresh iteration.
+ * `--detach` returns immediately; the deploy side waits for the run to complete
+ * (waitForSwarmJobCompletion), so a failed job fails the deploy.
+ */
+export const SWARM_JOB_DEPLOY_COMMAND = [
+  'set -a && . ./.env && set +a',
+  '&& echo "$GITHUB_TOKEN" | docker login ghcr.io -u token --password-stdin 2>/dev/null;',
+  'STACK_FILES="-c stack.yml";',
+  `if [ -n "$${SWARM_STACK_ENV_VAR}" ]; then`,
+  `[ -f "stack.$${SWARM_STACK_ENV_VAR}.yml" ] ||`,
+  `{ echo "deploy: stack.$${SWARM_STACK_ENV_VAR}.yml not found in bundle" >&2; exit 1; };`,
+  `STACK_FILES="$STACK_FILES -c stack.$${SWARM_STACK_ENV_VAR}.yml";`,
+  'fi;',
+  'if docker service inspect @{ STACK_SERVICE_ID } >/dev/null 2>&1; then PRE=1; else PRE=0; fi;',
+  'docker stack deploy --with-registry-auth $STACK_FILES @{ STACK };',
+  '[ "$PRE" = 1 ] && docker service update --force --detach @{ STACK_SERVICE_ID } || true',
+].join(' ');
+
+/**
+ * docker.swarm-job — a dedicated one-shot job bundle. Identical packing to
+ * dockerSwarm (stack.yml + overlays), but the deploy waits for the job's tasks
+ * to run to completion (exit 0 = success, any task fails = failure) instead of
+ * for a long-running rolling update to converge.
+ */
+export const dockerSwarmJob: DeployMethodHandler = {
+  supportsParallelMajors: true,
+  copyFiles: dockerSwarm.copyFiles,
+  async generateDeployYml({ deployOutputDir, projectName, version, versioning, stack }) {
+    await upsertDeployEnv(deployOutputDir, { DEPLOY_IMAGE_TAG: version });
+    await writeFile(
+      join(deployOutputDir, 'deploy.yml'),
+      stringify({
+        method: 'swarm-job',
+        slot: deploymentSlot(projectName, version, versioning),
+        versioning: versioning ?? 'singleton',
+        deployCommand: SWARM_JOB_DEPLOY_COMMAND,
+        // The docker service name (`docker service ls`), rendered at pack time.
+        // The deploy side polls this service's .ServiceStatus for job completion.
+        swarmService: `@{ STACK_SERVICE_ID }`,
+        teardownCommand: stack
+          ? `docker service rm @{ STACK_SERVICE_ID }`
+          : `docker stack rm @{ STACK }`,
+      }),
+    );
+  },
+};
+
 // ── npm.node ───────────────────────────────────────────────────────────────
 
 /**
@@ -405,5 +459,6 @@ export const builtinDeployMethods: Array<{
 }> = [
   { artifactType: 'docker-image', method: 'compose', handler: dockerCompose },
   { artifactType: 'docker-image', method: 'swarm', handler: dockerSwarm },
+  { artifactType: 'docker-image', method: 'swarm-job', handler: dockerSwarmJob },
   { artifactType: 'npm', method: 'node', handler: npmNode },
 ];

@@ -24,12 +24,18 @@ export type {
   ConvergenceResult,
   ConvergenceWaitOptions,
   DockerRunner,
+  SwarmJobStatus,
+  SwarmJobState,
+  JobCompletionResult,
+  JobWaitOptions,
 } from './swarm-rollout.js';
 export {
   stackRollout,
   serviceRollout,
   serviceReplicas,
   waitForSwarmConvergence,
+  waitForSwarmJobCompletion,
+  serviceJobStatus,
   rolloutStateOf,
   aggregateRollout,
 } from './swarm-rollout.js';
