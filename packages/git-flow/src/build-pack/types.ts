@@ -108,6 +108,8 @@ export interface BuildPackResult {
   skipped: string[];
   /** Projects that failed */
   failed: ExecutionResult[];
+  /** Projects cancelled by fail-fast because a sibling or dependency failed (never started or aborted) */
+  cancelled: string[];
   /** Draft releases created/updated during this run */
   releases: BuildPackRelease[];
 }

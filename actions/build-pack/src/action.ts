@@ -110,6 +110,7 @@ projects:
         ['Uploaded', result.uploaded.length.toString()],
         ['Skipped', result.skipped.length.toString()],
         ['Failed', result.failed.length.toString()],
+        ['Cancelled (fail-fast)', result.cancelled.length.toString()],
       ])
       .addRaw(`<p><strong>Triggered by:</strong> ${prLink}</p>\n`, true);
 
@@ -132,6 +133,14 @@ projects:
           true,
         );
       }
+    }
+
+    if (result.cancelled.length > 0) {
+      core.summary.addHeading('Cancelled Projects', 3);
+      core.summary.addRaw(
+        `<p>Not started or aborted by fail-fast after another project failed: ${result.cancelled.map((p) => `<code>${p}</code>`).join(', ')}</p>\n`,
+        true,
+      );
     }
 
     await core.summary.write();

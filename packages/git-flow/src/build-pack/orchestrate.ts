@@ -104,6 +104,7 @@ export async function runBuildPack(
       uploaded: [],
       skipped: projectsToSkip.map((p) => p.name),
       failed: [],
+      cancelled: [],
       releases: [],
     };
   }
@@ -209,28 +210,28 @@ export async function runBuildPack(
       return { name, version: config.version, url: releaseUrlMap.get(name)! };
     });
 
-  const failedResults: ExecutionResult[] = [
-    ...summary.failed.map((t) => ({
-      project: t.project,
-      success: false,
-      error: t.output || 'Build failed',
-    })),
-    ...summary.cancelled.map((t) => ({
-      project: t.project,
-      success: false,
-      error: 'Cancelled due to dependency failure',
-    })),
-  ];
+  // Only genuine failures go in `failed`; siblings/dependents the scheduler
+  // cancelled via fail-fast are reported separately so one real error does not
+  // read as N failures.
+  const failedResults: ExecutionResult[] = summary.failed.map((t) => ({
+    project: t.project,
+    success: false,
+    error: t.output || 'Build failed',
+  }));
+  const cancelledProjects = summary.cancelled.map((t) => t.project);
 
   const totalSuccess = builtProjects.length;
 
   // Final summary
   console.log(`\n${'='.repeat(80)}`);
-  if (failedResults.length === 0) {
+  if (failedResults.length === 0 && cancelledProjects.length === 0) {
     console.log(`✅ Phase 2 Complete: ${totalSuccess} projects succeeded`);
   } else {
+    const cancelledNote = cancelledProjects.length > 0
+      ? `, ${cancelledProjects.length} cancelled (fail-fast)`
+      : '';
     console.log(
-      `⚠️  Phase 2 Completed with errors: ${totalSuccess} succeeded, ${failedResults.length} failed`,
+      `⚠️  Phase 2 Completed with errors: ${totalSuccess} succeeded, ${failedResults.length} failed${cancelledNote}`,
     );
   }
   console.log(`${'='.repeat(80)}\n`);
@@ -241,6 +242,7 @@ export async function runBuildPack(
     uploaded: uploadedProjects,
     skipped: projectsToSkip.map((p) => p.name),
     failed: failedResults,
+    cancelled: cancelledProjects,
     releases,
   };
 }
