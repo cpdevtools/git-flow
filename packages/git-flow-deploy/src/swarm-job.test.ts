@@ -17,7 +17,10 @@ const ok = (stdout: string): DockerResult => ({ status: 0, stdout, stderr: '' })
  * the last entry once the queue is drained. `null` simulates a service inspect
  * failure (no status yet).
  */
-function statusSequence(statuses: Array<string | null>): { run: DockerRunner; calls: () => number } {
+function statusSequence(statuses: Array<string | null>): {
+  run: DockerRunner;
+  calls: () => number;
+} {
   let i = 0;
   const run: DockerRunner = () => {
     const s = statuses[Math.min(i, statuses.length - 1)];
@@ -49,7 +52,9 @@ describe('serviceJobStatus', () => {
   });
 
   it('returns null on an inspect failure', () => {
-    expect(serviceJobStatus('batch', () => ({ status: 1, stdout: '', stderr: 'no such service' }))).toBeNull();
+    expect(
+      serviceJobStatus('batch', () => ({ status: 1, stdout: '', stderr: 'no such service' })),
+    ).toBeNull();
   });
 
   it('rejects an invalid service name without shelling out', () => {
@@ -72,22 +77,14 @@ describe('waitForSwarmJobCompletion', () => {
   });
 
   it('completes a replicated-job once all replicas finish', async () => {
-    const { run } = statusSequence([
-      svcStatus(3, 3, 0),
-      svcStatus(3, 1, 2),
-      svcStatus(3, 0, 3),
-    ]);
+    const { run } = statusSequence([svcStatus(3, 3, 0), svcStatus(3, 1, 2), svcStatus(3, 0, 3)]);
     const result = await waitForSwarmJobCompletion('migrate', { ...fakeClock() }, run);
     expect(result.state).toBe('completed');
   });
 
   it('fails when tasks settle unmet for the stability window', async () => {
     // active → then running 0 with completed < desired, stable for 2 polls.
-    const { run } = statusSequence([
-      svcStatus(1, 1, 0),
-      svcStatus(1, 0, 0),
-      svcStatus(1, 0, 0),
-    ]);
+    const { run } = statusSequence([svcStatus(1, 1, 0), svcStatus(1, 0, 0), svcStatus(1, 0, 0)]);
     const result = await waitForSwarmJobCompletion(
       'batch',
       { ...fakeClock(), failStabilityPolls: 2 },
@@ -123,7 +120,7 @@ describe('waitForSwarmJobCompletion', () => {
     expect(result.timedOut).toBe(true);
   });
 
-  it('does not mistake a prior iteration\'s completed counts for this run', async () => {
+  it("does not mistake a prior iteration's completed counts for this run", async () => {
     // Leftover complete counts before the forced iteration registers, then the
     // new run starts and completes. Must NOT return on the first poll.
     const { run, calls } = statusSequence([

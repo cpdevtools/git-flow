@@ -48,7 +48,15 @@ runs:
     # publish and fails with 'Unknown artifact type'.
     - name: Install workspace dependencies
       shell: bash
-      run: pnpm install --lockfile-dir .pnpm-prod
+      run: |
+        # .pnpm-prod presence IS the per-repo migration state: repos still on the
+        # dual-lockfile layout install from it; converted repos (single root
+        # lockfile, dev-link overlay for local packages) do a frozen root install.
+        if [ -f .pnpm-prod/pnpm-lock.yaml ]; then
+          pnpm install --lockfile-dir .pnpm-prod
+        else
+          pnpm install --frozen-lockfile
+        fi
       env:
         HUSKY: '0'
         GITHUB_TOKEN: ${{ inputs.token }}

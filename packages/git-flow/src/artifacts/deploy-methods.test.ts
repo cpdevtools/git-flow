@@ -142,7 +142,9 @@ describe('docker.swarm-job generateDeployYml', () => {
   });
 
   it('bakes the job service name so the deploy side can poll .ServiceStatus', async () => {
-    await getDeployMethod('docker-image', 'swarm-job')!.generateDeployYml(ctx('swarm-job', 'major'));
+    await getDeployMethod('docker-image', 'swarm-job')!.generateDeployYml(
+      ctx('swarm-job', 'major'),
+    );
     const m = await readDeployYml();
     expect(m.swarmService).toBe('@{ STACK_SERVICE_ID }');
   });

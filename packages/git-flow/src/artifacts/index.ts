@@ -414,4 +414,3 @@ export {
   listArtifactTypeProviders,
   providerOf,
 } from './registry.js';
-

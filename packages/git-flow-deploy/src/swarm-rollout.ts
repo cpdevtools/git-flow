@@ -397,12 +397,17 @@ export async function waitForSwarmJobCompletion(
     const status = serviceJobStatus(service, run);
     if (status) {
       last = status;
-      const active = status.running > 0 || (status.desired > 0 && status.completed < status.desired);
+      const active =
+        status.running > 0 || (status.desired > 0 && status.completed < status.desired);
 
       // Phase A: wait for the run to register before trusting completion counts.
       if (!started) {
         if (active) started = true;
-        else if (status.desired > 0 && status.completed >= status.desired && now() < graceDeadline) {
+        else if (
+          status.desired > 0 &&
+          status.completed >= status.desired &&
+          now() < graceDeadline
+        ) {
           // Counts already complete but the forced iteration may not have started
           // yet — hold until it registers or the grace window closes.
           onLine(`  … ${service}: waiting for job run to start`);
@@ -431,7 +436,9 @@ export async function waitForSwarmJobCompletion(
         unmetStreak = 0;
       }
 
-      onLine(`  … ${service}: job ${status.completed}/${status.desired} complete, ${status.running} running`);
+      onLine(
+        `  … ${service}: job ${status.completed}/${status.desired} complete, ${status.running} running`,
+      );
     } else {
       onLine(`  … ${service}: waiting for job status`);
     }

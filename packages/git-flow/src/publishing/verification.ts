@@ -130,18 +130,15 @@ export async function isNugetPublished(
     const index = (await indexResponse.json()) as {
       resources?: { '@id': string; '@type': string }[];
     };
-    const baseResource = index.resources?.find((r) =>
-      r['@type'].startsWith('PackageBaseAddress/'),
-    );
+    const baseResource = index.resources?.find((r) => r['@type'].startsWith('PackageBaseAddress/'));
     if (!baseResource) {
       throw new Error('NuGet service index has no PackageBaseAddress resource');
     }
 
     const base = baseResource['@id'].replace(/\/$/, '');
-    const versionsResponse = await fetch(
-      `${base}/${packageId.toLowerCase()}/index.json`,
-      { headers },
-    );
+    const versionsResponse = await fetch(`${base}/${packageId.toLowerCase()}/index.json`, {
+      headers,
+    });
 
     if (versionsResponse.status === 404) {
       // The package has never been published — expected before a first publish.

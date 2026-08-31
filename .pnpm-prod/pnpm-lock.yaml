@@ -84,8 +84,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/git-flow
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.1.1
+        version: 1.1.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -123,8 +123,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.1.1
+        version: 1.1.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -135,8 +135,8 @@ importers:
         specifier: ^1.11.1
         version: 1.11.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.1.1
+        version: 1.1.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4
@@ -150,8 +150,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
       '@cpdevtools/ts-dev-utilities':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.1.1
+        version: 1.1.1
       fast-glob:
         specifier: ^3.3.2
         version: 3.3.3
@@ -648,8 +648,8 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
-  '@cpdevtools/ts-dev-utilities@1.0.1':
-    resolution: {integrity: sha512-T41l6UHGW30jFZsL09UnJvQNmPyp7nM6TgicBgTi3PoIl3p8FetF42HltqP7RPkkKYyK/aRK+w6fhZyIpegYEw==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/1.0.1/b7dc21dfe3441c51437316089c4e6311d67adf27}
+  '@cpdevtools/ts-dev-utilities@1.1.1':
+    resolution: {integrity: sha512-zewIlpgqufNzvjnsAPp7iiaOOdlznVGiG340k4IRFqgP0nNgYkc7R4fGdvVEvAQ9G2prrqA8bTPiXGo4xI0tkQ==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/1.1.1/037f3747a3b2b6621c6315d9b2f22f933304a4b5}
     engines: {node: '>=24'}
 
   '@cspotcode/source-map-support@0.8.1':
@@ -2862,6 +2862,7 @@ packages:
   eslint@9.39.4:
     resolution: {integrity: sha512-XoMjdBOwe/esVgEvLmNsD3IRHkm7fbKIUGvrleloJXUZgDHig2IPWNniv+GwjyJXzuNqVjlr5+4yVUZjycJwfQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -4999,7 +5000,7 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
-  '@cpdevtools/ts-dev-utilities@1.0.1':
+  '@cpdevtools/ts-dev-utilities@1.1.1':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
