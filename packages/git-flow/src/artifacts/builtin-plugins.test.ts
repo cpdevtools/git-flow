@@ -179,9 +179,7 @@ describe('ng-lib', { timeout: SUBPROCESS_TIMEOUT }, () => {
       directory: 'nope',
     } as never;
 
-    await expect(getArtifactType('ng-lib').pack(artifact, ctx())).rejects.toThrow(
-      /does not exist/,
-    );
+    await expect(getArtifactType('ng-lib').pack(artifact, ctx())).rejects.toThrow(/does not exist/);
   });
 
   it('says what to fix when the build output is missing', async () => {

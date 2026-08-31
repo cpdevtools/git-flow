@@ -31,7 +31,8 @@ export async function applyPlugin(
 
   if (typeof plugin.register === 'function') {
     const api: PluginApi = {
-      registerArtifactType: (type, handler) => registerArtifactType(type, handler, provider, anchor),
+      registerArtifactType: (type, handler) =>
+        registerArtifactType(type, handler, provider, anchor),
       registerDeployMethod: (artifactType, method, handler) =>
         registerDeployMethod(artifactType, method, handler, provider, anchor),
     };

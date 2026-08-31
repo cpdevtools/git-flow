@@ -54,9 +54,7 @@ export function draftBodyConsumesVersion(body: string): boolean {
   const hasArtifacts = /artifacts:/i.test(yaml);
 
   if (hasArtifacts && !hasPublishedField) {
-    console.log(
-      `[versionExists] Found artifacts without published field, assuming version taken`,
-    );
+    console.log(`[versionExists] Found artifacts without published field, assuming version taken`);
     return true;
   }
 

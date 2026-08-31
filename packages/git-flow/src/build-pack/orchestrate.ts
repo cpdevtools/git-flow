@@ -227,9 +227,8 @@ export async function runBuildPack(
   if (failedResults.length === 0 && cancelledProjects.length === 0) {
     console.log(`✅ Phase 2 Complete: ${totalSuccess} projects succeeded`);
   } else {
-    const cancelledNote = cancelledProjects.length > 0
-      ? `, ${cancelledProjects.length} cancelled (fail-fast)`
-      : '';
+    const cancelledNote =
+      cancelledProjects.length > 0 ? `, ${cancelledProjects.length} cancelled (fail-fast)` : '';
     console.log(
       `⚠️  Phase 2 Completed with errors: ${totalSuccess} succeeded, ${failedResults.length} failed${cancelledNote}`,
     );

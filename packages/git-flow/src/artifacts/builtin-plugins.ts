@@ -107,8 +107,9 @@ const dotnetLib: ArtifactType<DotnetLibArtifact> = {
       (f) => f.endsWith('.nupkg') && !f.endsWith('.snupkg'),
     );
     const match =
-      produced.find((f) => f.toLowerCase() === `${artifact.name}.${ctx.version}.nupkg`.toLowerCase()) ??
-      produced.find((f) => f.toLowerCase().startsWith(`${artifact.name.toLowerCase()}.`));
+      produced.find(
+        (f) => f.toLowerCase() === `${artifact.name}.${ctx.version}.nupkg`.toLowerCase(),
+      ) ?? produced.find((f) => f.toLowerCase().startsWith(`${artifact.name.toLowerCase()}.`));
 
     if (!match) {
       throw new Error(
