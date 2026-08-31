@@ -64,7 +64,7 @@ runs:
       shell: bash
       # verifyDepsBeforeRun=false: its default is "install", so every workspace
       # project's `pnpm run` otherwise shells a full `pnpm install` before its
-      # script. The setup step already installs once from .pnpm-prod; with
+      # script. The setup step already installs the workspace once; with
       # projects running in parallel those redundant per-project installs race on
       # the shared store and fail the job intermittently (pnpm `.bin` mkdir
       # ENOENT, dotnet first-run NuGet-Migrations EEXIST). Matches actions/build-pack.
@@ -86,7 +86,15 @@ runs:
 
     - name: Install workspace dependencies
       shell: bash
-      run: pnpm install --lockfile-dir .pnpm-prod
+      run: |
+        # .pnpm-prod presence IS the per-repo migration state: repos still on the
+        # dual-lockfile layout install from it; converted repos (single root
+        # lockfile, dev-link overlay for local packages) do a frozen root install.
+        if [ -f .pnpm-prod/pnpm-lock.yaml ]; then
+          pnpm install --lockfile-dir .pnpm-prod
+        else
+          pnpm install --frozen-lockfile
+        fi
       env:
         HUSKY: '0'
         NODE_AUTH_TOKEN: ${{ inputs.token }}
