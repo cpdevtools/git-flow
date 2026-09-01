@@ -4,10 +4,15 @@ packages:
 allowBuilds:
   esbuild: false
   unrs-resolver: true
+# The git-flow toolchain ships on a prerelease cadence, so its packages are
+# regularly younger than the default release-age cutoff. Exclude them by NAME:
+# pnpm stops at the first entry matching a package, so a version-pinned entry
+# silently shadows every later one for that package — which is how
+# '...-cli@1.1.3' hid the '@1.1.5' entry pnpm appended on the 1.1.5 bump and
+# failed CI with ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION. Never pin a version here.
 minimumReleaseAgeExclude:
   - '@cpdevtools/ts-dev-utilities'
+  - '@cpdevtools/ts-dev-utilities-cli'
   - '@sinclair/typebox'
   - 'node-releases'
   - 'terser'
-  - '@cpdevtools/ts-dev-utilities-cli@1.1.3'
-  - '@cpdevtools/ts-dev-utilities-cli@1.1.5'
