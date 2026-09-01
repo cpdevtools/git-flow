@@ -1,0 +1,6 @@
+# devutil dev-link package map: local checkouts overlaid onto node_modules after
+# install, only when DEV_LOCAL=true and not CI. Workspace members (git-flow,
+# git-flow-cli) are never mapped — pnpm links those itself via workspace:*.
+packages:
+  '@cpdevtools/ts-dev-utilities': ../ts-dev-utilities/packages/ts-dev-utilities
+  '@cpdevtools/ts-dev-utilities-cli': ../ts-dev-utilities/packages/cli

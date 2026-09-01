@@ -9,8 +9,4 @@ coverage/
 .wireit/
 .docker-bundle/
 
-# Production lockfile dir — only the lockfile is committed
-.pnpm-prod/*
-!.pnpm-prod/pnpm-lock.yaml
-
 actions/*/dist/
