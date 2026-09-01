@@ -17,7 +17,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/ts-dev-utilities": "^1.1.6",
+    "@cpdevtools/ts-dev-utilities": "^1.1.7",
     "fast-glob": "^3.3.2",
     "nunjucks": "^3.2.4",
     "semver": "^7.6.3",

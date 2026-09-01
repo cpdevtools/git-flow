@@ -32,22 +32,27 @@ async function run(): Promise<void> {
     core.info(`  Concurrency: ${concurrency ?? 'unlimited'}`);
     core.info(`  Workspace:   ${workspaceRoot}`);
 
+    // Pass task output through VERBATIM the moment it is produced. A task's
+    // own tooling (a nested `devutil run` in task mode, wireit) already emits
+    // complete per-unit blocks as each inner lib/script finishes — this layer
+    // must not hold them until the outer task ends, and must not reformat them
+    // into prefixed line-streams. Consumers keep blocks from parallel tasks
+    // from interleaving by setting concurrency: 1. Failures are still
+    // re-dumped whole as annotations by renderSummary.
     const summary = await runScripts({
       scripts,
       cwd: workspaceRoot,
       failFast,
       concurrency,
+      onOutput: (_project, chunk) => {
+        process.stdout.write(chunk);
+      },
       beforeTask: (project) => {
         core.info(`▶ ${project.name}`);
       },
       afterTask: (_project, result) => {
         const icon = result.state === 'passed' ? '✅' : '❌';
         core.info(`${icon} ${result.project} (${(result.durationMs / 1000).toFixed(1)}s)`);
-        if (result.output?.trim()) {
-          for (const line of result.output.trimEnd().split('\n')) {
-            core.info(`  ${line}`);
-          }
-        }
       },
     });
 

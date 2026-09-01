@@ -23,11 +23,22 @@ async function run(): Promise<void> {
     // Phase 1: build all packages (so services are compiled before tests run)
     core.info('');
     core.info('── Phase 1: Build ──────────────────────────────────');
+    // Pass task output through VERBATIM the moment it is produced. A task's
+    // own tooling (a nested `devutil run` in task mode, wireit) already emits
+    // complete per-unit blocks as each inner lib/script finishes — this layer
+    // must not hold them until the outer task ends, and must not reformat them
+    // into prefixed line-streams. Consumers keep blocks from parallel tasks
+    // from interleaving by setting concurrency: 1.
+    const passthrough = (_project: unknown, chunk: string): void => {
+      process.stdout.write(chunk);
+    };
+
     const buildSummary = await runScripts({
       scripts: ['github.actions.build'],
       cwd: workspaceRoot,
       failFast: true, // always fail-fast on build errors
       concurrency,
+      onOutput: passthrough,
       beforeTask: (project) => core.info(`▶ build ${project.name}`),
       afterTask: (_project, result) => {
         const icon = result.state === 'passed' ? '✅' : '❌';
@@ -49,15 +60,11 @@ async function run(): Promise<void> {
       cwd: workspaceRoot,
       failFast,
       concurrency,
+      onOutput: passthrough,
       beforeTask: (project) => core.info(`▶ ${project.name}`),
       afterTask: (_project, result) => {
         const icon = result.state === 'passed' ? '✅' : '❌';
         core.info(`${icon} ${result.project} (${(result.durationMs / 1000).toFixed(1)}s)`);
-        if (result.output?.trim()) {
-          for (const line of result.output.trimEnd().split('\n')) {
-            core.info(`  ${line}`);
-          }
-        }
       },
     });
 
