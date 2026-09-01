@@ -105,7 +105,7 @@
       ]
     },
     "build:bundle": {
-      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-bundle && pnpm deploy --config.inject-workspace-packages=true --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-bundle && pnpm install --lockfile-dir .pnpm-prod --filter @cpdevtools/git-flow-deploy-service --lockfile-only",
+      "command": "cd ../.. && rm -rf packages/git-flow-deploy-service/.docker-bundle && pnpm deploy --config.inject-workspace-packages=true --filter @cpdevtools/git-flow-deploy-service --prod packages/git-flow-deploy-service/.docker-bundle",
       "dependencies": [
         "build",
         "../git-flow-deploy:build"

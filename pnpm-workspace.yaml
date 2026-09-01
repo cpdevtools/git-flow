@@ -9,3 +9,4 @@ minimumReleaseAgeExclude:
   - '@sinclair/typebox'
   - 'node-releases'
   - 'terser'
+  - '@cpdevtools/ts-dev-utilities-cli@1.1.3'

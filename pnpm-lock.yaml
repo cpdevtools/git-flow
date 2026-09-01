@@ -4,8 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-pnpmfileChecksum: sha256-Yd87H2G4FNRaRHsGWe4RxbbAMWPqGKWBRMZ2gEk5D8M=
-
 importers:
 
   .:
@@ -13,6 +11,9 @@ importers:
       '@cpdevtools/git-flow-cli':
         specifier: workspace:*
         version: link:packages/git-flow-cli
+      '@cpdevtools/ts-dev-utilities-cli':
+        specifier: ^1.1.3
+        version: 1.1.3
       '@types/node':
         specifier: ^20.17.11
         version: 20.19.43
@@ -663,8 +664,17 @@ packages:
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
 
+  '@cpdevtools/ts-dev-utilities-cli@1.1.3':
+    resolution: {integrity: sha512-8EWj95ZEIrImevhcdT+Bnv8OPjSR9e9XrhTtFEmHF0qZCw/OT3lyXRSAXFwa8mkWHXl01NXIo7phGreBu+IFhA==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities-cli/1.1.3/8b8c0db33afa334104d44a5262be759fa44b4f76}
+    engines: {node: '>=24'}
+    hasBin: true
+
   '@cpdevtools/ts-dev-utilities@1.1.1':
     resolution: {integrity: sha512-zewIlpgqufNzvjnsAPp7iiaOOdlznVGiG340k4IRFqgP0nNgYkc7R4fGdvVEvAQ9G2prrqA8bTPiXGo4xI0tkQ==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/1.1.1/037f3747a3b2b6621c6315d9b2f22f933304a4b5}
+    engines: {node: '>=24'}
+
+  '@cpdevtools/ts-dev-utilities@1.1.3':
+    resolution: {integrity: sha512-3WFm4z9BN20165fVysd0CrUZa4EPx2GoDTaUpHIuaeMmI5MgNXX/OQiQ8SO3BJAxetuTqklPwlTnqWOr0bWynQ==, tarball: https://npm.pkg.github.com/download/@cpdevtools/ts-dev-utilities/1.1.3/8a30a1461eb7c05982e9536ccbfa8bbae28b6cd6}
     engines: {node: '>=24'}
 
   '@cspotcode/source-map-support@0.8.1':
@@ -5048,7 +5058,18 @@ snapshots:
   '@colors/colors@1.5.0':
     optional: true
 
+  '@cpdevtools/ts-dev-utilities-cli@1.1.3':
+    dependencies:
+      '@cpdevtools/ts-dev-utilities': 1.1.3
+
   '@cpdevtools/ts-dev-utilities@1.1.1':
+    dependencies:
+      change-case: 5.4.4
+      globby: 14.1.0
+      jsonc-parser: 3.3.1
+      yaml: 2.9.0
+
+  '@cpdevtools/ts-dev-utilities@1.1.3':
     dependencies:
       change-case: 5.4.4
       globby: 14.1.0
