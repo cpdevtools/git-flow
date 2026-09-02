@@ -242,6 +242,10 @@ const ngLib: ArtifactType<NgLibArtifact> = {
  * `docker-image` minus the image: nothing is packed, uploaded or published to a
  * registry; the compose/swarm deploy methods are the same ones docker-image
  * uses, since they only ever operated on the deploy files.
+ *
+ * With nothing to build, such a project defines no `github.actions.build`.
+ * Release participation hangs on `github.actions.pack` alone, and build-pack
+ * packs/uploads build-less release projects after the build phase.
  */
 export interface DockerServiceArtifact {
   type: 'docker-service';
