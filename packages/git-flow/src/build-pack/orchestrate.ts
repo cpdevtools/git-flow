@@ -144,6 +144,30 @@ export async function runBuildPack(
   );
   const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
   const releaseUrlMap = new Map<string, string>(); // project name → html_url
+  const packedSet = new Set<string>(); // release projects that produced an artifact
+
+  /**
+   * Pack + upload a single release project. Driven from two places: the build
+   * task's `afterTask` hook, and the post-scheduler pass that catches release
+   * projects which never ran a build task at all.
+   */
+  const packAndUpload = async (name: string): Promise<void> => {
+    const config = projectConfigMap.get(name)!;
+    const packResult = await executePack(config, contextWithProjects);
+    if (!packResult.success) {
+      throw new Error(packResult.error || 'Pack failed');
+    }
+    if (!context.skipUpload) {
+      const uploadResult = await executeUpload(config, contextWithProjects);
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Upload failed');
+      }
+      if (uploadResult.releaseUrl) {
+        releaseUrlMap.set(name, uploadResult.releaseUrl);
+      }
+    }
+    packedSet.add(name);
+  };
 
   // Map ProjectConfig[] to the scheduler's Project type so the scheduler can
   // build a real dependency graph from packageJson.dependencies/devDependencies.
@@ -169,38 +193,61 @@ export async function runBuildPack(
       await applyVersion(config.cwd, config.version);
       return { PROJECT_VERSION: config.version };
     },
+    // Fires for `no-script` too: release participation hangs on
+    // `github.actions.pack`, so a project with nothing to build still has to be
+    // packed. ts-dev-utilities 1.1.7 and older never call the hook for those —
+    // the post-scheduler pass below is the fallback that covers them there.
     afterTask: async (project, result) => {
-      if (result.state !== 'passed') return;
-      const config = projectConfigMap.get(project.name)!;
+      if (result.state !== 'passed' && result.state !== 'no-script') return;
       if (!releaseSet.has(project.name)) {
-        console.log(`✓ ${project.name}: Build completed (dependency only, skipping pack/upload)`);
+        const outcome = result.state === 'no-script' ? 'Nothing to build' : 'Build completed';
+        console.log(`✓ ${project.name}: ${outcome} (dependency only, skipping pack/upload)`);
         return;
       }
-      const packResult = await executePack(config, contextWithProjects);
-      if (!packResult.success) {
-        throw new Error(packResult.error || 'Pack failed');
+      if (result.state === 'no-script') {
+        console.log(`📦 ${project.name}: no "github.actions.build" script - packing anyway`);
       }
-      if (!context.skipUpload) {
-        const uploadResult = await executeUpload(config, contextWithProjects);
-        if (!uploadResult.success) {
-          throw new Error(uploadResult.error || 'Upload failed');
-        }
-        if (uploadResult.releaseUrl) {
-          releaseUrlMap.set(project.name, uploadResult.releaseUrl);
-        }
-      }
+      await packAndUpload(project.name);
     },
     _discover: async () => schedulerProjects,
   });
+
+  // Fallback for ts-dev-utilities 1.1.7 and older, whose scheduler fires
+  // `afterTask` only for tasks that ran a script. There, a release project without
+  // a `github.actions.build` ends as `no-script` and would silently drop out of
+  // the release with exit 0 — which is every `docker-service` project, whose
+  // only product is a deploy bundle and which has nothing to build by
+  // definition. Pack/upload whatever the hook did not; the scheduler has
+  // finished, so dependency ordering is satisfied either way.
+  const noScriptFailures: ExecutionResult[] = [];
+  const noScriptReleases = summary.noScript.filter(
+    (t) => releaseSet.has(t.project) && !packedSet.has(t.project),
+  );
+
+  if (noScriptReleases.length > 0 && summary.failed.length === 0) {
+    for (const task of noScriptReleases) {
+      const config = projectConfigMap.get(task.project)!;
+      console.log(
+        `\n📦 ${task.project}: no "github.actions.build" script - packing without a build step`,
+      );
+      try {
+        console.log(`  📝 ${task.project}: Applying version ${config.version}...`);
+        await applyVersion(config.cwd, config.version);
+        await packAndUpload(task.project);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`✗ ${task.project}: ${message}`);
+        noScriptFailures.push({ project: task.project, success: false, error: message });
+      }
+    }
+  }
 
   // Map RunSummary back to the legacy result shapes
   const builtProjects = [
     ...summary.passed.map((t) => t.project),
     ...summary.noScript.map((t) => t.project),
   ];
-  const packedProjects = summary.passed
-    .filter((t) => releaseSet.has(t.project))
-    .map((t) => t.project);
+  const packedProjects = [...packedSet];
   const uploadedProjects = context.skipUpload ? [] : [...packedProjects];
 
   const releases: BuildPackRelease[] = packedProjects
@@ -213,14 +260,39 @@ export async function runBuildPack(
   // Only genuine failures go in `failed`; siblings/dependents the scheduler
   // cancelled via fail-fast are reported separately so one real error does not
   // read as N failures.
-  const failedResults: ExecutionResult[] = summary.failed.map((t) => ({
-    project: t.project,
-    success: false,
-    error: t.output || 'Build failed',
-  }));
+  const failedResults: ExecutionResult[] = [
+    ...summary.failed.map((t) => ({
+      project: t.project,
+      success: false,
+      error: t.output || 'Build failed',
+    })),
+    ...noScriptFailures,
+  ];
   const cancelledProjects = summary.cancelled.map((t) => t.project);
 
-  const totalSuccess = builtProjects.length;
+  // Nothing in the release set may leave this job without an artifact. Without
+  // this, `publish-release` is the first thing to notice — after the release PR
+  // has already merged.
+  const reportedProjects = new Set<string>([
+    ...failedResults.map((f) => f.project),
+    ...cancelledProjects,
+  ]);
+  for (const name of releaseSet) {
+    if (packedSet.has(name) || reportedProjects.has(name)) continue;
+    failedResults.push({
+      project: name,
+      success: false,
+      error:
+        `Release project ${name} was never packed. It takes part in the release ` +
+        `(it defines "github.actions.pack") but no artifact was produced for it.`,
+    });
+  }
+
+  // A project that built but then failed to pack (or never packed at all) must
+  // not be counted twice — once as a success and once as a failure.
+  const totalSuccess = builtProjects.filter(
+    (name) => !failedResults.some((f) => f.project === name),
+  ).length;
 
   // Final summary
   console.log(`\n${'='.repeat(80)}`);

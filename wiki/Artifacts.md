@@ -107,6 +107,10 @@ the repository's entire product is the deploy bundle. Nothing is packed, uploade
 Declaring `registries` on this type is an error rather than a no-op, because a silently ignored
 `registries` looks exactly like a publish that never happened.
 
+A `docker-service` project has nothing to build, so it needs no `github.actions.build` script —
+`github.actions.pack` alone is what makes a project take part in a release, and `build-pack` packs
+and uploads it whether or not a build script exists.
+
 ### `release-attachment`
 
 | Field         | Notes                                  |
