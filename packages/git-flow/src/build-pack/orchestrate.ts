@@ -193,10 +193,10 @@ export async function runBuildPack(
       await applyVersion(config.cwd, config.version);
       return { PROJECT_VERSION: config.version };
     },
-    // Fires for `no-script` too: release participation hangs on
-    // `github.actions.pack`, so a project with nothing to build still has to be
-    // packed. ts-dev-utilities 1.1.7 and older never call the hook for those —
-    // the post-scheduler pass below is the fallback that covers them there.
+    // Fires for `no-script` too (ts-dev-utilities >= 1.1.8): release
+    // participation hangs on `github.actions.pack`, so a project with nothing to
+    // build — every `docker-service`, whose only product is a deploy bundle —
+    // still has to be packed and uploaded.
     afterTask: async (project, result) => {
       if (result.state !== 'passed' && result.state !== 'no-script') return;
       if (!releaseSet.has(project.name)) {
@@ -211,36 +211,6 @@ export async function runBuildPack(
     },
     _discover: async () => schedulerProjects,
   });
-
-  // Fallback for ts-dev-utilities 1.1.7 and older, whose scheduler fires
-  // `afterTask` only for tasks that ran a script. There, a release project without
-  // a `github.actions.build` ends as `no-script` and would silently drop out of
-  // the release with exit 0 — which is every `docker-service` project, whose
-  // only product is a deploy bundle and which has nothing to build by
-  // definition. Pack/upload whatever the hook did not; the scheduler has
-  // finished, so dependency ordering is satisfied either way.
-  const noScriptFailures: ExecutionResult[] = [];
-  const noScriptReleases = summary.noScript.filter(
-    (t) => releaseSet.has(t.project) && !packedSet.has(t.project),
-  );
-
-  if (noScriptReleases.length > 0 && summary.failed.length === 0) {
-    for (const task of noScriptReleases) {
-      const config = projectConfigMap.get(task.project)!;
-      console.log(
-        `\n📦 ${task.project}: no "github.actions.build" script - packing without a build step`,
-      );
-      try {
-        console.log(`  📝 ${task.project}: Applying version ${config.version}...`);
-        await applyVersion(config.cwd, config.version);
-        await packAndUpload(task.project);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`✗ ${task.project}: ${message}`);
-        noScriptFailures.push({ project: task.project, success: false, error: message });
-      }
-    }
-  }
 
   // Map RunSummary back to the legacy result shapes
   const builtProjects = [
@@ -260,14 +230,11 @@ export async function runBuildPack(
   // Only genuine failures go in `failed`; siblings/dependents the scheduler
   // cancelled via fail-fast are reported separately so one real error does not
   // read as N failures.
-  const failedResults: ExecutionResult[] = [
-    ...summary.failed.map((t) => ({
-      project: t.project,
-      success: false,
-      error: t.output || 'Build failed',
-    })),
-    ...noScriptFailures,
-  ];
+  const failedResults: ExecutionResult[] = summary.failed.map((t) => ({
+    project: t.project,
+    success: false,
+    error: t.output || 'Build failed',
+  }));
   const cancelledProjects = summary.cancelled.map((t) => t.project);
 
   // Nothing in the release set may leave this job without an artifact. Without

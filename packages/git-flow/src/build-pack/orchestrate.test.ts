@@ -7,13 +7,6 @@ type MockState = 'passed' | 'no-script' | 'failed' | 'skipped';
 /** Per-test scheduler outcome, keyed by project name. Defaults to 'passed'. */
 const schedulerStates = new Map<string, MockState>();
 
-/**
- * Newer ts-dev-utilities calls the task hooks for no-script tasks as well.
- * Toggles between that and the older scheduler, which did not — build-pack has
- * to produce the same release either way.
- */
-let schedulerFiresNoScriptHooks = false;
-
 vi.mock('@cpdevtools/ts-dev-utilities/runner', () => ({
   // Minimal stand-in for the real scheduler: drives beforeTask/afterTask exactly
   // where the real one does — i.e. only for tasks that actually ran a script.
@@ -40,16 +33,13 @@ vi.mock('@cpdevtools/ts-dev-utilities/runner', () => ({
           summary.failed.push({ ...result, state: 'failed', output: (err as Error).message });
         }
       } else if (state === 'no-script') {
-        if (schedulerFiresNoScriptHooks) {
-          await options.beforeTask?.(project);
-          try {
-            await options.afterTask?.(project, result);
-            summary.noScript.push(result);
-          } catch (err) {
-            summary.failed.push({ ...result, state: 'failed', output: (err as Error).message });
-          }
-        } else {
+        // ts-dev-utilities >= 1.1.8 runs the hooks for these too.
+        await options.beforeTask?.(project);
+        try {
+          await options.afterTask?.(project, result);
           summary.noScript.push(result);
+        } catch (err) {
+          summary.failed.push({ ...result, state: 'failed', output: (err as Error).message });
         }
       } else if (state === 'failed') {
         summary.failed.push({ ...result, output: 'build blew up' });
@@ -116,7 +106,6 @@ describe('runBuildPack', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     schedulerStates.clear();
-    schedulerFiresNoScriptHooks = false;
     delete process.env.GITHUB_REPOSITORY;
   });
 
@@ -144,22 +133,6 @@ describe('runBuildPack', () => {
         url: 'https://example.test/@idealsupply/swarmpit',
       },
     ]);
-    expect(result.failed).toEqual([]);
-  });
-
-  it('packs a build-less release project exactly once when the scheduler fires its hooks', async () => {
-    schedulerFiresNoScriptHooks = true;
-    discovered = [project('@idealsupply/swarmpit', { 'github.actions.pack': 'gitflow pack' })];
-    schedulerStates.set('@idealsupply/swarmpit', 'no-script');
-
-    const result = await runBuildPack(
-      context,
-      prBody({ name: '@idealsupply/swarmpit', version: '2.0.1-alpha.0' }),
-    );
-
-    expect(executePack).toHaveBeenCalledTimes(1);
-    expect(executeUpload).toHaveBeenCalledTimes(1);
-    expect(result.packed).toEqual(['@idealsupply/swarmpit']);
     expect(result.failed).toEqual([]);
   });
 
@@ -208,13 +181,13 @@ describe('runBuildPack', () => {
     expect(result.failed[0].error).toMatch(/never packed/);
   });
 
-  it('does not pack build-less release projects when another project failed', async () => {
+  it('reports a build-less release project that fail-fast skipped before it ran', async () => {
     discovered = [
       project('@scope/lib', { 'github.actions.build': 'tsc', 'github.actions.pack': 'p' }),
       project('@scope/svc', { 'github.actions.pack': 'gitflow pack' }),
     ];
     schedulerStates.set('@scope/lib', 'failed');
-    schedulerStates.set('@scope/svc', 'no-script');
+    schedulerStates.set('@scope/svc', 'skipped');
 
     const result = await runBuildPack(
       context,
