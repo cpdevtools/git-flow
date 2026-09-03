@@ -817,6 +817,7 @@ export async function executeUpload(
       success: true,
       exitCode: 0,
       releaseUrl: getReleaseUrl(owner, repo, project.name, project.version),
+      draftUrl: release.html_url,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
