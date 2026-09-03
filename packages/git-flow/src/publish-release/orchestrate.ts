@@ -29,6 +29,7 @@ import {
   finalizeRelease,
   createGitTag,
   getReleaseTag,
+  getReleaseUrl,
   parseReleaseTag,
   getDraftReleaseMetadata,
   isReleasePublished,
@@ -296,25 +297,15 @@ export async function runPublishRelease(
     // Post comment on PR with release links
     if (result.published.length > 0) {
       console.log(`\n💬 Posting release links to PR #${options.prNumber}...`);
-      const releaseLinks = await Promise.all(
-        options.projects.map(async (project) => {
-          const tag = getReleaseTag(project.name, project.version);
-          const release = await findDraftReleaseByTag(
-            options.githubToken,
-            options.owner,
-            options.repo,
-            tag,
-          );
-          return {
-            name: project.name,
-            version: project.version,
-            url:
-              release?.html_url ||
-              `https://github.com/${options.owner}/${options.repo}/releases/tag/${tag}`,
-            tag,
-          };
-        }),
-      );
+      // Always the tag URL, never the draft's `html_url`: by this point the
+      // release has been published, so the tag exists and the untagged- URL a
+      // still-draft lookup would return is already dead.
+      const releaseLinks = options.projects.map((project) => ({
+        name: project.name,
+        version: project.version,
+        url: getReleaseUrl(options.owner, options.repo, project.name, project.version),
+        tag: getReleaseTag(project.name, project.version),
+      }));
 
       await postPRReleaseComment(
         options.githubToken,

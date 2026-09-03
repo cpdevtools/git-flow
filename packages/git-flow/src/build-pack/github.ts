@@ -46,6 +46,25 @@ export function getReleaseTag(projectName: string, version: string): string {
 }
 
 /**
+ * Permanent web URL for a project's release.
+ *
+ * Deliberately not the API's `html_url` for a draft: that is
+ * `/releases/tag/untagged-<hash>`, which 404s while the release is a draft (no
+ * such tag exists yet) and dies for good once publish-release tags it. This URL
+ * is wrong only in the window before the release is published, and right
+ * forever after — which is the way round that suits a job summary someone reads
+ * after the run.
+ */
+export function getReleaseUrl(
+  owner: string,
+  repo: string,
+  projectName: string,
+  version: string,
+): string {
+  return `https://github.com/${owner}/${repo}/releases/tag/${getReleaseTag(projectName, version)}`;
+}
+
+/**
  * Get the version-group tag (e.g. `MAIN/v1.2.3`)
  */
 export function getGroupTag(versionGroup: string, version: string): string {

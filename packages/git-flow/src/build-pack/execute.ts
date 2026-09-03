@@ -28,7 +28,12 @@ import {
   majorVersion,
   type VersioningStrategy,
 } from '../artifacts/slot.js';
-import { findOrCreateDraftRelease, uploadArtifact, markReleasePublished } from './github.js';
+import {
+  findOrCreateDraftRelease,
+  getReleaseUrl,
+  uploadArtifact,
+  markReleasePublished,
+} from './github.js';
 import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
@@ -811,7 +816,7 @@ export async function executeUpload(
       project: project.name,
       success: true,
       exitCode: 0,
-      releaseUrl: release.html_url,
+      releaseUrl: getReleaseUrl(owner, repo, project.name, project.version),
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

@@ -143,7 +143,7 @@ export async function runBuildPack(
     allProjectsToProcess.map((p) => [p.name, p]),
   );
   const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
-  const releaseUrlMap = new Map<string, string>(); // project name → html_url
+  const releaseUrlMap = new Map<string, string>(); // project name → release URL
   const packedSet = new Set<string>(); // release projects that produced an artifact
 
   /**
