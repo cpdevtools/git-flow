@@ -29,11 +29,12 @@ The file is declarative — nothing in it is executed as a command. Building is 
 
 ### `npm`
 
-| Field        | Notes                                        |
-| ------------ | -------------------------------------------- |
-| `name`       | Package name. Usually `'${PACKAGE_NAME}'`.   |
-| `path`       | Filled in by pack — omit it.                 |
-| `registries` | Registry IDs from `.publish/registries.yml`. |
+| Field          | Notes                                                                 |
+| -------------- | --------------------------------------------------------------------- |
+| `name`         | Package name. Usually `'${PACKAGE_NAME}'`.                            |
+| `path`         | Filled in by pack — omit it.                                          |
+| `registries`   | Registry IDs from `.publish/registries.yml`.                          |
+| `floatingTags` | `false` to publish no dist-tags. See [Floating tags](#floating-tags). |
 
 ### `nuget`
 
@@ -80,12 +81,13 @@ otherwise publish successfully and then fail verification.
 
 ### `docker-image`
 
-| Field        | Notes                                                                     |
-| ------------ | ------------------------------------------------------------------------- |
-| `name`       | **The bare repository name** — `my-service`, not `ghcr.io/org/my-service` |
-| `localTag`   | Local tag to push. Defaults to `name:latest`.                             |
-| `registries` | Registry IDs                                                              |
-| `deploy`     | Deploy methods to build bundles for                                       |
+| Field          | Notes                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| `name`         | **The bare repository name** — `my-service`, not `ghcr.io/org/my-service`  |
+| `localTag`     | Local tag to push. Defaults to `name:latest`.                              |
+| `registries`   | Registry IDs                                                               |
+| `deploy`       | Deploy methods to build bundles for                                        |
+| `floatingTags` | `false` to push only the version tag. See [Floating tags](#floating-tags). |
 
 > **`name` must not contain a `/`.** Host and namespace come from each registry entry and are
 > composed per destination, so one image can publish to several registries. Baking a full path into
@@ -123,6 +125,33 @@ and uploads it whether or not a build script exists.
 
 A standalone deploy bundle, for a project whose only output is deployment instructions. Most
 projects get bundles through `deploy:` on another artifact instead.
+
+## Floating tags
+
+Docker images and npm packages are published under their version and under whichever of these
+pointers the version earns:
+
+| pointer               | points at                                 |
+| --------------------- | ----------------------------------------- |
+| `latest`              | the highest **stable** version            |
+| `next`                | the highest version, prereleases included |
+| `alpha`, `beta`, `rc` | the highest version of that channel       |
+
+A pointer moves only when the version being published _is_ the highest of its class, judged against
+every version the project has ever tagged — so a `1.8.5` maintenance patch cut after `2.0.0` leaves
+`latest` on `2.0.0`, and an `alpha.0` published after `alpha.1` moves nothing. `next` is never below
+`latest`. On npm, a mainline version that earns no pointer is published under the `previous`
+dist-tag rather than npm's default `latest`.
+
+Only mainline releases carry pointers: `X.Y.Z` or `X.Y.Z-{alpha|beta|rc}.N`. Development-branch
+versions (`2.0.0-feature.auth.beta.0`) and `.build.N` versions never move one; they keep their
+first prerelease identifier as an npm dist-tag (`feature`, `dev`) as before.
+
+Docker carries the pointers as image tags, npm as dist-tags. NuGet has no pointer concept and
+needs none — its clients resolve the same three from version ordering: the highest stable by
+default, the highest prerelease with `--prerelease` (or a floating `*-*`), a channel with `*-alpha*`.
+
+`floatingTags: false` on a `docker-image` or `npm` artifact publishes the version only.
 
 ## Deployment keys
 

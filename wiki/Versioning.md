@@ -181,3 +181,7 @@ MAIN/v2.1.0            one per version key
 
 Project tags are what "already released" checks against, which is why two projects on different
 keys can hold the same version number without colliding.
+
+They are also what publishing reads to decide whether a version is the highest of its kind and so
+earns a `latest` / `next` / channel pointer on Docker and npm — see
+[Floating tags](Artifacts#floating-tags).

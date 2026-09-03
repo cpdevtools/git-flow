@@ -15,6 +15,7 @@ import {
   type PublishContext,
 } from '../artifacts/index.js';
 import {
+  computeFloatingTags,
   loadRegistryConfig,
   getRegistry,
   getToken,
@@ -30,6 +31,7 @@ import {
   createGitTag,
   getReleaseTag,
   getReleaseUrl,
+  listProjectVersions,
   parseReleaseTag,
   getDraftReleaseMetadata,
   isReleasePublished,
@@ -222,12 +224,29 @@ export async function runPublishRelease(
           artifactsDir,
         );
 
+        // Which pointers this version earns, judged against every version the
+        // project has ever tagged. Computed once here — it is a property of the
+        // project, not of any one artifact or registry.
+        const existingVersions = await listProjectVersions(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          project.name,
+        );
+        const floatingTags = computeFloatingTags(project.version, existingVersions);
+        console.log(
+          floatingTags.length > 0
+            ? `  🏷️  Floating tags: ${floatingTags.join(', ')}`
+            : `  🏷️  Floating tags: none (${project.version} is not the highest of its kind)`,
+        );
+
         // Publish each artifact to its registries
         const publishResult = await publishProjectArtifacts(
           descriptor,
           registryConfig,
           options.workspaceRoot,
           project.version,
+          floatingTags,
         );
 
         if (!publishResult.success) {
@@ -359,6 +378,7 @@ async function publishProjectArtifacts(
   registryConfig: RegistryConfig,
   workspaceRoot: string,
   projectVersion: string,
+  floatingTags: string[],
 ): Promise<ProjectPublishResult> {
   const result: ProjectPublishResult = {
     project: descriptor.project,
@@ -373,7 +393,7 @@ async function publishProjectArtifacts(
   }
 
   try {
-    const publishCtx: PublishContext = { workspaceRoot, projectVersion };
+    const publishCtx: PublishContext = { workspaceRoot, projectVersion, floatingTags };
 
     for (const artifact of descriptor.artifacts) {
       const registries = getArtifactType(artifact.type, providerOf(artifact)).getRegistries(

@@ -18,6 +18,7 @@ import { basename, isAbsolute, join } from 'node:path';
 import { $ } from 'zx';
 import { uploadArtifact } from '../build-pack/github.js';
 import {
+  floatingTagsFor,
   getToken,
   publishToNpm,
   publishToNuget,
@@ -224,6 +225,9 @@ const ngLib: ArtifactType<NgLibArtifact> = {
       artifactPath: join(ctx.workspaceRoot, '.artifacts', basename(artifact.path)),
       registry: registry as NpmRegistry,
       token: getToken(registry),
+      packageName: artifact.name,
+      version: ctx.projectVersion,
+      floatingTags: floatingTagsFor(artifact, ctx),
     });
   },
   getRegistries(artifact) {

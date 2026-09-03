@@ -46,6 +46,35 @@ export function getReleaseTag(projectName: string, version: string): string {
 }
 
 /**
+ * Every version of a project that has a release tag (`<name>/v<version>`).
+ *
+ * Read from git refs rather than from a registry: the tags are the one record
+ * every registry was published from, and registries drift (GHCR still carries a
+ * `next` frozen on a pipeline that no longer exists). Includes `.build.N` and
+ * development-branch versions — callers filter by shape.
+ */
+export async function listProjectVersions(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  projectName: string,
+): Promise<string[]> {
+  const octokit = getOctokit(githubToken);
+  // The prefix goes into the URL directly: as a template parameter octokit
+  // would encode the `/` inside the project name.
+  const refs = await octokit.paginate<{ ref: string }>(
+    `GET /repos/${owner}/${repo}/git/matching-refs/tags/${projectName}/v`,
+    { per_page: 100 },
+  );
+  const versions: string[] = [];
+  for (const { ref } of refs) {
+    const parsed = parseReleaseTag(ref.replace(/^refs\/tags\//, ''));
+    if (parsed && parsed.name === projectName) versions.push(parsed.version);
+  }
+  return versions;
+}
+
+/**
  * Permanent web URL for a project's release.
  *
  * Deliberately not the API's `html_url` for a draft: that is
