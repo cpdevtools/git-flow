@@ -15,6 +15,7 @@ import {
   type PublishContext,
 } from '../artifacts/index.js';
 import {
+  computeFloatingTags,
   loadRegistryConfig,
   getRegistry,
   getToken,
@@ -29,6 +30,8 @@ import {
   finalizeRelease,
   createGitTag,
   getReleaseTag,
+  getReleaseUrl,
+  listProjectVersions,
   parseReleaseTag,
   getDraftReleaseMetadata,
   isReleasePublished,
@@ -221,12 +224,29 @@ export async function runPublishRelease(
           artifactsDir,
         );
 
+        // Which pointers this version earns, judged against every version the
+        // project has ever tagged. Computed once here — it is a property of the
+        // project, not of any one artifact or registry.
+        const existingVersions = await listProjectVersions(
+          options.githubToken,
+          options.owner,
+          options.repo,
+          project.name,
+        );
+        const floatingTags = computeFloatingTags(project.version, existingVersions);
+        console.log(
+          floatingTags.length > 0
+            ? `  🏷️  Floating tags: ${floatingTags.join(', ')}`
+            : `  🏷️  Floating tags: none (${project.version} is not the highest of its kind)`,
+        );
+
         // Publish each artifact to its registries
         const publishResult = await publishProjectArtifacts(
           descriptor,
           registryConfig,
           options.workspaceRoot,
           project.version,
+          floatingTags,
         );
 
         if (!publishResult.success) {
@@ -296,25 +316,15 @@ export async function runPublishRelease(
     // Post comment on PR with release links
     if (result.published.length > 0) {
       console.log(`\n💬 Posting release links to PR #${options.prNumber}...`);
-      const releaseLinks = await Promise.all(
-        options.projects.map(async (project) => {
-          const tag = getReleaseTag(project.name, project.version);
-          const release = await findDraftReleaseByTag(
-            options.githubToken,
-            options.owner,
-            options.repo,
-            tag,
-          );
-          return {
-            name: project.name,
-            version: project.version,
-            url:
-              release?.html_url ||
-              `https://github.com/${options.owner}/${options.repo}/releases/tag/${tag}`,
-            tag,
-          };
-        }),
-      );
+      // Always the tag URL, never the draft's `html_url`: by this point the
+      // release has been published, so the tag exists and the untagged- URL a
+      // still-draft lookup would return is already dead.
+      const releaseLinks = options.projects.map((project) => ({
+        name: project.name,
+        version: project.version,
+        url: getReleaseUrl(options.owner, options.repo, project.name, project.version),
+        tag: getReleaseTag(project.name, project.version),
+      }));
 
       await postPRReleaseComment(
         options.githubToken,
@@ -368,6 +378,7 @@ async function publishProjectArtifacts(
   registryConfig: RegistryConfig,
   workspaceRoot: string,
   projectVersion: string,
+  floatingTags: string[],
 ): Promise<ProjectPublishResult> {
   const result: ProjectPublishResult = {
     project: descriptor.project,
@@ -382,7 +393,7 @@ async function publishProjectArtifacts(
   }
 
   try {
-    const publishCtx: PublishContext = { workspaceRoot, projectVersion };
+    const publishCtx: PublishContext = { workspaceRoot, projectVersion, floatingTags };
 
     for (const artifact of descriptor.artifacts) {
       const registries = getArtifactType(artifact.type, providerOf(artifact)).getRegistries(

@@ -65,6 +65,13 @@ export interface PublishContext {
   workspaceRoot: string;
   /** Project release version */
   projectVersion: string;
+  /**
+   * Floating pointers this version earns (`latest`, `next`, a channel), computed
+   * once per project from its release tags — see publishing/floating-tags.ts.
+   * Docker publishes them as image tags, npm as dist-tags; other types ignore
+   * them. Empty for anything that is not a mainline release.
+   */
+  floatingTags: string[];
 }
 
 export interface ArtifactType<T extends Artifact = Artifact> {

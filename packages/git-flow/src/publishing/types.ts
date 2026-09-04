@@ -63,6 +63,12 @@ export interface NpmPublishOptions {
   artifactPath: string;
   registry: NpmRegistry;
   token: string;
+  /** Package name, for `npm dist-tag add <name>@<version>` */
+  packageName: string;
+  /** Version being published */
+  version: string;
+  /** dist-tags this version earns, most important first (see floating-tags.ts) */
+  floatingTags: string[];
 }
 
 /**
@@ -86,6 +92,8 @@ export interface DockerPublishOptions {
   registry: DockerRegistry;
   username?: string;
   token: string;
+  /** Extra tags to push alongside `finalTag` (see floating-tags.ts) */
+  floatingTags: string[];
 }
 
 /**

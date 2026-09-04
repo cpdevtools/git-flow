@@ -143,7 +143,10 @@ export async function runBuildPack(
     allProjectsToProcess.map((p) => [p.name, p]),
   );
   const releaseSet = new Set<string>(projectsToProcess.map((p) => p.name));
-  const releaseUrlMap = new Map<string, string>(); // project name → html_url
+  // project name → { permanent tag URL, draft URL }. Both are reported: the
+  // draft URL is the only way to open the release before publish-release tags
+  // it, and the only one that is dead afterwards.
+  const releaseLinkMap = new Map<string, { url: string; draftUrl?: string }>();
   const packedSet = new Set<string>(); // release projects that produced an artifact
 
   /**
@@ -163,7 +166,10 @@ export async function runBuildPack(
         throw new Error(uploadResult.error || 'Upload failed');
       }
       if (uploadResult.releaseUrl) {
-        releaseUrlMap.set(name, uploadResult.releaseUrl);
+        releaseLinkMap.set(name, {
+          url: uploadResult.releaseUrl,
+          draftUrl: uploadResult.draftUrl,
+        });
       }
     }
     packedSet.add(name);
@@ -221,10 +227,11 @@ export async function runBuildPack(
   const uploadedProjects = context.skipUpload ? [] : [...packedProjects];
 
   const releases: BuildPackRelease[] = packedProjects
-    .filter((name) => releaseUrlMap.has(name))
+    .filter((name) => releaseLinkMap.has(name))
     .map((name) => {
       const config = projectConfigMap.get(name)!;
-      return { name, version: config.version, url: releaseUrlMap.get(name)! };
+      const links = releaseLinkMap.get(name)!;
+      return { name, version: config.version, url: links.url, draftUrl: links.draftUrl };
     });
 
   // Only genuine failures go in `failed`; siblings/dependents the scheduler

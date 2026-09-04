@@ -10,15 +10,19 @@ import { runBuildPack, cleanupEmptyDraftReleases } from '@cpdevtools/git-flow/bu
 async function run(): Promise<void> {
   try {
     // Get inputs - read from environment variables directly since we run tsx from workspace root
-    const prNumber = parseInt(process.env['INPUT_PR-NUMBER'] || process.env.INPUT_PR_NUMBER || '0', 10);
+    const prNumber = parseInt(
+      process.env['INPUT_PR-NUMBER'] || process.env.INPUT_PR_NUMBER || '0',
+      10,
+    );
     const token = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
-    const workspaceRoot = process.env['INPUT_WORKSPACE-ROOT'] || process.env.INPUT_WORKSPACE_ROOT || process.cwd();
+    const workspaceRoot =
+      process.env['INPUT_WORKSPACE-ROOT'] || process.env.INPUT_WORKSPACE_ROOT || process.cwd();
 
     // Validate inputs
     if (isNaN(prNumber) || prNumber < 0) {
       throw new Error(`Invalid PR number: ${core.getInput('pr-number')}`);
     }
-    
+
     const isManualDispatch = prNumber === 0;
 
     // Get GitHub context
@@ -36,7 +40,7 @@ async function run(): Promise<void> {
     // Fetch PR body (skip for manual dispatch)
     const octokit = github.getOctokit(token);
     const [owner, repo] = (process.env.GITHUB_REPOSITORY || '/').split('/');
-    
+
     let prBody = '';
     if (!isManualDispatch) {
       const { data: pr } = await octokit.rest.pulls.get({
@@ -80,7 +84,7 @@ projects:
         sha,
         runNumber,
       },
-      prBody
+      prBody,
     );
 
     // Set outputs
@@ -91,20 +95,39 @@ projects:
 
     // Log summary
     const repoUrl = `https://github.com/${owner}/${repo}`;
-    const prLink = !isManualDispatch ? `<a href="${repoUrl}/pull/${prNumber}">PR #${prNumber}</a>` : '<em>manual dispatch</em>';
+    const prLink = !isManualDispatch
+      ? `<a href="${repoUrl}/pull/${prNumber}">PR #${prNumber}</a>`
+      : '<em>manual dispatch</em>';
 
     core.summary.addHeading('Build & Pack Results');
 
     if (result.releases.length > 0) {
       core.summary.addHeading('Draft Releases', 3);
+      // Two links on purpose. A job summary is read both while the run is live
+      // and long afterwards, and it cannot be edited once the job ends: the
+      // draft link is the only way to open the release now, and it dies the
+      // moment publish-release tags it; the version link is dead until then and
+      // correct forever after.
       core.summary.addList(
-        result.releases.map((r) => `<strong>${r.name}</strong> <a href="${r.url}">${r.version}</a>`),
+        result.releases.map((r) => {
+          const version = `<a href="${r.url}">${r.version}</a>`;
+          const draft = r.draftUrl ? ` · <a href="${r.draftUrl}">draft</a>` : '';
+          return `<strong>${r.name}</strong> ${version}${draft}`;
+        }),
+      );
+      core.summary.addRaw(
+        '<p><em>Version links go live once <code>publish-release</code> tags the release; ' +
+          'the draft links stop working at the same moment.</em></p>\n',
+        true,
       );
     }
 
     core.summary
       .addTable([
-        [{ data: 'Phase', header: true }, { data: 'Count', header: true }],
+        [
+          { data: 'Phase', header: true },
+          { data: 'Count', header: true },
+        ],
         ['Built', result.built.length.toString()],
         ['Packed', result.packed.length.toString()],
         ['Uploaded', result.uploaded.length.toString()],
@@ -120,7 +143,10 @@ projects:
         const rawError = failure.error || 'Unknown error';
         // Strip ANSI for both headline and code block (summaries don't support ansi lang)
         // eslint-disable-next-line no-control-regex
-        const cleanError = rawError.replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '');
+        const cleanError = rawError.replace(
+          /\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g,
+          '',
+        );
         const errorLines = cleanError
           .split('\n')
           .map((l) => l.trim())
@@ -129,7 +155,7 @@ projects:
           .join('\n');
         core.summary.addRaw(
           `<details><summary>❌ <strong>${failure.project}</strong>${errorLines ? ` — ${errorLines.split('\n')[0].slice(0, 120)}` : ''}</summary>\n\n` +
-          `\`\`\`\n${cleanError.trim().slice(0, 8000)}\n\`\`\`\n\n</details>\n`,
+            `\`\`\`\n${cleanError.trim().slice(0, 8000)}\n\`\`\`\n\n</details>\n`,
           true,
         );
       }
@@ -164,11 +190,13 @@ projects:
         await cleanupEmptyDraftReleases(token, owner, repo, runNumber);
       }
     } catch (cleanupErr) {
-      core.warning(`Cleanup failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`);
+      core.warning(
+        `Cleanup failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`,
+      );
     }
 
     core.setFailed(`Build & Pack workflow failed: ${errorMessage}`);
-    
+
     if (error instanceof Error && error.stack) {
       core.debug(error.stack);
     }

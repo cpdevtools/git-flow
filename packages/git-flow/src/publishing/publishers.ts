@@ -9,6 +9,7 @@ import type {
   DockerPublishOptions,
   DockerRegistry,
 } from './types.js';
+import { isFloatingEligible } from './floating-tags.js';
 
 /**
  * Resolve the fully-qualified docker image base (registry host + namespace + image).
@@ -165,7 +166,7 @@ export async function dockerPushWithRetry(
  * Publish NPM package to registry
  */
 export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
-  const { artifactPath, registry, token } = options;
+  const { artifactPath, registry, token, packageName, version, floatingTags } = options;
 
   // Create .npmrc in home directory (where npm looks for auth by default)
   const npmrcPath = join(homedir(), '.npmrc');
@@ -184,25 +185,49 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
   console.log(`  📝 Writing .npmrc to ${npmrcPath}`);
   await writeFile(npmrcPath, npmrcContent);
 
-  // The dist-tag is the first prerelease identifier (e.g. pkg-1.2.3-alpha.0.tgz → 'alpha').
-  const filenameVersion = basename(artifactPath).match(/-(\d.*?)\.tgz$/)?.[1];
-  const prereleaseTag = filenameVersion
-    ? String(semver.prerelease(filenameVersion)?.[0] ?? '') || undefined
-    : undefined;
+  // npm insists on a dist-tag at publish and defaults to `latest`, so the tag
+  // is always explicit here — `latest` must only move for the highest stable.
+  //   - a version that earns pointers publishes under the most important one
+  //     and the rest are added afterwards;
+  //   - a mainline version that earns none (a maintenance patch behind a newer
+  //     line, an alpha older than the current one) parks on `previous` rather
+  //     than dragging `latest` or its channel backwards;
+  //   - anything else (development-branch and .build.N versions) keeps the
+  //     first prerelease identifier as before (`feature`, `dev`, `main`).
+  const firstPrereleaseId = String(semver.prerelease(version)?.[0] ?? '') || undefined;
+  const publishTag =
+    floatingTags[0] ?? (isFloatingEligible(version) ? 'previous' : firstPrereleaseId);
 
   // Add --provenance when OIDC is available (GitHub Actions with id-token: write)
   // --access public is required for scoped packages with provenance
   const provenance = !!process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
 
   try {
-    if (prereleaseTag && provenance) {
-      await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${prereleaseTag} --provenance --access public`;
-    } else if (prereleaseTag) {
-      await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${prereleaseTag}`;
+    if (publishTag && provenance) {
+      await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${publishTag} --provenance --access public`;
+    } else if (publishTag) {
+      await $`npm publish ${artifactPath} --registry ${registry.url} --tag ${publishTag}`;
     } else if (provenance) {
       await $`npm publish ${artifactPath} --registry ${registry.url} --provenance --access public`;
     } else {
       await $`npm publish ${artifactPath} --registry ${registry.url}`;
+    }
+
+    // Best effort: the version is published and verified above; a pointer that
+    // fails to move is logged with the exact command so it can be re-run by
+    // hand. (GitHub Packages' support for `dist-tag add` is not yet proven.)
+    for (const tag of floatingTags.slice(1)) {
+      const spec = `${packageName}@${version}`;
+      try {
+        await $`npm dist-tag add ${spec} ${tag} --registry ${registry.url}`;
+        console.log(`  🏷️  dist-tag ${tag} → ${version}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `  ⚠️  Could not move dist-tag '${tag}' to ${version}: ${message}\n` +
+            `     npm dist-tag add ${spec} ${tag} --registry ${registry.url}`,
+        );
+      }
     }
   } finally {
     // Clean up .npmrc
@@ -225,10 +250,12 @@ export async function publishToNuget(options: NugetPublishOptions): Promise<void
  * The image is transported between the build-pack and publish jobs as a gzipped
  * tarball artifact (produced by `docker save` during pack) rather than a
  * transient registry tag. This keeps the registry free of throwaway `temp-*`
- * tags: the image only ever appears under its final release/`latest` tags.
+ * tags: the image only ever appears under its release tag and whichever
+ * floating pointers (`latest`, `next`, a channel) the version earns.
  */
 export async function publishToDocker(options: DockerPublishOptions): Promise<void> {
-  const { imageName, archivePath, finalTag, digest, registry, username, token } = options;
+  const { imageName, archivePath, finalTag, digest, registry, username, token, floatingTags } =
+    options;
 
   // Load the image from the tarball artifact produced during pack.
   await $`docker load -i ${archivePath}`;
@@ -254,20 +281,23 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
     // Build final image name with namespace if provided
     const finalImageBase = resolveDockerImageBase(imageName, registry);
 
-    const finalVersionImage = `${finalImageBase}:${finalTag}`;
-    const finalLatestImage = `${finalImageBase}:latest`;
+    // The release tag first, then the pointers this version earns. `latest` is
+    // one of those, not a given: it only moves for the highest stable release.
+    const images = [finalTag, ...floatingTags].map((tag) => `${finalImageBase}:${tag}`);
 
-    // Tag the loaded image (referenced by its id) with the final tags and push.
-    await $`docker tag ${digest} ${finalVersionImage}`;
-    await $`docker tag ${digest} ${finalLatestImage}`;
+    // Tag the loaded image (referenced by its id) with every final tag and push.
+    for (const image of images) {
+      await $`docker tag ${digest} ${image}`;
+    }
 
     // Retry on transient registry failures (GHCR secondary rate limits, network
     // blips). Re-pushing is idempotent, so this is safe.
-    await dockerPushWithRetry(finalVersionImage);
-    await dockerPushWithRetry(finalLatestImage);
+    for (const image of images) {
+      await dockerPushWithRetry(image);
+    }
 
     // Best-effort local cleanup of the tags we created.
-    await $`docker rmi ${finalVersionImage} ${finalLatestImage}`.catch(() => {
+    await $`docker rmi ${images}`.catch(() => {
       // Ignore errors - cleanup is best-effort
     });
   } finally {

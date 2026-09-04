@@ -69,7 +69,8 @@ vi.mock('./execute.js', () => ({
   executeUpload: vi.fn(async (project: any) => ({
     project: project.name,
     success: true,
-    releaseUrl: `https://example.test/${project.name}`,
+    releaseUrl: `https://example.test/releases/tag/${project.name}/v${project.version}`,
+    draftUrl: `https://example.test/releases/tag/untagged-abc123`,
   })),
 }));
 
@@ -126,11 +127,14 @@ describe('runBuildPack', () => {
     expect(executeUpload).toHaveBeenCalledTimes(1);
     expect(result.packed).toEqual(['@idealsupply/swarmpit']);
     expect(result.uploaded).toEqual(['@idealsupply/swarmpit']);
+    // Both links are reported: the permanent one is dead until publish-release
+    // tags the release, the draft one is dead from that moment on.
     expect(result.releases).toEqual([
       {
         name: '@idealsupply/swarmpit',
         version: '2.0.1-alpha.0',
-        url: 'https://example.test/@idealsupply/swarmpit',
+        url: 'https://example.test/releases/tag/@idealsupply/swarmpit/v2.0.1-alpha.0',
+        draftUrl: 'https://example.test/releases/tag/untagged-abc123',
       },
     ]);
     expect(result.failed).toEqual([]);

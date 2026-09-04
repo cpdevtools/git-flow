@@ -68,6 +68,7 @@ import {
   publishToNuget,
   publishToDocker,
   getToken,
+  floatingTagsFor,
   type NpmRegistry,
   type NugetRegistry,
   type DockerRegistry,
@@ -130,6 +131,9 @@ const npm: ArtifactType<NpmArtifact> = {
       artifactPath: join(ctx.workspaceRoot, '.artifacts', basename(artifact.path)),
       registry: registry as NpmRegistry,
       token: getToken(registry),
+      packageName: artifact.name,
+      version: ctx.projectVersion,
+      floatingTags: floatingTagsFor(artifact, ctx),
     });
   },
   getRegistries(artifact) {
@@ -262,6 +266,7 @@ const docker: ArtifactType<DockerArtifact> = {
       registry: dockerRegistry,
       username: dockerRegistry.usernameEnv ? process.env[dockerRegistry.usernameEnv] : undefined,
       token: getToken(registry),
+      floatingTags: floatingTagsFor(artifact, ctx),
     });
   },
   getRegistries(artifact) {

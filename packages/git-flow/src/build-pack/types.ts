@@ -32,8 +32,18 @@ export interface ExecutionResult {
   error?: string;
   /** Exit code if available */
   exitCode?: number;
-  /** URL of the created/updated draft release (upload phase only) */
+  /**
+   * Permanent URL the release will live at once publish-release tags it
+   * (upload phase only). 404s until then — see getReleaseUrl.
+   */
   releaseUrl?: string;
+  /**
+   * The draft's own URL (`/releases/tag/untagged-<hash>`, upload phase only).
+   * The only way to open the release while it is still a draft, and dead the
+   * moment publish-release tags it — so it is reported alongside `releaseUrl`,
+   * never instead of it.
+   */
+  draftUrl?: string;
 }
 
 /**
@@ -90,8 +100,10 @@ export interface BuildPackRelease {
   name: string;
   /** Release version */
   version: string;
-  /** GitHub release URL */
+  /** Permanent release URL — live once publish-release tags the release */
   url: string;
+  /** The draft's URL — live only until publish-release tags the release */
+  draftUrl?: string;
 }
 
 /**
