@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@cpdevtools/git-flow-cli": "workspace:*",
-    "@cpdevtools/ts-dev-utilities-cli": "^1.1.8",
+    "@cpdevtools/ts-dev-utilities-cli": "^1.1.9",
     "@types/node": "^20.17.11",
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
