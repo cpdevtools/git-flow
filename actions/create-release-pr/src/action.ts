@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import * as semver from 'semver';
 import { parse as parseYaml } from 'yaml';
@@ -10,6 +11,9 @@ import { discoverProjects, detectDraftReleases } from '@cpdevtools/git-flow/buil
 interface VersionsConfig {
   [placeholder: string]: string;
 }
+
+/** Where the versions file is looked for when the `versions-file` input is empty. */
+const VERSIONS_FILE_CANDIDATES = ['.publish/versions.yml', '.github/versions.yml'] as const;
 
 interface ProjectMetadata {
   name: string;
@@ -25,7 +29,12 @@ async function run() {
     // Get inputs
     const branch = core.getInput('branch', { required: true });
     const token = core.getInput('token', { required: true });
-    const versionsFile = core.getInput('versions_file') || '.publish/versions.yml';
+    // An empty input means "find it": the documented location first, then the
+    // legacy one, so repositories on either layout work without configuration.
+    const versionsFile =
+      core.getInput('versions_file') ||
+      VERSIONS_FILE_CANDIDATES.find((p) => existsSync(p)) ||
+      VERSIONS_FILE_CANDIDATES[0];
     const runNumber = parseInt(core.getInput('run_number') || '0', 10);
 
     // Set GITHUB_TOKEN for gh CLI commands in version resolution

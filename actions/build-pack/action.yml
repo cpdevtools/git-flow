@@ -153,4 +153,3 @@ runs:
         INPUT_PR_NUMBER: ${{ inputs.pr-number }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
-        INPUT_ARTIFACT_OUTPUT_DIR: ${{ inputs.artifact-output-dir }}

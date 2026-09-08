@@ -1,19 +1,20 @@
 # Actions and Workflows
 
-Eight composite actions, referenced as `cpdevtools/git-flow/actions/<name>@main`. A managed
+Nine composite actions, referenced as `cpdevtools/git-flow/actions/<name>@main`. A managed
 repository's own workflows are thin wrappers around them — see
 [Repository Structure](Repository-Structure).
 
-| Action                                      | Purpose                                                                   |
-| ------------------------------------------- | ------------------------------------------------------------------------- |
-| [`create-release-pr`](#create-release-pr)   | Ensure the release branch and keep the draft release pull request current |
-| [`test`](#test)                             | Run build and test scripts across the workspace in dependency order       |
-| [`test-integration`](#test-integration)     | The same, for integration scripts, on pull requests                       |
-| [`build-pack`](#build-pack)                 | Build and pack release artifacts from a release pull request              |
-| [`publish-release`](#publish-release)       | Publish to registries and finalise the releases                           |
-| [`deploy`](#deploy)                         | Send a signed deploy request to a gateway and stream the log back         |
-| [`cleanup-old-builds`](#cleanup-old-builds) | Prune superseded prerelease builds                                        |
-| [`publish-wiki`](#publish-wiki)             | Mirror a repository directory into the repository's GitHub wiki           |
+| Action                                              | Purpose                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------- |
+| [`create-release-pr`](#create-release-pr)           | Ensure the release branch and keep the draft release pull request current |
+| [`test`](#test)                                     | Run build and test scripts across the workspace in dependency order       |
+| [`test-integration`](#test-integration)             | The same, for integration scripts, on pull requests                       |
+| [`build-pack`](#build-pack)                         | Build and pack release artifacts from a release pull request              |
+| [`publish-release`](#publish-release)               | Publish to registries and finalise the releases                           |
+| [`deploy`](#deploy)                                 | Send a signed deploy request to a gateway and stream the log back         |
+| [`cleanup-old-builds`](#cleanup-old-builds)         | Prune superseded prerelease builds                                        |
+| [`cleanup-deleted-branch`](#cleanup-deleted-branch) | Delete `release/<branch>` after `<branch>` is deleted                     |
+| [`publish-wiki`](#publish-wiki)                     | Mirror a repository directory into the repository's GitHub wiki           |
 
 Every action takes a `token` input defaulting to `${{ github.token }}`.
 
@@ -25,21 +26,17 @@ Every action takes a `token` input defaulting to `${{ github.token }}`.
 - uses: cpdevtools/git-flow/actions/create-release-pr@main
   with:
     branch: ${{ github.ref_name }}
-    versions-file: .publish/versions.yml
     run-number: ${{ github.run_number }}
 ```
 
-| Input           | Default                  | Description                                                   |
-| --------------- | ------------------------ | ------------------------------------------------------------- |
-| `branch`        | `${{ github.ref_name }}` | Source branch                                                 |
-| `versions-file` | `.github/versions.yml`   | Path to the versions file — set it to `.publish/versions.yml` |
-| `run-number`    | _(required)_             | Used for the build suffix when a version is already released  |
-| `token`         | `${{ github.token }}`    | Needs `contents: write`, `pull-requests: write`               |
+| Input           | Default                  | Description                                                                                                                                 |
+| --------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `branch`        | `${{ github.ref_name }}` | Source branch                                                                                                                               |
+| `versions-file` | _(empty)_                | Path to the versions file. Empty resolves `.publish/versions.yml`, falling back to `.github/versions.yml`; pass it only to use another path |
+| `run-number`    | _(required)_             | Used for the build suffix when a version is already released                                                                                |
+| `token`         | `${{ github.token }}`    | Needs `contents: write`, `pull-requests: write`                                                                                             |
 
 **Outputs:** `pr-number`, `pr-url`, `release-branch`.
-
-> The default for `versions-file` is the legacy `.github/` location. Set it explicitly unless your
-> versions file lives there.
 
 ## `test`
 
@@ -113,6 +110,8 @@ Check out `${{ github.event.pull_request.merge_commit_sha }}`, not the branch he
 | `pr-number` | yes      | The merged release pull request                                    |
 | `token`     | yes      | Needs `contents: write`, `packages: write`, `pull-requests: write` |
 
+**Outputs:** `published-count`, `verified-count`, `failed-count`.
+
 ## `deploy`
 
 Signs and POSTs a deploy trigger to the gateway, then streams the log until the run reports its exit
@@ -144,6 +143,36 @@ the GitHub Environment rather than hardcoding them. See [Deployment](Deployment)
 Removes `.build.*` releases, their tags, and the matching GitHub Packages versions. Only build
 versions are touched.
 
+## `cleanup-deleted-branch`
+
+Deletes the `release/<branch>` counterpart that `create-release-pr` maintained for a branch, once
+that branch itself is deleted. Deleting a `release/*` ref is ignored, so the action never recurses
+into `release/release/<branch>` and a release branch's own deletion has no counterpart to remove.
+
+| Input    | Default                   | Description                         |
+| -------- | ------------------------- | ----------------------------------- |
+| `branch` | `${{ github.event.ref }}` | Name of the branch that was deleted |
+| `token`  | `${{ github.token }}`     | Needs `contents: write`             |
+
+Consumers wire it through an `on: delete` workflow that calls the reusable workflow. The delete
+event also fires for tags, hence the `ref_type` guard:
+
+```yaml
+name: Cleanup Deleted Branch
+
+on: delete
+
+jobs:
+  cleanup:
+    if: github.event.ref_type == 'branch'
+    uses: cpdevtools/git-flow/.github/workflows/cleanup-deleted-branch.yml@main
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+> Delete-event workflows only run from the copy of the file on the **default** branch. Adding the
+> workflow on a feature branch does nothing until it is merged.
+
 ## `publish-wiki`
 
 Mirrors a directory in the repository into the repository's GitHub wiki, so wiki pages are reviewed
@@ -166,10 +195,11 @@ in the same pull request as the code they document.
 
 Called with `uses:` at the job level rather than the step level.
 
-| Workflow                                                            | Wraps                |
-| ------------------------------------------------------------------- | -------------------- |
-| `cpdevtools/git-flow/.github/workflows/cleanup-old-builds.yml@main` | `cleanup-old-builds` |
-| `cpdevtools/git-flow/.github/workflows/publish-wiki.yml@main`       | `publish-wiki`       |
+| Workflow                                                                | Wraps                    |
+| ----------------------------------------------------------------------- | ------------------------ |
+| `cpdevtools/git-flow/.github/workflows/cleanup-old-builds.yml@main`     | `cleanup-old-builds`     |
+| `cpdevtools/git-flow/.github/workflows/cleanup-deleted-branch.yml@main` | `cleanup-deleted-branch` |
+| `cpdevtools/git-flow/.github/workflows/publish-wiki.yml@main`           | `publish-wiki`           |
 
 ```yaml
 jobs:

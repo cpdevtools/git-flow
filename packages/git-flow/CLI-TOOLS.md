@@ -1,3 +1,7 @@
+> **Historical record (January 2026).** Kept as-is for history; paths, version numbers, config
+> locations and artifact type names below are stale. Current documentation: the `wiki/` folder
+> (e.g. `wiki/CLI.md`) and `CHANGELOG.md`.
+
 # CLI Tools Documentation
 
 The git-flow ecosystem provides two CLI tools:

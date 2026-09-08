@@ -1,3 +1,7 @@
+> **Historical record (July 2026).** Kept as-is for history; paths, version numbers, config
+> locations and artifact type names below are stale. Current documentation: the `wiki/` folder
+> (e.g. `wiki/Actions.md`, `wiki/Release-Pipeline.md`) and `CHANGELOG.md`.
+
 # Phase 4 Implementation - COMPLETE ✅
 
 **Implementation Date**: July 2, 2026  

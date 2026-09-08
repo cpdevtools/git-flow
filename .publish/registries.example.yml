@@ -1,5 +1,8 @@
-# Registry Configuration for Phase 3 Publishing
-# Place this file at: .github/registries.yml
+# Registry configuration for publish-release
+# Place this file at: .publish/registries.yml
+#
+# `auth` (and `usernameEnv`) name ENVIRONMENT VARIABLES read at publish time —
+# never put a token value here.
 
 registries:
   # NPM Registry (npmjs.com)
@@ -50,25 +53,25 @@ registries:
     auth: ACR_TOKEN
     usernameEnv: ACR_USERNAME
 
-# How to use in artifact.yml:
+# How to reference registries from a project's release-artifacts.yml:
 # artifacts:
 #   - type: npm
-#     name: "@cpdevtools/my-package"
-#     path: "my-package-1.0.0.tgz"
-#     registries: ["npm", "github-npm"]  # Publish to both registries
+#     name: '${PACKAGE_NAME}'
+#     registries: [npm, github-npm]  # Publish to both registries
 #
-#   - type: docker
-#     name: "my-app"
-#     tempTag: "temp-abc1234"
-#     finalTag: "1.0.0"
-#     digest: "sha256:..."
-#     registry: "ghcr"  # Uses ghcr registry config
+#   - type: docker-image
+#     name: my-app                   # bare repository name — host and namespace
+#     registries: [ghcr, dockerhub]  # come from each registry entry above
+#
+# Pack saves the image with `docker save | gzip` and records `finalTag` (the
+# release version) and `digest`; publish loads, verifies, tags and pushes it.
+# Nothing is pushed to a registry at pack time.
 
 # Workflow usage:
 # - uses: cpdevtools/git-flow/actions/publish-release@main
 #   with:
 #     pr-number: ${{ github.event.pull_request.number }}
-#     github-token: ${{ secrets.GITHUB_TOKEN }}
+#     token: ${{ secrets.GITHUB_TOKEN }}
 #   env:
 #     # Pass all tokens as environment variables
 #     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

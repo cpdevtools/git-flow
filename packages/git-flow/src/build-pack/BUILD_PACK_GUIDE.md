@@ -22,7 +22,7 @@ The Build & Pack workflow (Phase 2) automates building and packaging projects fr
 - ✅ Packs only projects marked for release
 - ✅ Creates draft GitHub releases with artifacts
 - ✅ Supports resumability (skip completed projects)
-- ✅ Handles multiple artifact types (npm, docker, nuget, attachments)
+- ✅ Handles multiple artifact types (`npm`, `nuget`, `dotnet-lib`, `ng-lib`, `docker-image`, `docker-service`, `release-attachment`)
 
 ## Workflow Steps
 
@@ -35,12 +35,16 @@ runNumber: 42
 sha: abc1234567890
 timestamp: '2026-01-29T12:00:00Z'
 sourceBranch: develop
-projects:
-  - name: my-package
-    version: 1.2.3
-    prerelease: false
-    cwd: packages/my-package
+MAIN:
+  projects:
+    - name: my-package
+      version: 1.2.3
+      prerelease: false
+      cwd: packages/my-package
 ```
+
+Versions come from `.publish/versions.yml` (`0.0.0-MAIN: 1.2.3`), resolved per version key by
+`create-release-pr` when it updates the PR.
 
 ### 2. Project Discovery
 
@@ -62,6 +66,9 @@ Executes `pnpm run github.actions.build` for:
 - All projects marked for release
 - All their workspace dependencies
 
+Builds run through the workspace dependency graph in parallel, each project starting as soon as its
+own dependencies have built. The release version is applied to the project's manifests first.
+
 Environment variables provided:
 - `PROJECT_NAME` - Current project name
 - `PROJECT_VERSION` - Version to build
@@ -80,16 +87,18 @@ For each project:
 1. Creates/finds draft release (`{project-name}/v{version}`)
 2. Uploads `{project-name}.artifact.yml`
 3. Uploads artifact files based on type:
-   - NPM: `.tgz` file
-   - Docker: `.image.tar.gz` (gzipped `docker save` tarball)
-   - NuGet: `.nupkg` file
-   - Attachment: Specified file
+   - `npm`, `ng-lib`: `.tgz` file
+   - `docker-image`: `.image.tar.gz` (gzipped `docker save` tarball)
+   - `nuget`, `dotnet-lib`: `.nupkg` file
+   - `release-attachment`: Specified file
+   - `docker-service`: nothing — its product is the deploy bundle
 
 ## Project Configuration
 
-Each project must implement two package scripts:
+A project takes part in a release when it defines `github.actions.pack`. Most projects also define
+`github.actions.build`; a project with nothing to build (a `docker-service`) may omit it.
 
-### Required: `github.actions.build`
+### `github.actions.build`
 
 Builds your project. Typically just runs your normal build process.
 
@@ -115,7 +124,9 @@ Builds your project. Typically just runs your normal build process.
 
 ### Required: `github.actions.pack`
 
-Packages your project and creates the artifact descriptor.
+Packages your project and creates the artifact descriptor. The usual implementation is
+`gitflow pack`, which reads the project's declarative `release-artifacts.yml` and dispatches each
+entry to the handler for its `type`; the hand-written helper scripts below show what that produces.
 
 **Environment variables available:**
 - `PROJECT_NAME` - Your project name
@@ -187,38 +198,58 @@ then declare it in `release-artifacts.yml`:
 ```yaml
 # release-artifacts.yml
 artifacts:
-  - type: docker
-    name: ghcr.io/myorg/my-image   # fully-qualified: ghcr.io/<owner>/<image>
-    localTag: my-image:latest       # local tag to save (defaults to <name>:latest)
+  - type: docker-image
+    name: my-image              # bare repository name — no host or namespace
+    localTag: my-image:latest   # local tag to save (defaults to <project>:latest)
     registries: [ghcr, dockerhub]
+    deploy: [swarm]             # optional: deploy methods to build bundles for
 ```
 
+`name` must not contain a `/`. Host and namespace come from each registry entry in
+`.publish/registries.yml` and are composed per destination, so the same image can publish to
+several registries.
+
 During `pack`, `gitflow` serializes the built image with `docker save | gzip`
-into a tarball artifact (`<name>.image.tar.gz`) and records the image id as
-`digest`. That tarball is uploaded to the draft release and travels to the
-publish job, which runs `docker load`, verifies the `digest`, then tags and
-pushes the final release/`latest` tags. No transient `temp-*` tag is ever pushed
-to the registry, so nothing needs cleaning up afterwards.
+into a tarball artifact (`<name>.image.tar.gz`), records the release version as
+`finalTag` and the image id as `digest`. That tarball is uploaded to the draft
+release and travels to the publish job, which runs `docker load`, verifies the
+`digest`, then tags and pushes the release tag plus whichever floating tags
+(`latest`, `next`, a channel) the version earns. Nothing is pushed to any
+registry at pack time, so nothing needs cleaning up afterwards.
 
 The generated descriptor looks like:
 
 ```yaml
 project: my-image
 artifacts:
-  - type: docker
-    name: ghcr.io/myorg/my-image
+  - type: docker-image
+    name: my-image
     localTag: my-image:latest
     finalTag: 1.0.0
     digest: sha256:...
-    registry: ghcr.io
-    imageArchive: /tmp/git-flow-artifacts/myorg-my-image.image.tar.gz
+    imageArchive: /tmp/git-flow-artifacts/my-image.image.tar.gz
     pushedAt: '2026-01-29T12:00:00Z'
     registries: [ghcr, dockerhub]
+    deploy: [swarm]
 ```
+
+Any artifact may also carry deployment keys — `deploy` (methods: `compose`, `swarm`, `swarm-job`),
+`versioning` (`singleton` or `major`), `stack`, `service`, `sharedStorage`, `seedStorage`. They
+configure the deploy bundle, not the artifact.
 
 ### NuGet Package
 
-**Pack script:**
+`nuget` copies a `.nupkg` the build already produced and does not control its version. For a
+library you own, prefer `dotnet-lib`, which builds and packs at the release version:
+
+```yaml
+artifacts:
+  - type: dotnet-lib
+    name: MyOrg.Package
+    registries: [github-nuget]
+```
+
+**Pack script (`nuget`):**
 ```json
 {
   "scripts": {
@@ -266,57 +297,44 @@ name: Build & Pack
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [closed]
     branches:
       - 'release/**'
 
 permissions:
   contents: write
   pull-requests: read
-  packages: write # required to push docker artifacts to GHCR
+  packages: read
 
 jobs:
   build-pack:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: actions/checkout@v7
         with:
-          version: 9
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-      
-      - name: Install dependencies
-        run: pnpm install
-      
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
       - name: Build & Pack
         uses: cpdevtools/git-flow/actions/build-pack@main
         with:
           pr-number: ${{ github.event.pull_request.number }}
           token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload artifact manifests
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: artifact-manifests
-          path: .artifacts/*.yml
 ```
+
+Check out the merge commit, not the branch head. The action installs Node, pnpm and the workspace
+itself, so no setup steps are needed before it. `publish-release` runs afterwards in the same
+workflow with `packages: write`.
 
 ### Permissions
 
 The workflow requires:
 - `contents: write` - Create draft releases and upload assets
 - `pull-requests: read` - Read PR description
-- `packages: write` - Push docker artifacts to GHCR (required only when packing `docker` artifacts)
+- `packages: read` - Install workspace packages from GitHub Packages. Nothing is pushed at pack time;
+  registry pushes happen in `publish-release`
 
 ### Secrets
 
@@ -396,7 +414,10 @@ my-monorepo/
 │           └── create-artifact.js
 ├── .github/
 │   └── workflows/
-│       └── build-pack.yml
+│       └── build-pack-publish.yml
+├── .publish/
+│   ├── versions.yml
+│   └── registries.yml
 └── pnpm-workspace.yaml
 ```
 
@@ -431,8 +452,8 @@ writeFileSync(
 
 ## Next Steps
 
-After Phase 2 completes:
+After Build & Pack completes:
 - Draft releases created with artifacts
-- Ready for Phase 3: Publish & Release
+- Ready for `publish-release`
 - Can manually verify artifacts before publishing
 - Resumability allows re-running failed builds
