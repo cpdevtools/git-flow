@@ -29,6 +29,10 @@ runs:
       uses: actions/setup-node@v6
       with:
         node-version: '24'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@cpdevtools'
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
 
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
@@ -42,12 +46,25 @@ runs:
         # package.json.
         version: 11.5.0
 
+    # The workspace lockfile resolves @cpdevtools/* from npm.pkg.github.com,
+    # which requires a token even to read package metadata. Without it pnpm's
+    # supply-chain check cannot verify those entries against the registry and
+    # fails with ERR_PNPM_TARBALL_URL_MISMATCH before the tarballs are fetched.
+    # Matches actions/build-pack.
+    - name: Configure registry auth
+      shell: bash
+      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
     - name: Install action dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
       run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-cleanup-old-builds
       env:
         HUSKY: '0'
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
 
     - name: Cleanup releases, tags and packages
       shell: bash
