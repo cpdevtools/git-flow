@@ -10,7 +10,7 @@ inputs:
   days-old:
     description: 'Delete builds/drafts older than X days'
     required: false
-    default: '14'
+    default: '90'
 
   dry-run:
     description: 'Dry run (show what would be deleted without deleting)'

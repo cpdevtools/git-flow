@@ -6,7 +6,7 @@ on:
       days_old:
         description: 'Delete builds older than X days'
         type: string
-        default: '14'
+        default: '90'
       dry_run:
         description: 'Dry run (show what would be deleted without deleting)'
         type: string

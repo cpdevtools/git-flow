@@ -136,7 +136,7 @@ the GitHub Environment rather than hardcoding them. See [Deployment](Deployment)
 
 | Input      | Default               | Description                                |
 | ---------- | --------------------- | ------------------------------------------ |
-| `days-old` | `14`                  | Delete builds older than this              |
+| `days-old` | `90`                  | Delete builds older than this (about three months) |
 | `dry-run`  | `false`               | Report without deleting                    |
 | `token`    | `${{ github.token }}` | Needs `contents: write`, `packages: write` |
 
@@ -206,7 +206,7 @@ jobs:
   cleanup:
     uses: cpdevtools/git-flow/.github/workflows/cleanup-old-builds.yml@main
     with:
-      days_old: '14'
+      days_old: '90'
       dry_run: 'false'
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}

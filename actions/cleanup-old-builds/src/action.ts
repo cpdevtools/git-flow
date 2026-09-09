@@ -25,7 +25,7 @@ import { parse as parseYaml } from 'yaml';
 const token = process.env['GH_TOKEN'] ?? process.env['GITHUB_TOKEN'] ?? '';
 const repo = process.env['GITHUB_REPOSITORY'] ?? '';
 const owner = process.env['GITHUB_REPOSITORY_OWNER'] ?? '';
-const daysOld = Number(process.env['DAYS_OLD'] || '14');
+const daysOld = Number(process.env['DAYS_OLD'] || '90');
 const dryRun = (process.env['DRY_RUN'] || 'false') === 'true';
 
 if (!token || !repo || !owner) {
