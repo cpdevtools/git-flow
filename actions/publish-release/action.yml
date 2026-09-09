@@ -9,13 +9,16 @@ inputs:
     description: 'GitHub token for API access'
     required: true
 
-# outputs:
-#   published-count:
-#     description: 'Number of projects successfully published'
-#   verified-count:
-#     description: 'Number of projects verified'
-#   failed-count:
-#     description: 'Number of projects that failed'
+outputs:
+  published-count:
+    description: 'Number of projects successfully published'
+    value: ${{ steps.publish.outputs.published-count }}
+  verified-count:
+    description: 'Number of projects verified'
+    value: ${{ steps.publish.outputs.verified-count }}
+  failed-count:
+    description: 'Number of projects that failed'
+    value: ${{ steps.publish.outputs.failed-count }}
 
 runs:
   using: 'composite'
@@ -72,6 +75,7 @@ runs:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
 
     - name: Run Publish Release
+      id: publish
       shell: bash
       run: ${{ github.action_path }}/node_modules/.bin/tsx --tsconfig ${{ github.action_path }}/tsconfig.json ${{ github.action_path }}/src/action.ts
       env:

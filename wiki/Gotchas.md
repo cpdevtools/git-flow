@@ -36,12 +36,6 @@ It does **not** read the workspace member globs.
 A fixture or example directory with a `package.json` will show up in the build set. Being discovered
 does not mean being released, but it does mean being built.
 
-## `versions-file` defaults to the old location
-
-`create-release-pr`'s `versions-file` input defaults to `.github/versions.yml`. If your file is at
-`.publish/versions.yml` — the documented location — you must pass it explicitly, or version
-resolution fails to find any keys.
-
 ## Check out the merge commit, not the branch
 
 `build-pack` and `publish-release` must run against
