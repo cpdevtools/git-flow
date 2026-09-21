@@ -35,6 +35,21 @@ function setPublishedInMetadata(artifactYaml: string, value: boolean): string {
 }
 
 /**
+ * Record where a release came from as top-level `branch` / `pr` keys, so
+ * `gitflow deploy` can map the release back to its source branch without a PR
+ * lookup. Keys with no value (manual dispatch has no PR) are left out.
+ */
+export function addSourceToMetadata(
+  artifactYaml: string,
+  source: { branch?: string; prNumber?: number },
+): string {
+  const doc = parseDocument(artifactYaml);
+  if (source.branch) doc.set('branch', source.branch);
+  if (source.prNumber) doc.set('pr', source.prNumber);
+  return doc.toString();
+}
+
+/**
  * Get release tag name for a project.
  *
  * The version must be the last path segment: git refs are filesystem paths, so a
@@ -275,7 +290,7 @@ export async function findOrCreateDraftRelease(
 
   // Add published:false to artifact metadata if provided
   const processedMetadata = artifactMetadata
-    ? addPublishedFlagsToMetadata(artifactMetadata)
+    ? addSourceToMetadata(addPublishedFlagsToMetadata(artifactMetadata), context)
     : undefined;
 
   // Build release body with PR link, tags, and artifact metadata

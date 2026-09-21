@@ -1,18 +1,22 @@
 /**
  * gitflow deploy
  *
- * Interactive CLI to select a deploy target (environment), package, and version,
- * then dispatch the corresponding per-environment deploy workflow via the GitHub API.
+ * Interactive CLI that scans the repo's deployable releases into one master list
+ * and narrows it with each selection — environment → source branch → version →
+ * packages — then dispatches the per-environment deploy workflow via the GitHub
+ * API. The version determines which packages can be deployed, and the workflow
+ * runs on the ref mapped from the release's source branch.
  *
  * Required env vars:
  *   GITHUB_TOKEN — PAT with actions:write + contents:read
  *
  * Every prompt is short-circuitable via flags:
- *   --branch  -b  Release branch to scan for deploy workflows
  *   --target  -t  Target environment (e.g. production, dev)
- *   --package -p  Package name(s) to deploy (repeatable)
+ *   --branch  -b  Source branch the releases were cut from
  *   --version -v  Version to deploy: semver, "latest", or "next"
+ *   --package -p  Package name(s) to deploy (repeatable)
  *   --method  -m  Deploy method (e.g. node, compose, swarm)
+ *   --ref         Force the ref the workflow is dispatched on
  *   --yes     -y  Skip confirmation prompt
  *   --repo    -r  Override GitHub repo (owner/repo)
  */
@@ -24,18 +28,23 @@ import prompts from 'prompts';
 import {
   type GHRelease,
   versionFromTag,
-  packageFromTag,
   parseRepoFromUrl,
-  groupByPackage,
   resolveVersionKeyword,
   buildVersionChoices,
   LOAD_MORE,
   isDeployable,
+  isGitflowTag,
   releaseDeployMethods,
   defaultMethod,
   parseWorkflowEnvironment,
-  majorFromVersionBranch,
-  filterReleasesByMajor,
+  filterReleasesByMethods,
+  stripReleasePrefix,
+  prNumbersToLookUp,
+  sourceBranchOf,
+  groupBySourceBranch,
+  distinctVersions,
+  packagesAtVersion,
+  dispatchRefCandidates,
 } from './deploy-helpers.js';
 
 interface DeployTarget {
@@ -130,42 +139,81 @@ async function fetchEnvironmentConfig(
   }
 }
 
-async function discoverReleaseBranch(token: string, owner: string, repo: string): Promise<string> {
-  const current = getCurrentBranch();
-  if (current.startsWith('release/')) return current;
-
-  // Try release/<current-branch> by convention
-  const candidate = `release/${current}`;
-  try {
-    await gh(token, `/repos/${owner}/${repo}/git/ref/heads/${candidate}`);
-    return candidate;
-  } catch {
-    // Candidate doesn't exist — fall through to list
-  }
-
-  const branches = await gh<{ name: string }[]>(
-    token,
-    `/repos/${owner}/${repo}/branches?per_page=100`,
-  );
-  const releaseBranches = (branches ?? [])
-    .filter((b) => b.name.startsWith('release/'))
-    .map((b) => b.name);
-
-  if (releaseBranches.length === 0) {
-    throw new Error(
-      `No release/* branches found in ${owner}/${repo}. Use --branch to specify one.`,
+/** All branch names on origin (paginated). */
+async function listRemoteBranches(token: string, owner: string, repo: string): Promise<string[]> {
+  const names: string[] = [];
+  let page = 1;
+  while (true) {
+    const batch = await gh<{ name: string }[]>(
+      token,
+      `/repos/${owner}/${repo}/branches?per_page=100&page=${page}`,
     );
+    if (!batch || batch.length === 0) break;
+    names.push(...batch.map((b) => b.name));
+    if (batch.length < 100) break;
+    page++;
   }
-  if (releaseBranches.length === 1) return releaseBranches[0];
+  return names;
+}
 
-  const r = await prompts({
-    type: 'select',
-    name: 'branch',
-    message: 'Select release branch:',
-    choices: releaseBranches.map((b) => ({ title: b, value: b })),
-  });
-  if (!r.branch) process.exit(0);
-  return r.branch as string;
+async function fetchDefaultBranch(token: string, owner: string, repo: string): Promise<string> {
+  const res = await gh<{ default_branch?: string }>(token, `/repos/${owner}/${repo}`);
+  return res?.default_branch ?? 'main';
+}
+
+/**
+ * Head branch of each PR in `numbers`. Pages the PR list newest-first and stops
+ * once every wanted PR is found or the page is past the oldest one wanted.
+ * Best-effort: an API failure returns what was found so far, and the caller
+ * falls back to parsing the branch out of the version.
+ */
+async function fetchPrHeads(
+  token: string,
+  owner: string,
+  repo: string,
+  numbers: number[],
+): Promise<Map<number, string>> {
+  const heads = new Map<number, string>();
+  if (numbers.length === 0) return heads;
+  const wanted = new Set(numbers);
+  const oldest = Math.min(...numbers);
+  try {
+    let page = 1;
+    while (heads.size < wanted.size) {
+      const batch = await gh<{ number: number; head: { ref: string } }[]>(
+        token,
+        `/repos/${owner}/${repo}/pulls?state=all&sort=created&direction=desc&per_page=100&page=${page}`,
+      );
+      if (!batch || batch.length === 0) break;
+      for (const pr of batch) {
+        if (wanted.has(pr.number)) heads.set(pr.number, pr.head.ref);
+      }
+      if (batch.length < 100 || batch[batch.length - 1].number <= oldest) break;
+      page++;
+    }
+  } catch {
+    // Fall back to version parsing for the PRs not resolved.
+  }
+  return heads;
+}
+
+/** True when `ref` carries the workflow file, i.e. the dispatch can run there. */
+async function refHasWorkflow(
+  token: string,
+  owner: string,
+  repo: string,
+  ref: string,
+  workflowFile: string,
+): Promise<boolean> {
+  try {
+    await gh(
+      token,
+      `/repos/${owner}/${repo}/contents/.github/workflows/${encodeURIComponent(workflowFile)}?ref=${encodeURIComponent(ref)}`,
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function discoverDeployTargets(
@@ -221,7 +269,7 @@ async function listDeployableReleases(
     if (!batch || batch.length === 0) break;
     for (const r of batch) {
       if (r.draft) continue;
-      if (isDeployable(r)) results.push(r);
+      if (isGitflowTag(r.tag_name) && isDeployable(r)) results.push(r);
     }
     if (batch.length < 100) break;
     page++;
@@ -262,13 +310,14 @@ async function dispatchWorkflow(
 
 export default class Deploy extends Command {
   static override description =
-    'Interactive deploy — select an environment, package, and version, then dispatch the deploy workflow.';
+    'Interactive deploy — select an environment, source branch, version, and packages, then dispatch the deploy workflow.';
 
   static override examples = [
     '<%= config.bin %> deploy',
     '<%= config.bin %> deploy --target production --package @org/svc --version latest',
     '<%= config.bin %> deploy --target production --package @org/svc --version next --yes',
-    '<%= config.bin %> deploy --repo owner/repo --branch release/main --target dev --yes',
+    '<%= config.bin %> deploy --target dev --branch feature/checkout --version next --yes',
+    '<%= config.bin %> deploy --repo owner/repo --target dev --ref release/main --yes',
   ];
 
   static override flags = {
@@ -279,7 +328,11 @@ export default class Deploy extends Command {
     branch: Flags.string({
       char: 'b',
       description:
-        'Release branch to scan for deploy workflows (e.g. release/main). Defaults to release/<current-branch>.',
+        'Source branch the releases were cut from (e.g. main, feature/checkout). Skips branch prompt.',
+    }),
+    ref: Flags.string({
+      description:
+        'Ref to dispatch the workflow on. Defaults to the release branch mapped from the selected version.',
     }),
     target: Flags.string({
       char: 't',
@@ -287,7 +340,8 @@ export default class Deploy extends Command {
     }),
     package: Flags.string({
       char: 'p',
-      description: 'Package(s) to deploy. Repeatable. Skips package selection prompt.',
+      description:
+        'Package(s) to deploy; must have the selected version. Repeatable. Skips package selection prompt.',
       multiple: true,
     }),
     version: Flags.string({
@@ -327,15 +381,39 @@ export default class Deploy extends Command {
     // ── 1. Resolve repo ──────────────────────────────────────────────────────
     const repo = flags.repo ?? getRepoFromRemote();
     const [owner, repoName] = repo.split('/');
+    const current = getCurrentBranch();
 
-    // ── 2. Resolve release branch ────────────────────────────────────────────
-    const branch = flags.branch ?? (await discoverReleaseBranch(token, owner, repoName));
-    this.log(`Release branch: ${branch}`);
+    // ── 2. Scan deployable releases (the master list) ────────────────────────
+    // Every later selection only filters this list down.
+    this.log('Fetching releases...');
+    const [allReleases, remoteBranches, defaultBranch] = await Promise.all([
+      listDeployableReleases(token, owner, repoName),
+      listRemoteBranches(token, owner, repoName),
+      fetchDefaultBranch(token, owner, repoName),
+    ]);
+    let releases = allReleases;
+    if (releases.length === 0) {
+      this.error(
+        'No deployable releases found (no published releases advertising a deploy method).',
+      );
+    }
+
+    // Map releases back to their source branch: metadata `branch` → release PR
+    // head → parsed from the version.
+    const prHeads = await fetchPrHeads(token, owner, repoName, prNumbersToLookUp(releases));
+    const branchOf = (r: GHRelease): string =>
+      sourceBranchOf(r, prHeads, remoteBranches, defaultBranch);
 
     // ── 3. Discover deploy targets ───────────────────────────────────────────
-    const targets = await discoverDeployTargets(token, owner, repoName, branch);
+    // Targets are read from the current branch's release branch (else the default
+    // one); the ref the workflow runs on is resolved later from the version.
+    const scanRef = dispatchRefCandidates('', current, defaultBranch).find((b) =>
+      remoteBranches.includes(b),
+    );
+    if (!scanRef) this.error(`No branch to scan for deploy workflows found in ${repo}.`);
+    const targets = await discoverDeployTargets(token, owner, repoName, scanRef!);
     if (targets.length === 0) {
-      this.error(`No deploy workflows found on ${branch}. Expected files matching deploy-*.yml.`);
+      this.error(`No deploy workflows found on ${scanRef}. Expected files matching deploy-*.yml.`);
     }
 
     // ── 4. Select target environment ─────────────────────────────────────────
@@ -365,48 +443,87 @@ export default class Deploy extends Command {
       target = r.target as DeployTarget;
     }
 
-    // ── 5. List deployable releases ──────────────────────────────────────────
-    // Fetch releases and environment config in parallel — independent reads.
-    this.log('Fetching releases...');
-    const [releases, envConfig] = await Promise.all([
-      listDeployableReleases(token, owner, repoName),
-      fetchEnvironmentConfig(token, owner, repoName, target.environment),
-    ]);
+    const envConfig = await fetchEnvironmentConfig(token, owner, repoName, target.environment);
     if (envConfig.allowedMethods.length > 0) {
       this.log(
         `Allowed methods in "${target.environment}": ${envConfig.allowedMethods.join(', ')}`,
       );
-    }
-    if (releases.length === 0) {
-      this.error(
-        'No deployable releases found (no published releases advertising a deploy method).',
-      );
-    }
-
-    // On a versioned release branch (e.g. release/v0), restrict the selectable
-    // versions to that major so the operator isn't scrolling past other majors.
-    const branchMajor = majorFromVersionBranch(branch);
-    const scopedReleases =
-      branchMajor === null ? releases : filterReleasesByMajor(releases, branchMajor);
-    if (branchMajor !== null) {
-      this.log(`Restricting to v${branchMajor}.x releases (versioned branch ${branch}).`);
-      if (scopedReleases.length === 0) {
-        this.error(
-          `No deployable v${branchMajor}.x releases found. ` +
-            `Use --branch to target a different release branch.`,
-        );
+      releases = filterReleasesByMethods(releases, envConfig.allowedMethods);
+      if (releases.length === 0) {
+        this.error(`No releases advertise a deploy method allowed in "${target.environment}".`);
       }
     }
 
-    const byPackage = groupByPackage(scopedReleases);
+    // ── 5. Select source branch ──────────────────────────────────────────────
+    const groups = groupBySourceBranch(releases, branchOf, remoteBranches, current, defaultBranch);
+    let group: (typeof groups)[number];
+    if (flags.branch) {
+      const wanted = stripReleasePrefix(flags.branch);
+      const found = groups.find((g) => g.branch === wanted);
+      if (!found) {
+        this.error(
+          `No deployable releases from branch "${wanted}". Available: ${groups.map((g) => g.branch).join(', ')}.`,
+        );
+      }
+      group = found!;
+    } else if (groups.length === 1) {
+      group = groups[0];
+      this.log(`Branch: ${group.branch}`);
+    } else {
+      // groupBySourceBranch puts the current branch first (else the default one).
+      const r = await prompts({
+        type: 'select',
+        name: 'group',
+        message: 'Select branch:',
+        choices: groups.map((g) => ({
+          title: g.exists ? g.branch : `${g.branch} (deleted)`,
+          value: g,
+        })),
+        initial: 0,
+      });
+      if (!r.group) process.exit(0);
+      group = r.group as (typeof groups)[number];
+    }
+    releases = group.releases;
+
+    // ── 6. Select version ────────────────────────────────────────────────────
+    // One version across all packages — it decides which packages are available.
+    const versions = distinctVersions(releases);
+    let versionRelease: GHRelease | undefined;
+    if (flags.version) {
+      versionRelease = resolveVersionKeyword(flags.version, versions);
+      if (!versionRelease) {
+        this.error(`No release found on ${group.branch} matching version "${flags.version}".`);
+      }
+    } else {
+      let showAllVersions = false;
+      while (!versionRelease) {
+        const r = await prompts({
+          type: 'select',
+          name: 'release',
+          message: 'Select version:',
+          choices: buildVersionChoices(versions, showAllVersions),
+        });
+        if (!r.release) process.exit(0);
+        if (r.release === LOAD_MORE) {
+          showAllVersions = true;
+          continue;
+        }
+        versionRelease = r.release as GHRelease;
+      }
+    }
+    const version = versionFromTag(versionRelease!.tag_name);
+    const byPackage = packagesAtVersion(releases, version);
     const packageNames = Object.keys(byPackage).sort();
 
-    // ── 6. Select packages ───────────────────────────────────────────────────
+    // ── 7. Select packages ───────────────────────────────────────────────────
     let selectedPackages: string[];
     if (flags.package && flags.package.length > 0) {
       for (const p of flags.package) {
         if (!byPackage[p]) {
-          this.error(`Package "${p}" not found. Available: ${packageNames.join(', ')}.`);
+          this.error(
+            `Package "${p}" has no deployable ${version} release. Available: ${packageNames.join(', ')}.`,
+          );
         }
       }
       selectedPackages = flags.package;
@@ -417,7 +534,7 @@ export default class Deploy extends Command {
       const r = await prompts({
         type: 'multiselect',
         name: 'packages',
-        message: 'Select packages to deploy:',
+        message: `Select packages to deploy at ${version}:`,
         choices: packageNames.map((p) => ({ title: p, value: p })),
         min: 1,
       });
@@ -425,37 +542,11 @@ export default class Deploy extends Command {
       selectedPackages = r.packages as string[];
     }
 
-    // ── 7. Select version + deploy method for each package ──────────────────
+    // ── 8. Select deploy method for each package ─────────────────────────────
     const dispatches: { pkg: string; release: GHRelease; method: string }[] = [];
 
     for (const pkg of selectedPackages) {
-      const pkgReleases = byPackage[pkg];
-      let selected: GHRelease | undefined;
-
-      if (flags.version) {
-        selected = resolveVersionKeyword(flags.version, pkgReleases);
-        if (!selected) {
-          this.error(`No release found for ${pkg} matching version "${flags.version}".`);
-        }
-      } else {
-        let showAllVersions = false;
-        while (!selected) {
-          const r = await prompts({
-            type: 'select',
-            name: 'release',
-            message: `Select version for ${pkg}:`,
-            choices: buildVersionChoices(pkgReleases, showAllVersions),
-          });
-          if (!r.release) process.exit(0);
-          if (r.release === LOAD_MORE) {
-            showAllVersions = true;
-            continue;
-          }
-          selected = r.release as GHRelease;
-        }
-      }
-
-      const release = selected!;
+      const release = byPackage[pkg];
       const releaseMethods = releaseDeployMethods(release);
       // Intersect with the environment allowlist if one is configured.
       const methods =
@@ -510,9 +601,30 @@ export default class Deploy extends Command {
       dispatches.push({ pkg, release, method });
     }
 
-    // ── 8. Confirm ───────────────────────────────────────────────────────────
+    // ── 9. Resolve the ref the workflow runs on ──────────────────────────────
+    // release/<source> → <source> → current branch → default branch; a ref only
+    // counts when it is on origin and carries the target's workflow file.
+    let ref = flags.ref;
+    if (!ref) {
+      for (const candidate of dispatchRefCandidates(group.branch, current, defaultBranch)) {
+        if (!remoteBranches.includes(candidate)) continue;
+        if (await refHasWorkflow(token, owner, repoName, candidate, target.workflowFile)) {
+          ref = candidate;
+          break;
+        }
+      }
+      if (!ref) {
+        this.error(
+          `No branch on origin carries ${target.workflowFile} for ${group.branch}. Use --ref to specify one.`,
+        );
+      }
+    }
+
+    // ── 10. Confirm ──────────────────────────────────────────────────────────
     if (!flags.yes) {
       this.log('\nDeploy plan:');
+      this.log(`  Source branch: ${group.branch}${group.exists ? '' : ' (deleted)'}`);
+      this.log(`  Workflow ref:  ${ref}`);
       for (const d of dispatches) {
         this.log(
           `  ${d.pkg}  ${versionFromTag(d.release.tag_name)}  [${d.method}]  →  ${target.environment}`,
@@ -530,7 +642,7 @@ export default class Deploy extends Command {
       }
     }
 
-    // ── 9. Dispatch ──────────────────────────────────────────────────────────
+    // ── 11. Dispatch ─────────────────────────────────────────────────────────
     // Build the deploy env string: files first (lower priority), --set last (higher).
     const envFileParts: string[] = [];
     for (const f of flags['env-file'] ?? []) {
@@ -550,7 +662,7 @@ export default class Deploy extends Command {
         owner,
         repoName,
         target,
-        branch,
+        ref!,
         d.release.id,
         d.method,
         deployEnv,

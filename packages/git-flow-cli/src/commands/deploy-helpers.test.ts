@@ -14,6 +14,19 @@ import {
   parseWorkflowEnvironment,
   majorFromVersionBranch,
   filterReleasesByMajor,
+  filterReleasesByMethods,
+  isGitflowTag,
+  stripReleasePrefix,
+  branchFromMetadata,
+  prNumberFromBody,
+  branchKeyFromVersion,
+  branchFromKey,
+  sourceBranchOf,
+  prNumbersToLookUp,
+  groupBySourceBranch,
+  distinctVersions,
+  packagesAtVersion,
+  dispatchRefCandidates,
   type GHRelease,
 } from './deploy-helpers.js';
 
@@ -413,5 +426,230 @@ describe('parseWorkflowEnvironment', () => {
 
   it('returns undefined for malformed YAML', () => {
     expect(parseWorkflowEnvironment('jobs: [unclosed')).toBeUndefined();
+  });
+});
+
+// ─── source branch mapping ────────────────────────────────────────────────────
+
+const ORIGIN = ['main', 'release/main', 'feature/wirecut', 'release/feature/wirecut', 'qq/asdf'];
+
+/** Release body whose metadata records the source branch / PR (new build-pack format). */
+function bodyWithSource(branch?: string, pr?: number): string {
+  const source = `${branch ? `branch: ${branch}\n` : ''}${pr ? `pr: ${pr}\n` : ''}`;
+  const yaml = `project: '@org/svc'\n${source}artifacts:\n  - type: npm\n    name: '@org/svc'\n    published: true\n    deploy:\n      - node`;
+  return `## Artifact Metadata\n\`\`\`yaml\n${yaml}\n\`\`\``;
+}
+
+describe('stripReleasePrefix', () => {
+  it('strips only a leading release/', () => {
+    expect(stripReleasePrefix('release/feature/x')).toBe('feature/x');
+    expect(stripReleasePrefix('feature/release/x')).toBe('feature/release/x');
+    expect(stripReleasePrefix('main')).toBe('main');
+  });
+});
+
+describe('prNumberFromBody / branchFromMetadata', () => {
+  it('reads the PR number from the Created-from-PR line', () => {
+    expect(prNumberFromBody(release(1, '@org/svc/v1.0.0').body)).toBe(12);
+  });
+
+  it('prefers the metadata pr key', () => {
+    expect(prNumberFromBody(bodyWithSource('main', 205))).toBe(205);
+  });
+
+  it('returns undefined when there is no PR', () => {
+    expect(prNumberFromBody(null)).toBeUndefined();
+    expect(prNumberFromBody('no pr here')).toBeUndefined();
+  });
+
+  it('reads the branch from the metadata, when recorded', () => {
+    expect(
+      branchFromMetadata(release(1, '@org/svc/v1.0.0', { body: bodyWithSource('qq/asdf') })),
+    ).toBe('qq/asdf');
+    expect(branchFromMetadata(release(1, '@org/svc/v1.0.0'))).toBeUndefined();
+  });
+});
+
+describe('branchKeyFromVersion', () => {
+  it.each([
+    ['3.0.0-erd.wire-cut.batched-ids.alpha.1.build.99', 'erd.wire-cut.batched-ids'],
+    ['3.0.0-feature.wirecut.alpha.2', 'feature.wirecut'],
+    ['3.0.0-alpha.2', ''],
+    ['3.0.0-rc.0.build.4', ''],
+    ['3.0.0', ''],
+    ['1.2.3-main.build.5', 'main'],
+    ['1.2.3-feature.x', 'feature.x'],
+    ['1.2.3-feature.alpha.tools.beta.1', 'feature.alpha.tools'],
+  ])('%s → "%s"', (version, key) => {
+    expect(branchKeyFromVersion(version)).toBe(key);
+  });
+});
+
+describe('branchFromKey', () => {
+  it('matches forward against sanitized remote branches', () => {
+    const remote = [...ORIGIN, 'erd/wire-cut/batched-ids', 'fix/a.b'];
+    expect(branchFromKey('erd.wire-cut.batched-ids', 3, remote, 'main')).toBe(
+      'erd/wire-cut/batched-ids',
+    );
+    expect(branchFromKey('fix.a.b', 3, remote, 'main')).toBe('fix/a.b');
+  });
+
+  it('matches a branch that only survives as its release/ counterpart', () => {
+    expect(branchFromKey('feature.gone', 3, ['release/feature/gone'], 'main')).toBe('feature/gone');
+  });
+
+  it('falls back to dots→slashes for a deleted branch', () => {
+    expect(branchFromKey('www.qwerty', 3, ORIGIN, 'main')).toBe('www/qwerty');
+  });
+
+  it('maps mainline to v<major> when that branch exists, else the default branch', () => {
+    expect(branchFromKey('', 3, ORIGIN, 'main')).toBe('main');
+    expect(branchFromKey('', 3, [...ORIGIN, 'v3'], 'main')).toBe('v3');
+    expect(branchFromKey('', 3, [...ORIGIN, 'release/v3'], 'main')).toBe('v3');
+    expect(branchFromKey('', 2, [...ORIGIN, 'v3'], 'trunk')).toBe('trunk');
+  });
+});
+
+describe('sourceBranchOf', () => {
+  const prHeads = new Map([[12, 'feature/wirecut']]);
+
+  it('prefers the metadata branch over the PR and the version', () => {
+    const r = release(1, '@org/svc/v3.0.0-qq.asdf.alpha.1', {
+      body: `📋 **Created from PR:** #12\n\n${bodyWithSource('from/yaml')}`,
+    });
+    expect(sourceBranchOf(r, prHeads, ORIGIN, 'main')).toBe('from/yaml');
+  });
+
+  it('uses the PR head when the metadata has no branch', () => {
+    const r = release(1, '@org/svc/v3.0.0-qq.asdf.alpha.1');
+    expect(sourceBranchOf(r, prHeads, ORIGIN, 'main')).toBe('feature/wirecut');
+  });
+
+  it('parses the version when the PR lookup has nothing', () => {
+    const empty = new Map<number, string>();
+    expect(
+      sourceBranchOf(release(1, '@org/svc/v3.0.0-qq.asdf.alpha.1'), empty, ORIGIN, 'main'),
+    ).toBe('qq/asdf');
+    expect(sourceBranchOf(release(2, '@org/svc/v3.0.0-alpha.2'), empty, ORIGIN, 'main')).toBe(
+      'main',
+    );
+  });
+});
+
+describe('prNumbersToLookUp', () => {
+  it('lists distinct PRs of releases without a metadata branch', () => {
+    const releases = [
+      release(1, '@org/a/v1.0.0'),
+      release(2, '@org/b/v1.0.0'),
+      release(3, '@org/c/v1.0.0', { body: bodyWithSource('main', 99) }),
+    ];
+    expect(prNumbersToLookUp(releases)).toEqual([12]);
+  });
+});
+
+describe('groupBySourceBranch', () => {
+  const releases = [
+    release(10, '@org/a/v3.0.0-alpha.2'),
+    release(30, '@org/a/v3.0.0-feature.wirecut.alpha.2'),
+    release(20, '@org/b/v3.0.0-feature.wirecut.alpha.2'),
+    release(40, '@org/a/v3.0.0-www.qwerty.alpha.2'),
+  ];
+  const branchOf = (r: GHRelease) => sourceBranchOf(r, new Map(), ORIGIN, 'main');
+
+  it('groups releases and flags branches gone from origin', () => {
+    const groups = groupBySourceBranch(releases, branchOf, ORIGIN, 'main', 'main');
+    expect(groups.map((g) => [g.branch, g.exists, g.releases.length])).toEqual([
+      ['main', true, 1],
+      ['www/qwerty', false, 1],
+      ['feature/wirecut', true, 2],
+    ]);
+  });
+
+  it('puts the current branch first, then the default branch', () => {
+    const groups = groupBySourceBranch(
+      releases,
+      branchOf,
+      ORIGIN,
+      'release/feature/wirecut',
+      'main',
+    );
+    expect(groups.map((g) => g.branch)).toEqual(['feature/wirecut', 'main', 'www/qwerty']);
+  });
+});
+
+describe('distinctVersions / packagesAtVersion', () => {
+  const releases = [
+    release(1, '@org/a/v1.0.0'),
+    release(2, '@org/b/v1.0.0'),
+    release(3, '@org/a/v1.1.0-alpha.0'),
+    release(4, 'not-a-gitflow-tag'),
+  ];
+
+  it('lists each version once, newest first', () => {
+    expect(distinctVersions(releases).map((r) => versionFromTag(r.tag_name))).toEqual([
+      '1.1.0-alpha.0',
+      '1.0.0',
+    ]);
+  });
+
+  it('feeds resolveVersionKeyword across packages', () => {
+    const versions = distinctVersions(releases);
+    expect(versionFromTag(resolveVersionKeyword('latest', versions)!.tag_name)).toBe('1.0.0');
+    expect(versionFromTag(resolveVersionKeyword('next', versions)!.tag_name)).toBe('1.1.0-alpha.0');
+  });
+
+  it('returns only the packages that have the version', () => {
+    expect(Object.keys(packagesAtVersion(releases, '1.0.0')).sort()).toEqual(['@org/a', '@org/b']);
+    expect(Object.keys(packagesAtVersion(releases, '1.1.0-alpha.0'))).toEqual(['@org/a']);
+    expect(packagesAtVersion(releases, '1.0.0')['@org/b'].id).toBe(2);
+  });
+});
+
+describe('filterReleasesByMethods', () => {
+  const node = release(1, '@org/a/v1.0.0');
+  const compose = release(2, '@org/b/v1.0.0', {
+    body: bodyWithDeploy([{ type: 'docker-image', name: 'b', deploy: ['compose'] }]),
+  });
+
+  it('keeps releases advertising an allowed method', () => {
+    expect(filterReleasesByMethods([node, compose], ['compose', 'swarm'])).toEqual([compose]);
+  });
+
+  it('applies no restriction for an empty allowlist', () => {
+    expect(filterReleasesByMethods([node, compose], [])).toEqual([node, compose]);
+  });
+});
+
+describe('dispatchRefCandidates', () => {
+  // The ref used is the first candidate that is on origin (and has the workflow).
+  const pick = (source: string, current: string) =>
+    dispatchRefCandidates(source, current, 'main').find((b) => ORIGIN.includes(b));
+
+  it('runs on the release branch of the source branch', () => {
+    expect(pick('main', 'qq/asdf')).toBe('release/main');
+    expect(pick('feature/wirecut', 'main')).toBe('release/feature/wirecut');
+  });
+
+  it('runs on the source branch itself when it has no release branch', () => {
+    expect(pick('qq/asdf', 'main')).toBe('qq/asdf');
+  });
+
+  it('falls back to the current branch, then the default branch', () => {
+    expect(pick('www/qwerty', 'feature/wirecut')).toBe('release/feature/wirecut');
+    expect(pick('www/qwerty', 'local/only')).toBe('release/main');
+  });
+
+  it('de-dupes, never double-prefixes release/, and skips a detached HEAD', () => {
+    expect(dispatchRefCandidates('main', 'release/main', 'main')).toEqual(['release/main', 'main']);
+    expect(dispatchRefCandidates('', '', 'main')).toEqual(['release/main', 'main']);
+  });
+});
+
+describe('isGitflowTag', () => {
+  it('accepts {name}/v{semver} and rejects other layouts', () => {
+    expect(isGitflowTag('@org/svc/v1.2.3-feature.x.alpha.1')).toBe(true);
+    expect(isGitflowTag('v0.4.0-feature.deploy-flow.dev.10/@org/svc')).toBe(false);
+    expect(isGitflowTag('v1.2.3')).toBe(false);
+    expect(isGitflowTag('@org/svc/vnext')).toBe(false);
   });
 });

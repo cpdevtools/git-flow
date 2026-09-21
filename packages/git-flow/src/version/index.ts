@@ -14,6 +14,7 @@ export {
   buildVersion,
 } from './utils.js';
 export {
+  CHANNEL_ORDER,
   keyDisplayName,
   computeBumpOptions,
   filterExistingTags,

@@ -134,11 +134,11 @@ the GitHub Environment rather than hardcoding them. See [Deployment](Deployment)
 
 ## `cleanup-old-builds`
 
-| Input      | Default               | Description                                |
-| ---------- | --------------------- | ------------------------------------------ |
+| Input      | Default               | Description                                        |
+| ---------- | --------------------- | -------------------------------------------------- |
 | `days-old` | `90`                  | Delete builds older than this (about three months) |
-| `dry-run`  | `false`               | Report without deleting                    |
-| `token`    | `${{ github.token }}` | Needs `contents: write`, `packages: write` |
+| `dry-run`  | `false`               | Report without deleting                            |
+| `token`    | `${{ github.token }}` | Needs `contents: write`, `packages: write`         |
 
 Removes `.build.*` releases, their tags, and the matching GitHub Packages versions. Only build
 versions are touched.
