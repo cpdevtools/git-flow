@@ -56,6 +56,8 @@ export interface BuildPackContext {
   githubToken: string;
   /** Pull request number */
   prNumber: number;
+  /** Source branch the release was cut from (the release PR's head ref) */
+  branch?: string;
   /** Git commit SHA */
   sha: string;
   /** Workflow run number */

@@ -4,7 +4,7 @@ import { extractVersionParts, buildVersion } from './utils.js';
 
 // Semver compares prerelease identifiers by ASCII, so this must stay in
 // ascending order — see the invariant test in bumps.test.ts.
-const CHANNEL_ORDER = ['alpha', 'beta', 'rc'] as const;
+export const CHANNEL_ORDER = ['alpha', 'beta', 'rc'] as const;
 type Channel = (typeof CHANNEL_ORDER)[number];
 
 export interface BumpOption {

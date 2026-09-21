@@ -67,8 +67,21 @@ gitflow deploy
 gitflow deploy --target production --package @org/api --version latest --yes
 ```
 
-The command resolves your branch to its release branch, lists the environments available there, and
-lists the releases that branch produced. Two shorthands:
+The command scans the repository's deployable releases once and narrows that list with each choice:
+
+1. **Environment** — the `deploy-*.yml` workflows on your branch's release branch (else the default
+   branch's). Releases with no method in `DEPLOY_ALLOWED_METHODS` drop out.
+2. **Branch** — the source branches those releases were cut from, your current branch preselected.
+   A branch that is gone from origin is still listed, marked `(deleted)`.
+3. **Version** — the versions that branch produced, across all packages.
+4. **Packages** — only the packages that have a release at that version. You pick one version, and
+   the version decides what can be deployed; there is no per-package version.
+
+A release is mapped to its branch by the `branch` key in its Artifact Metadata. Releases that
+predate that key are mapped through their release PR's head branch, and failing that by the branch
+embedded in the version (`3.0.0-erd.wire-cut.alpha.1` came from `erd/wire-cut`).
+
+Two version shorthands:
 
 | Selector | Means                                                            |
 | -------- | ---------------------------------------------------------------- |
@@ -78,6 +91,23 @@ lists the releases that branch produced. Two shorthands:
 A feature branch has no stable release, so `latest` is empty there and `next` is what you deploy —
 which is the branch model showing through: a development branch cannot produce a stable version, so
 it cannot offer one to deploy.
+
+### Which ref the workflow runs on
+
+The workflow is dispatched on the release branch of the **selected release's** source branch, not
+of your checkout. The first of these that exists on origin and contains the environment's workflow
+file wins; `--ref` overrides the lot:
+
+| Order | Ref                                   |
+| ----- | ------------------------------------- |
+| 1     | `release/<source>`, then `<source>`   |
+| 2     | `release/<current>`, then `<current>` |
+| 3     | `release/<default>`, then `<default>` |
+
+So with `main`, `release/main`, `feature/wirecut`, `release/feature/wirecut` and `qq/asdf` on
+origin: `3.0.0-alpha.2` runs on `release/main`, `3.0.0-feature.wirecut.alpha.2` on
+`release/feature/wirecut`, `3.0.0-qq.asdf.alpha.2` on `qq/asdf`, and `3.0.0-www.qwerty.alpha.2`
+(branch deleted) on your current branch's ref, else `release/main`.
 
 Dispatching starts one run of the chosen environment's workflow per selected release.
 

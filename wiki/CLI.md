@@ -42,23 +42,25 @@ It offers only legal next versions and will not offer one that collides with an 
 
 ## `gitflow deploy`
 
-Resolve the current branch to its release branch, choose an environment and a release, and dispatch
-that environment's deploy workflow.
+Choose an environment, a source branch, a version and the packages that have it, then dispatch that
+environment's deploy workflow on the ref mapped from the release's source branch.
 
 ```bash
 gitflow deploy
 gitflow deploy --target production --package @org/api --version latest --yes
-gitflow deploy --repo owner/repo --branch release/main --target dev --yes
+gitflow deploy --target dev --branch feature/checkout --version next --yes
+gitflow deploy --repo owner/repo --target dev --ref release/main --yes
 ```
 
 | Flag                      | Meaning                                                                |
 | ------------------------- | ---------------------------------------------------------------------- |
 | `-r, --repo <owner/repo>` | Defaults to the current `origin` remote                                |
-| `-b, --branch <branch>`   | Release branch to scan. Defaults to `release/<current-branch>`         |
 | `-t, --target <env>`      | Environment. Skips the prompt                                          |
-| `-p, --package <name>`    | Package to deploy. Repeatable                                          |
+| `-b, --branch <branch>`   | Source branch the releases were cut from. Skips the prompt             |
+| `-p, --package <name>`    | Package to deploy; must have the selected version. Repeatable          |
 | `-v, --version <spec>`    | A semver string, `latest` (highest stable) or `next` (highest overall) |
 | `-m, --method <name>`     | Deploy method. Must be one the release advertises                      |
+| `--ref <ref>`             | Ref to dispatch on. Defaults to the one mapped from the version        |
 | `-s, --set KEY=VAL`       | Per-run environment override. Repeatable                               |
 | `-e, --env-file <path>`   | File of `KEY=VAL` lines. Repeatable; later files win                   |
 | `-y, --yes`               | Skip the confirmation prompt                                           |

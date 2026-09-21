@@ -42,6 +42,9 @@ async function run(): Promise<void> {
     const [owner, repo] = (process.env.GITHUB_REPOSITORY || '/').split('/');
 
     let prBody = '';
+    // Source branch recorded in the release metadata: the release PR's head, or
+    // on manual dispatch the ref the workflow runs on (minus any release/ prefix).
+    let branch = (process.env.GITHUB_REF_NAME || '').replace(/^release\//, '') || undefined;
     if (!isManualDispatch) {
       const { data: pr } = await octokit.rest.pulls.get({
         owner,
@@ -53,6 +56,7 @@ async function run(): Promise<void> {
         throw new Error(`PR #${prNumber} has no description`);
       }
       prBody = pr.body;
+      branch = pr.head.ref;
     } else {
       // For manual dispatch, create a default body with YAML metadata
       prBody = `Manual dispatch from commit ${sha.substring(0, 7)}
@@ -81,6 +85,7 @@ projects:
         workspaceRoot,
         githubToken: token,
         prNumber,
+        branch,
         sha,
         runNumber,
       },
