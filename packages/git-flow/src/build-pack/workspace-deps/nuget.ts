@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'fs/promises';
-import { $ } from 'zx';
+import { restoreTrackedFile } from './git-restore.js';
 import fg from 'fast-glob';
 
 export interface ProjectConfig {
@@ -79,8 +79,6 @@ export async function restoreCsprojFiles(projectCwd: string): Promise<void> {
   });
 
   for (const csprojPath of csprojFiles) {
-    await $({ cwd: projectCwd })`git checkout ${csprojPath}`.catch(() => {
-      // Ignore errors - file may not be tracked
-    });
+    await restoreTrackedFile(projectCwd, csprojPath);
   }
 }

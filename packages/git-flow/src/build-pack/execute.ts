@@ -31,9 +31,9 @@ import {
 import {
   findOrCreateDraftRelease,
   getReleaseUrl,
-  uploadArtifact,
   markReleasePublished,
 } from './github.js';
+import { uploadDeployBundle } from './deploy-bundle.js';
 import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
 import { rewriteWorkspaceDependencies, restoreProjectFiles } from './workspace-deps/index.js';
@@ -690,21 +690,8 @@ async function executePackDeploy(
         );
 
         // Zip the deploy output dir and upload directly
-        const zipName = `deploy-${method}.zip`;
-        const zipPath = join(ARTIFACT_OUTPUT_DIR, zipName);
-        await mkdir(ARTIFACT_OUTPUT_DIR, { recursive: true });
-        await $({ cwd: deployOutputDir })`zip -r ${zipPath} .`;
-
-        await uploadArtifact(
-          uploadCtx.githubToken,
-          uploadCtx.owner,
-          uploadCtx.repo,
-          uploadCtx.releaseId,
-          uploadCtx.uploadUrl,
-          zipPath,
-          zipName,
-        );
-        console.log(`  \u2713 ${project.name}: ${zipName} uploaded`);
+        await uploadDeployBundle(project.name, method, deployOutputDir, uploadCtx);
+        console.log(`  \u2713 ${project.name}: deploy-${method}.zip uploaded`);
       }
     }
     return;
