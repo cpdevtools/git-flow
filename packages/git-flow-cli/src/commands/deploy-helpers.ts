@@ -131,10 +131,18 @@ export function branchKeyFromVersion(version: string): string {
   const isChannel = (id: string | number | undefined): boolean =>
     typeof id === 'string' && (CHANNEL_ORDER as readonly string[]).includes(id.toLowerCase());
 
-  if (ids.length >= 2 && ids[ids.length - 2] === 'build' && typeof ids[ids.length - 1] === 'number') {
+  if (
+    ids.length >= 2 &&
+    ids[ids.length - 2] === 'build' &&
+    typeof ids[ids.length - 1] === 'number'
+  ) {
     ids.splice(-2);
   }
-  if (ids.length >= 2 && isChannel(ids[ids.length - 2]) && typeof ids[ids.length - 1] === 'number') {
+  if (
+    ids.length >= 2 &&
+    isChannel(ids[ids.length - 2]) &&
+    typeof ids[ids.length - 1] === 'number'
+  ) {
     ids.splice(-2);
   } else if (isChannel(ids[ids.length - 1])) {
     ids.pop();

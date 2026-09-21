@@ -495,9 +495,7 @@ describe('branchFromKey', () => {
   });
 
   it('matches a branch that only survives as its release/ counterpart', () => {
-    expect(branchFromKey('feature.gone', 3, ['release/feature/gone'], 'main')).toBe(
-      'feature/gone',
-    );
+    expect(branchFromKey('feature.gone', 3, ['release/feature/gone'], 'main')).toBe('feature/gone');
   });
 
   it('falls back to dots→slashes for a deleted branch', () => {
@@ -597,9 +595,7 @@ describe('distinctVersions / packagesAtVersion', () => {
   it('feeds resolveVersionKeyword across packages', () => {
     const versions = distinctVersions(releases);
     expect(versionFromTag(resolveVersionKeyword('latest', versions)!.tag_name)).toBe('1.0.0');
-    expect(versionFromTag(resolveVersionKeyword('next', versions)!.tag_name)).toBe(
-      '1.1.0-alpha.0',
-    );
+    expect(versionFromTag(resolveVersionKeyword('next', versions)!.tag_name)).toBe('1.1.0-alpha.0');
   });
 
   it('returns only the packages that have the version', () => {
