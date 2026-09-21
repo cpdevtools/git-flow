@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { $ } from 'zx';
+import { restoreTrackedFile } from './git-restore.js';
 
 export interface ProjectConfig {
   name: string;
@@ -62,6 +62,5 @@ export async function rewriteNpmWorkspaceDependencies(
  * Restore original package.json from git
  */
 export async function restorePackageJson(projectCwd: string): Promise<void> {
-  const pkgPath = join(projectCwd, 'package.json');
-  await $({ cwd: projectCwd })`git checkout ${pkgPath}`;
+  await restoreTrackedFile(projectCwd, join(projectCwd, 'package.json'));
 }

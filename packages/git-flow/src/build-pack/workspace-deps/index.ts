@@ -34,9 +34,12 @@ export async function rewriteWorkspaceDependencies(options: {
  * Restore original project files after packing
  */
 export async function restoreProjectFiles(projectCwd: string): Promise<void> {
+  // Untracked / absent files are ignored inside; a real failure (e.g. a lost
+  // index.lock) must surface, or a stamped file silently stays un-restored.
+
   // Restore NPM package.json
-  await restorePackageJson(projectCwd).catch(() => {});
+  await restorePackageJson(projectCwd);
 
   // Restore NuGet .csproj files
-  await restoreCsprojFiles(projectCwd).catch(() => {});
+  await restoreCsprojFiles(projectCwd);
 }
