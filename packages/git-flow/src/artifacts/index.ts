@@ -68,6 +68,14 @@ import {
   publishToNuget,
   publishToDocker,
   getToken,
+  getRegistry,
+  loadRegistryConfig,
+  isBuildVersion,
+  isGitHubRegistry,
+  dockerLogin,
+  dockerLogout,
+  dockerPushWithRetry,
+  resolveDockerImageBase,
   floatingTagsFor,
   type NpmRegistry,
   type NugetRegistry,
@@ -180,7 +188,34 @@ const nuget: ArtifactType<NuGetArtifact> = {
   },
 };
 
-/** Docker — save the built image to a tarball artifact; publish loads & pushes it */
+/**
+ * Temporary registry tag for an image built from `sha`. One per commit, so a
+ * re-run of the same merge commit re-pushes (idempotently) rather than
+ * accumulating tags.
+ */
+export function dockerTempTag(sha: string): string {
+  const short = sha.trim().slice(0, 7);
+  if (!/^[0-9a-f]{7}$/i.test(short)) {
+    throw new Error(`dockerTempTag: expected a commit sha, got '${sha}'`);
+  }
+  return `temp-${short.toLowerCase()}`;
+}
+
+async function currentSha(cwd: string): Promise<string> {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  return (await $({ cwd })`git rev-parse HEAD`).stdout.trim();
+}
+
+/**
+ * Docker — push the built image to each destination registry under a temp tag
+ * at pack; publish promotes that tag to the release tag by digest.
+ *
+ * The image is transported between the build-pack and publish jobs through the
+ * registry itself, not as a release asset: GitHub caps release assets at 2 GiB,
+ * which a devcontainer or SDK-laden service image exceeds, and re-pushing at
+ * publish would upload every layer twice. Publish only pulls the temp tag,
+ * verifies it, and pushes tags — layers are already there.
+ */
 const docker: ArtifactType<DockerArtifact> = {
   async pack(artifact, ctx) {
     // The name is the image's BARE repository name — no registry host, no
@@ -188,7 +223,7 @@ const docker: ArtifactType<DockerArtifact> = {
     // and ACR in one release, so the host/namespace cannot live on the
     // artifact. Each registry entry in .publish/registries.yml carries its own
     // `registry:` + `namespace:`, and resolveDockerImageBase composes
-    // `<registry>/<namespace>/<name>` per destination at publish and verify.
+    // `<registry>/<namespace>/<name>` per destination at pack, publish and verify.
     //
     // Default: the unscoped project name. The npm scope is DROPPED, not
     // flattened — the registry namespace already carries the org, so
@@ -212,55 +247,76 @@ const docker: ArtifactType<DockerArtifact> = {
     // one KEEPS the flattened scope (`cpdevtools-git-flow-deploy-service`)
     // because local tags share a flat namespace across the workspace and must
     // match what the project's own `build:docker` script tagged.
-    const source =
-      (artifact as { localTag?: string }).localTag ?? `${safeName(ctx.projectName)}:latest`;
-    const archiveName = `${safeName(artifact.name)}.image.tar.gz`;
-    const archivePath = join(ctx.artifactOutputDir, archiveName);
+    const source = artifact.localTag ?? `${safeName(ctx.projectName)}:latest`;
 
-    await mkdir(ctx.artifactOutputDir, { recursive: true });
-
-    // Capture the image config id (.Id) — stable across docker save/load — to
-    // verify the image content in the publish phase.
+    // The image config id (.Id) is content-addressed and survives push/pull, so
+    // publish can check the temp tag it pulls is exactly this image.
     const digest = (await $`docker inspect --format='{{.Id}}' ${source}`).stdout
       .trim()
       .replace(/^'|'$/g, '');
 
-    // Serialize the image to a gzipped tarball artifact. No registry temp tag is
-    // pushed, so the registry only ever sees the final release/latest tags.
-    await $`docker save ${source} | gzip > ${archivePath}`;
+    const tempTag = dockerTempTag(await currentSha(ctx.projectCwd));
+    const registryConfig = await loadRegistryConfig(ctx.workspaceRoot);
+    const build = isBuildVersion(ctx.version);
 
+    for (const registryId of artifact.registries ?? []) {
+      const registry = getRegistry(registryConfig, registryId);
+      if (registry.type !== 'docker') {
+        throw new Error(
+          `docker-image '${artifact.name}': registry '${registryId}' is type '${registry.type}', ` +
+            `expected 'docker'`,
+        );
+      }
+      // Same rule publish applies: a .build.* version never leaves GitHub.
+      if (build && !isGitHubRegistry(registry)) {
+        console.log(`  ⏭️  ${registryId}: build version, not pushed to non-GitHub registry`);
+        continue;
+      }
+      const tempImage = `${resolveDockerImageBase(artifact.name, registry)}:${tempTag}`;
+      const dockerRegistry = registry as DockerRegistry;
+      await dockerLogin(
+        dockerRegistry,
+        getToken(registry),
+        dockerRegistry.usernameEnv ? process.env[dockerRegistry.usernameEnv] : undefined,
+      );
+      try {
+        await $`docker tag ${source} ${tempImage}`;
+        await dockerPushWithRetry(tempImage);
+        await $`docker rmi ${tempImage}`.catch(() => {
+          // local alias only; the pushed tag is what matters
+        });
+      } finally {
+        await dockerLogout(dockerRegistry);
+      }
+      console.log(`  ✓ docker: pushed ${source} → ${tempImage}`);
+    }
+
+    artifact.tempTag = tempTag;
     artifact.finalTag = ctx.version;
     artifact.digest = digest;
     // No artifact.registry: the destination is a per-registry fact decided at
     // publish, not a property of the image.
     artifact.pushedAt = new Date().toISOString();
-    (artifact as { imageArchive?: string }).imageArchive = archivePath;
 
-    console.log(`  ✓ docker: saved ${source} → ${archiveName}`);
     console.log(`  ✓ digest: ${digest}`);
   },
   async packDeploy() {
     // no-op
   },
-  async upload(artifact, ctx) {
-    const imageArchive = (artifact as { imageArchive?: string }).imageArchive;
-    if (!imageArchive) {
-      throw new Error(`docker artifact ${artifact.name} missing image archive (run pack first)`);
-    }
-    const path = isAbsolute(imageArchive) ? imageArchive : join(ctx.workspaceRoot, imageArchive);
-    await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
+  async upload() {
+    // Nothing to attach: the image travels through the registry (temp tag), and
+    // the descriptor the orchestrator uploads carries tempTag + digest.
   },
   async publish(artifact, registry, ctx) {
-    const imageArchive = (artifact as { imageArchive?: string }).imageArchive;
-    if (!imageArchive || !artifact.finalTag || !artifact.digest) {
+    if (!artifact.tempTag || !artifact.finalTag || !artifact.digest) {
       throw new Error(
-        `docker artifact ${artifact.name} missing required fields (imageArchive, finalTag, digest)`,
+        `docker artifact ${artifact.name} missing required fields (tempTag, finalTag, digest)`,
       );
     }
     const dockerRegistry = registry as DockerRegistry;
     await publishToDocker({
       imageName: artifact.name,
-      archivePath: join(ctx.workspaceRoot, '.artifacts', basename(imageArchive)),
+      tempTag: artifact.tempTag,
       finalTag: artifact.finalTag,
       digest: artifact.digest,
       registry: dockerRegistry,

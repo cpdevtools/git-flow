@@ -92,7 +92,7 @@ The same engine against integration scripts, intended for pull requests.
 | ---------------- | ------------------------- | ---------------------------------------------------------------- |
 | `pr-number`      | `0`                       | The merged release pull request, whose body carries the metadata |
 | `workspace-root` | `${{ github.workspace }}` | Workspace root                                                   |
-| `token`          | `${{ github.token }}`     | Needs `contents: write`, `pull-requests: read`, `packages: read` |
+| `token`          | `${{ github.token }}`     | Needs `contents: write`, `pull-requests: read`, `packages: write` (pack pushes docker temp tags) |
 
 Check out `${{ github.event.pull_request.merge_commit_sha }}`, not the branch head.
 

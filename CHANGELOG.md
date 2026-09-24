@@ -9,6 +9,18 @@ Package set since 2026-07-09: `git-flow`, `git-flow-cli`, `git-flow-deploy`, `gi
 
 ---
 
+## 1.1.x — stable line
+
+### Unreleased
+
+- **Docker transport is the registry again** (restores Phase 6 Decision #5). `gitflow pack` pushes
+  the image to every destination registry under `temp-<sha7>`; publish pulls that tag, verifies the
+  image id against the digest captured at pack, and pushes the release tag plus floating pointers.
+  No `docker save` tarball on the release, so no 2 GiB asset ceiling and no layer re-upload at
+  publish. `.build.*` versions still only reach GitHub registries. The temp tag stays (GitHub
+  Packages can only delete a whole package version). **Consumers:** the `build-pack` job now needs
+  `permissions: packages: write`.
+
 ## 1.0.x — stable line (2026-08-14 → )
 
 ### 1.0.12 — 2026-09-04

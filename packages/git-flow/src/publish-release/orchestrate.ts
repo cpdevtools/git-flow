@@ -19,9 +19,10 @@ import {
   loadRegistryConfig,
   getRegistry,
   getToken,
+  isBuildVersion,
+  isGitHubRegistry,
   verifyPublication,
   type RegistryConfig,
-  type Registry,
   type PublishReleaseOptions,
   type PublishReleaseResult,
   type ProjectPublishResult,
@@ -343,31 +344,6 @@ export async function runPublishRelease(
     console.error('❌ Release failed:', error);
     throw error;
   }
-}
-
-/**
- * Check if a registry is a GitHub-hosted registry
- */
-function isGitHubRegistry(registry: Registry): boolean {
-  switch (registry.type) {
-    case 'npm':
-      return registry.url.includes('npm.pkg.github.com');
-    case 'nuget':
-      return registry.url.includes('nuget.pkg.github.com');
-    case 'docker':
-      return (
-        registry.registry.includes('ghcr.io') || registry.registry.includes('docker.pkg.github.com')
-      );
-    default:
-      return false;
-  }
-}
-
-/**
- * Check if a version is a build version (contains '.build.')
- */
-function isBuildVersion(version: string): boolean {
-  return version.includes('.build.');
 }
 
 /**

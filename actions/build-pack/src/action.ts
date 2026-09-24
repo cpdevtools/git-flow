@@ -15,6 +15,9 @@ async function run(): Promise<void> {
       10,
     );
     const token = process.env['INPUT_TOKEN'] || process.env.GITHUB_TOKEN || '';
+    // Pack handlers authenticate against registries through the env var each
+    // registry entry names (`auth: GITHUB_TOKEN` for ghcr / GitHub Packages).
+    if (token && !process.env.GITHUB_TOKEN) process.env.GITHUB_TOKEN = token;
     const workspaceRoot =
       process.env['INPUT_WORKSPACE-ROOT'] || process.env.INPUT_WORKSPACE_ROOT || process.cwd();
 
