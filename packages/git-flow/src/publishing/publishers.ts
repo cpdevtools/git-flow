@@ -247,45 +247,46 @@ export async function publishToNuget(options: NugetPublishOptions): Promise<void
 /**
  * Publish Docker image to registry
  *
- * The image is transported between the build-pack and publish jobs as a gzipped
- * tarball artifact (produced by `docker save` during pack) rather than a
- * transient registry tag. This keeps the registry free of throwaway `temp-*`
- * tags: the image only ever appears under its release tag and whichever
- * floating pointers (`latest`, `next`, a channel) the version earns.
+ * Pack already pushed the image to this registry under a temporary tag
+ * (`temp-<sha7>`), so publishing is a promotion: pull that tag, check its
+ * config id against the digest captured at pack, and push the same image under
+ * the release tag plus whichever floating pointers (`latest`, `next`, a channel)
+ * the version earns. Nothing is re-uploaded; the registry already has the layers.
+ *
+ * The temp tag is left in place. It points at the same manifest as the release
+ * tag, and GitHub Packages can only delete a package *version* (the manifest and
+ * every tag on it), so removing it would remove the release too.
  */
 export async function publishToDocker(options: DockerPublishOptions): Promise<void> {
-  const { imageName, archivePath, finalTag, digest, registry, username, token, floatingTags } =
-    options;
-
-  // Load the image from the tarball artifact produced during pack.
-  await $`docker load -i ${archivePath}`;
-
-  // Verify the loaded image matches the digest captured at pack time. The image
-  // config id (.Id) is stable across docker save/load, so we compare against it.
-  const actualDigest = (await $`docker inspect --format='{{.Id}}' ${digest}`.nothrow()).stdout
-    .trim()
-    .replace(/^'|'$/g, '');
-
-  if (actualDigest !== digest) {
-    throw new Error(
-      `Docker image digest mismatch!\n` +
-        `Expected: ${digest}\n` +
-        `Actual:   ${actualDigest || '(image not found after load)'}\n` +
-        `This may indicate the image archive was modified after being built.`,
-    );
-  }
+  const { imageName, tempTag, finalTag, digest, registry, username, token, floatingTags } = options;
 
   await dockerLogin(registry, token, username);
 
   try {
-    // Build final image name with namespace if provided
     const finalImageBase = resolveDockerImageBase(imageName, registry);
+    const tempImage = `${finalImageBase}:${tempTag}`;
+
+    await $`docker pull ${tempImage}`;
+
+    // The image config id (.Id) survives push/pull unchanged, so it identifies
+    // the exact image pack built regardless of which registry served it.
+    const actualDigest = (await $`docker inspect --format='{{.Id}}' ${tempImage}`.nothrow()).stdout
+      .trim()
+      .replace(/^'|'$/g, '');
+
+    if (actualDigest !== digest) {
+      throw new Error(
+        `Docker image digest mismatch for ${tempImage}!\n` +
+          `Expected: ${digest}\n` +
+          `Actual:   ${actualDigest || '(image not found after pull)'}\n` +
+          `The temp tag was overwritten after pack, or pack ran against a different registry.`,
+      );
+    }
 
     // The release tag first, then the pointers this version earns. `latest` is
     // one of those, not a given: it only moves for the highest stable release.
     const images = [finalTag, ...floatingTags].map((tag) => `${finalImageBase}:${tag}`);
 
-    // Tag the loaded image (referenced by its id) with every final tag and push.
     for (const image of images) {
       await $`docker tag ${digest} ${image}`;
     }
@@ -297,7 +298,7 @@ export async function publishToDocker(options: DockerPublishOptions): Promise<vo
     }
 
     // Best-effort local cleanup of the tags we created.
-    await $`docker rmi ${images}`.catch(() => {
+    await $`docker rmi ${[tempImage, ...images]}`.catch(() => {
       // Ignore errors - cleanup is best-effort
     });
   } finally {

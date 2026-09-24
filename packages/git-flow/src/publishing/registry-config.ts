@@ -89,6 +89,31 @@ export function getRegistry(config: RegistryConfig, name: string): Registry {
 /**
  * Get authentication token for a registry from environment variables
  */
+/**
+ * GitHub-hosted registries (GitHub Packages npm/NuGet, ghcr). The only
+ * destinations a `.build.*` version is allowed to reach — at pack (docker temp
+ * tag) and at publish alike, so the two phases agree on the registry set.
+ */
+export function isGitHubRegistry(registry: Registry): boolean {
+  switch (registry.type) {
+    case 'npm':
+      return registry.url.includes('npm.pkg.github.com');
+    case 'nuget':
+      return registry.url.includes('nuget.pkg.github.com');
+    case 'docker':
+      return (
+        registry.registry.includes('ghcr.io') || registry.registry.includes('docker.pkg.github.com')
+      );
+    default:
+      return false;
+  }
+}
+
+/** A `.build.<run>` version: a throwaway build of a release PR, not a release. */
+export function isBuildVersion(version: string): boolean {
+  return version.includes('.build.');
+}
+
 export function getToken(registry: Registry): string {
   const token = process.env[registry.auth];
 

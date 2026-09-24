@@ -133,7 +133,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
-      packages: read
+      packages: write # docker-image pack pushes a temp tag
     steps:
       - uses: actions/checkout@v7
         with:
