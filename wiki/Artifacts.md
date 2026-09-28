@@ -24,6 +24,7 @@ The file is declarative — nothing in it is executed as a command. Building is 
 | `ng-lib`             | Packs an npm package built outside the project directory   | npm registries    |
 | `docker-image`       | Builds, saves and pushes one image                         | Docker registries |
 | `docker-service`     | Nothing — the product is the deploy bundle                 | —                 |
+| `static-site`        | Zips a built site; deploys to GitHub Pages via `gh-pages`  | —                 |
 | `release-attachment` | Attaches an arbitrary file to the GitHub Release           | —                 |
 | `deploy`             | A deploy bundle zip                                        | —                 |
 
@@ -112,6 +113,38 @@ Declaring `registries` on this type is an error rather than a no-op, because a s
 A `docker-service` project has nothing to build, so it needs no `github.actions.build` script —
 `github.actions.pack` alone is what makes a project take part in a release, and `build-pack` packs
 and uploads it whether or not a build script exists.
+
+### `static-site`
+
+A built static site — an Angular, Vite or Astro app, generated docs, anything whose product is a
+directory of files served as-is. The type only needs to know which directory the build emitted;
+what produced it is irrelevant.
+
+| Field       | Notes                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------- |
+| `name`      | Site name — drives the slot, and so the folder it is served from. Defaults to project |
+| `directory` | Where the site's project lives, relative to the project directory. Defaults to `.`    |
+| `packDir`   | Subdirectory the build emits, relative to `directory`. Defaults to `dist`.            |
+| `pagesRoot` | `true` for the one site that owns the Pages root. See [Deployment](Deployment).       |
+| `deploy`    | `[gh-pages]`                                                                          |
+
+```yaml
+artifacts:
+  - type: static-site
+    name: '@org/portal'
+    packDir: dist/portal/browser # what `ng build` emits
+    deploy: [gh-pages]
+```
+
+Like `ng-lib` it **verifies rather than builds**: `github.actions.build` produces the site, pack
+checks that `packDir` exists and holds an `index.html`, zips it onto the release as
+`<name>-site.zip`, and hands it to the `gh-pages` deploy method. `packDir` must be the directory
+that is served — for an Angular app that is `dist/<project>/browser`, not `dist/<project>`.
+
+Build with the default `<base href="/">`. The deploy rewrites it to wherever the site lands, so
+the project never has to know its URL prefix.
+
+Declaring `registries` is an error, as for `docker-service`.
 
 ### `release-attachment`
 

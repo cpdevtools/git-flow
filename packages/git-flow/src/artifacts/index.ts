@@ -31,7 +31,12 @@ export {
   type DeployMethodRegistration,
 } from './plugin.js';
 export { ProviderConflictError, type PluginAnchor } from './provider-registry.js';
-export type { DockerServiceArtifact, DotnetLibArtifact, NgLibArtifact } from './builtin-plugins.js';
+export type {
+  DockerServiceArtifact,
+  DotnetLibArtifact,
+  NgLibArtifact,
+  StaticSiteArtifact,
+} from './builtin-plugins.js';
 export {
   loadPlugins,
   findWorkspaceRoot,

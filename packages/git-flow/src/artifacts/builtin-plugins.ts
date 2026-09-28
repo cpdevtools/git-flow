@@ -13,7 +13,7 @@
 
 import type { Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, rm } from 'node:fs/promises';
 import { basename, isAbsolute, join } from 'node:path';
 import { $ } from 'zx';
 import { uploadArtifact } from '../build-pack/github.js';
@@ -25,7 +25,8 @@ import {
   type NpmRegistry,
   type NugetRegistry,
 } from '../publishing/index.js';
-import { dockerCompose, dockerSwarm, dockerSwarmJob } from './deploy-methods.js';
+import { dockerCompose, dockerSwarm, dockerSwarmJob, ghPages } from './deploy-methods.js';
+import { safeName } from './slot.js';
 import type { GitFlowPlugin } from './plugin.js';
 import type { ArtifactType } from './types.js';
 
@@ -297,6 +298,96 @@ const dockerService: ArtifactType<DockerServiceArtifact> = {
   },
 };
 
+/**
+ * A built static site — an Angular/Vite/Astro app, generated docs, anything
+ * whose product is a directory of files to serve as-is.
+ *
+ * Generic on purpose: the type only needs to know which directory the build
+ * emitted into, never what produced it. Nothing publishes to a registry; the
+ * product is the deploy bundle (`gh-pages`), with the site zipped onto the
+ * release as a downloadable build.
+ */
+export interface StaticSiteArtifact {
+  type: 'static-site';
+  /** Site name — drives the deployment slot, and so the folder it lands in. */
+  name: string;
+  /** Where the site's project lives, relative to the project dir. Defaults to the project dir. */
+  directory?: string;
+  /** Subdirectory the build emits, relative to `directory`. Defaults to 'dist'. */
+  packDir?: string;
+  /**
+   * This site owns the Pages root: its files land directly at `/` (or at the
+   * environment prefix), not in a slot folder. Singleton only; one per repo.
+   */
+  pagesRoot?: boolean;
+  /** Populated by pack. */
+  path?: string;
+  /** See DotnetLibArtifact — satisfies the Artifact union via CustomArtifact. */
+  [key: string]: unknown;
+}
+
+const staticSite: ArtifactType<StaticSiteArtifact> = {
+  async pack(artifact, ctx) {
+    const declared = (artifact as { registries?: unknown }).registries;
+    if (Array.isArray(declared) && declared.length > 0) {
+      throw new Error(
+        `static-site '${artifact.name ?? ctx.projectName}' declares registries, but this ` +
+          `type produces nothing to publish — its product is the deploy bundle.`,
+      );
+    }
+    if (!artifact.name) (artifact as { name: string }).name = ctx.projectName;
+
+    if (artifact.pagesRoot === true && artifact.versioning === 'major') {
+      throw new Error(
+        `static-site '${artifact.name}' sets pagesRoot with versioning: major.\n` +
+          `A root site has no version folder to live in — only a singleton can own the Pages root.`,
+      );
+    }
+
+    const siteDir = join(ctx.projectCwd, artifact.directory ?? '.', artifact.packDir ?? 'dist');
+    // Building is the project's job: github.actions.build runs before pack and
+    // whatever it emitted is what ships. Pack only checks that it happened.
+    if (!existsSync(siteDir)) {
+      throw new Error(
+        `static-site: build output not found at ${siteDir}.\n` +
+          `The project's github.actions.build must produce the site before pack runs; ` +
+          `point 'directory' / 'packDir' at where it emits.`,
+      );
+    }
+    if (!existsSync(join(siteDir, 'index.html'))) {
+      throw new Error(
+        `static-site: ${siteDir} has no index.html.\n` +
+          `'packDir' should name the directory that is served — for an Angular app that is ` +
+          `usually dist/<project>/browser.`,
+      );
+    }
+
+    const zipName = `${safeName(artifact.name)}-site.zip`;
+    const zipPath = join(ctx.artifactOutputDir, zipName);
+    await rm(zipPath, { force: true });
+    await $({ cwd: siteDir })`zip -qr ${zipPath} .`;
+    artifact.path = zipPath;
+    console.log(`  ✓ static-site: ${zipName}`);
+  },
+  async packDeploy() {
+    // The orchestrator builds the bundle through the gh-pages handler.
+  },
+  async upload(artifact, ctx) {
+    if (!artifact.path) throw new Error(`static-site artifact ${artifact.name} missing path`);
+    const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
+    await uploadArtifact(ctx.githubToken, ctx.owner, ctx.repo, ctx.releaseId, ctx.uploadUrl, path);
+  },
+  async publish() {
+    // Unreachable: getRegistries is always empty.
+  },
+  getRegistries() {
+    return [];
+  },
+  getVersion(_, projectVersion) {
+    return projectVersion;
+  },
+};
+
 /** Shipped with git-flow; registered alongside the other built-ins. */
 export const firstPartyPlugin: GitFlowPlugin = {
   name: '@cpdevtools/git-flow',
@@ -304,6 +395,7 @@ export const firstPartyPlugin: GitFlowPlugin = {
     'dotnet-lib': dotnetLib as unknown as ArtifactType<Artifact>,
     'ng-lib': ngLib as unknown as ArtifactType<Artifact>,
     'docker-service': dockerService as unknown as ArtifactType<Artifact>,
+    'static-site': staticSite as unknown as ArtifactType<Artifact>,
   },
   deployMethods: [
     // The same handlers docker-image uses: they copy stack/compose files and
@@ -311,5 +403,8 @@ export const firstPartyPlugin: GitFlowPlugin = {
     { artifactType: 'docker-service', method: 'compose', handler: dockerCompose },
     { artifactType: 'docker-service', method: 'swarm', handler: dockerSwarm },
     { artifactType: 'docker-service', method: 'swarm-job', handler: dockerSwarmJob },
+    // Runs inside the deploy workflow rather than on a host: pushes the site to
+    // the gh-pages branch under its slot path.
+    { artifactType: 'static-site', method: 'gh-pages', handler: ghPages },
   ],
 };

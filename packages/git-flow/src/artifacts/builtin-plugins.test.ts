@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -60,6 +61,7 @@ describe('first-party types are available without installing anything', () => {
       'npm',
       'nuget',
       'release-attachment',
+      'static-site',
     ]);
   });
 
@@ -74,6 +76,7 @@ describe('first-party types are available without installing anything', () => {
       'docker-service.swarm',
       'docker-service.swarm-job',
       'npm.node',
+      'static-site.gh-pages',
     ]);
   });
 
@@ -288,6 +291,98 @@ describe('docker-service', () => {
     expect(getDeployMethod('docker-service', 'compose')).toBe(
       getDeployMethod('docker-image', 'compose'),
     );
+  });
+});
+
+describe('static-site', () => {
+  async function buildSite(sub = 'dist'): Promise<string> {
+    const siteDir = join(root, sub);
+    await mkdir(join(siteDir, 'assets'), { recursive: true });
+    await writeFile(join(siteDir, 'index.html'), '<html><head><base href="/"></head></html>');
+    await writeFile(join(siteDir, 'assets', 'main.js'), 'console.log("@{ not a template }")');
+    return siteDir;
+  }
+
+  it('zips the built site from packDir and records the path', async () => {
+    await buildSite();
+    const artifact = { type: 'static-site', name: '@org/site' } as never;
+
+    await getArtifactType('static-site').pack(artifact, ctx());
+
+    const path = (artifact as { path?: string }).path;
+    expect(path).toBe(join(outDir, 'org-site-site.zip'));
+    expect(existsSync(path!)).toBe(true);
+  });
+
+  it('honours directory and packDir', async () => {
+    await buildSite('app/dist/browser');
+    const artifact = {
+      type: 'static-site',
+      name: 'docs',
+      directory: 'app',
+      packDir: 'dist/browser',
+    } as never;
+
+    await getArtifactType('static-site').pack(artifact, ctx());
+    expect((artifact as { path?: string }).path).toBe(join(outDir, 'docs-site.zip'));
+  });
+
+  it('backfills the name from the project', async () => {
+    await buildSite();
+    const artifact = { type: 'static-site' } as never;
+    await getArtifactType('static-site').pack(artifact, ctx());
+    expect((artifact as { name: string }).name).toBe('@org/thing');
+  });
+
+  it('says what to fix when the build output is missing', async () => {
+    const artifact = { type: 'static-site', name: 'site' } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /build output not found/,
+    );
+  });
+
+  it('refuses a packDir that is not the served directory', async () => {
+    await mkdir(join(root, 'dist', 'browser'), { recursive: true });
+    await writeFile(join(root, 'dist', 'browser', 'index.html'), '<html></html>');
+    const artifact = { type: 'static-site', name: 'site' } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /no index\.html/,
+    );
+  });
+
+  it('rejects a registries declaration — there is nothing to publish', async () => {
+    await buildSite();
+    const artifact = { type: 'static-site', name: 'site', registries: ['npm'] } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /produces nothing to publish/,
+    );
+  });
+
+  it('only a singleton can own the Pages root', async () => {
+    await buildSite();
+    const artifact = {
+      type: 'static-site',
+      name: 'site',
+      pagesRoot: true,
+      versioning: 'major',
+    } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /pagesRoot with versioning: major/,
+    );
+  });
+
+  it('never asks to publish', () => {
+    const handler = getArtifactType('static-site');
+    expect(handler.getRegistries({ registries: ['npm'] } as never)).toEqual([]);
+    expect(handler.getVersion({} as never, '3.1.0')).toBe('3.1.0');
+  });
+
+  it('deploys through gh-pages, which runs two majors side by side', async () => {
+    const { getDeployMethod } = await import('./deploy-methods.js');
+    const handler = getDeployMethod('static-site', 'gh-pages');
+    expect(handler).toBeDefined();
+    expect(handler?.supportsParallelMajors).toBe(true);
+    expect(handler?.templateIgnore).toEqual(['site/**']);
   });
 });
 

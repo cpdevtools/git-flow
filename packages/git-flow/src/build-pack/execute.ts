@@ -28,11 +28,7 @@ import {
   majorVersion,
   type VersioningStrategy,
 } from '../artifacts/slot.js';
-import {
-  findOrCreateDraftRelease,
-  getReleaseUrl,
-  markReleasePublished,
-} from './github.js';
+import { findOrCreateDraftRelease, getReleaseUrl, markReleasePublished } from './github.js';
 import { uploadDeployBundle } from './deploy-bundle.js';
 import { generateArtifactDescriptor, ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import type { BuildPackContext, ExecutionResult, ProjectConfig } from './types.js';
@@ -242,6 +238,47 @@ const DEPLOY_TEMPLATE_TAGS = {
   commentEnd: '#@',
 };
 
+/** True when the content contains any deploy-template delimiter. */
+export function hasTemplateMarkers(content: string): boolean {
+  return (
+    content.includes(DEPLOY_TEMPLATE_TAGS.variableStart) ||
+    content.includes(DEPLOY_TEMPLATE_TAGS.blockStart) ||
+    content.includes(DEPLOY_TEMPLATE_TAGS.commentStart)
+  );
+}
+
+/**
+ * Compile a `templateIgnore` glob to a RegExp over bundle-relative paths.
+ *
+ * Deliberately small: `**` spans directories, `*` and `?` stay within one
+ * segment, everything else is literal. Matched against forward-slash paths.
+ */
+export function globToRegExp(glob: string): RegExp {
+  let out = '';
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i]!;
+    if (c === '*') {
+      if (glob[i + 1] === '*') {
+        i++;
+        // `**/` also matches zero directories
+        if (glob[i + 1] === '/') {
+          i++;
+          out += '(?:.*/)?';
+        } else {
+          out += '.*';
+        }
+      } else {
+        out += '[^/]*';
+      }
+    } else if (c === '?') {
+      out += '[^/]';
+    } else {
+      out += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+  }
+  return new RegExp(`^${out}$`);
+}
+
 /**
  * Render every text file under `dir` as a nunjucks template.
  *
@@ -256,8 +293,11 @@ const DEPLOY_TEMPLATE_TAGS = {
 export async function renderDeployTemplates(
   dir: string,
   values: Record<string, string>,
+  ignore: readonly string[] = [],
 ): Promise<void> {
   const root = resolve(dir);
+  const ignored = ignore.map(globToRegExp);
+  const isIgnored = (key: string): boolean => ignored.some((re) => re.test(key));
   const env = new nunjucks.Environment(null, {
     autoescape: false,
     throwOnUndefined: true,
@@ -323,8 +363,12 @@ export async function renderDeployTemplates(
         continue;
       }
       if (content.includes('\0')) continue; // binary file
-      const key = relative(root, fullPath);
-      const output = rendered.get(key) ?? render(key, content);
+      const key = relative(root, fullPath).split(sep).join('/');
+      if (isIgnored(key)) continue;
+      // A file with no template markers renders to itself, so skip the parse —
+      // a static site ships hundreds of chunks and none of them are templates.
+      const output =
+        rendered.get(key) ?? (hasTemplateMarkers(content) ? render(key, content) : content);
       if (output !== content) writeFileSync(fullPath, output, 'utf-8');
     }
   };
@@ -489,6 +533,7 @@ async function executePackDeploy(
     service?: string;
     sharedStorage?: unknown;
     seedStorage?: unknown;
+    templateIgnore?: unknown;
   };
   const artifactsWithDeploy = descriptor.artifacts.filter(
     (a: Artifact) =>
@@ -545,6 +590,18 @@ async function executePackDeploy(
         (artifact as unknown as WithDeploy).seedStorage,
         (artifact as { name?: string }).name ?? artifact.type,
       );
+      // Bundle paths the pack-time template pass must leave alone — merged with
+      // whatever the method handler declares for itself.
+      const rawIgnore = (artifact as unknown as WithDeploy).templateIgnore;
+      if (
+        rawIgnore !== undefined &&
+        (!Array.isArray(rawIgnore) || rawIgnore.some((g) => typeof g !== 'string' || !g))
+      ) {
+        throw new Error(
+          `Invalid templateIgnore on artifact '${(artifact as { name?: string }).name ?? artifact.type}': expected a list of glob strings.`,
+        );
+      }
+      const artifactIgnore = (rawIgnore as string[] | undefined) ?? [];
       for (const method of methods) {
         // Asked of the handler rather than matched against a list of method
         // names, so a plugin can support parallel majors without git-flow
@@ -574,6 +631,7 @@ async function executePackDeploy(
           method,
           versioning,
           stack: stackOverride,
+          artifact,
         };
 
         const env = {
@@ -684,9 +742,14 @@ async function executePackDeploy(
 
         // Render all text files (including deploy.yml itself) so baked-in values
         // work in YAML keys and anywhere else runtime env interpolation can't reach.
+        // The handler's own ignore list applies however the bundle was assembled:
+        // an override folder still ends up with the files the method expects.
+        const handlerIgnore =
+          getDeployMethod(artifact.type, method, providerOf(artifact))?.templateIgnore ?? [];
         await renderDeployTemplates(
           deployOutputDir,
           deployContext(project.name, project.version, versioning, stackOverride, serviceOverride),
+          [...handlerIgnore, ...artifactIgnore],
         );
 
         // Zip the deploy output dir and upload directly

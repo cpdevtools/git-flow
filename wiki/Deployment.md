@@ -60,6 +60,10 @@ from the workflow file.
 Adding an environment is adding a `deploy-<env>.yml` and configuring the GitHub Environment. There
 is no environment list to maintain anywhere in git-flow.
 
+A workflow does not have to hand the bundle to a gateway. For a target with no persistent host —
+GitHub Pages — the same `deploy-<env>.yml` fetches the bundle and runs its `deployCommand` inside
+the job, using the job's own `GITHUB_TOKEN`. See [`gh-pages`](#gh-pages-static-site) below.
+
 ## `gitflow deploy`
 
 ```bash
@@ -159,6 +163,20 @@ in YAML keys and other places runtime environment interpolation cannot reach:
 | `{{STACK_SERVICE}}`        | The same, without the version — stable across majors      |
 | `{{VERSION}}`, `{{MAJOR}}` | The release version and its major                         |
 
+Files that are payload rather than templates — a built site, vendored assets — are excluded with
+`templateIgnore`, a list of bundle-relative globs (`**` spans directories, `*` and `?` do not).
+A method handler declares its own (`gh-pages` excludes `site/**`); an artifact adds more:
+
+```yaml
+artifacts:
+  - type: static-site
+    deploy: [gh-pages]
+    templateIgnore: ['vendor/**']
+```
+
+Files containing no `@{`, `@%` or `@#` are never parsed, so the list only matters for content that
+happens to contain a delimiter.
+
 ## Deploy methods
 
 `compose` and `swarm` ship with git-flow, for both `docker-image` and `docker-service`. A method is
@@ -168,6 +186,74 @@ for anything else, because the two would not do the same thing.
 A project overrides or replaces a method by dropping files in `.deploy/<method>/`, adding a
 `github.actions.pack-deploy-<method>` script, or installing a [plugin](Plugins). See
 [Project Structure](Project-Structure).
+
+### `gh-pages` (static-site)
+
+Publishes a [`static-site`](Artifacts#static-site) artifact to the repository's `gh-pages` branch.
+GitHub Pages serves one branch per repository, so every deploy target gets its own directory on
+that branch and never touches another's:
+
+| Target                      | `versioning: singleton` | `versioning: major`     |
+| --------------------------- | ----------------------- | ----------------------- |
+| production                  | `/org-site/`            | `/org-site/v2/`         |
+| any other environment `dev` | `/env/dev/org-site/`    | `/env/dev/org-site/v2/` |
+
+The folder is the [slot](#slots) written as a path, so two majors can be served side by side and
+the method declares `supportsParallelMajors`. Production is simply the target with no prefix.
+
+The environment contributes only the prefix, through the ordinary `DEPLOY_ENV` lines:
+
+| Variable        | Production          | Other environments | Notes                                                                                 |
+| --------------- | ------------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| `GH_PAGES_DEST` | _(unset)_           | `env/dev`          | Directory prefix on the branch                                                        |
+| `PAGES_ROOT`    | _(unset = `/repo`)_ | _(same)_           | URL path Pages serves the branch at. Set empty for a custom domain or a user/org site |
+
+At deploy time the site's `<base href>` is rewritten to `PAGES_ROOT/GH_PAGES_DEST/<slot path>/`,
+so the project builds with its default base and is correct wherever it lands. A `.nojekyll` is kept
+at the branch root so `_`-prefixed build output (`_astro/`) is served.
+
+**The Pages root.** With every project in its own folder, `/` itself holds nothing. One
+`static-site` artifact per repository may set `pagesRoot: true` to own it: its files land directly
+at `/` (or at `/env/<env>/`), beside the other projects' folders. That site must be a singleton —
+there is no version folder for it to live in. Because it shares its directory, its deploy does not
+wipe anything: it records what it wrote in `.gitflow/root.files` and removes exactly those paths
+next time. A second artifact claiming the root is refused at deploy time. The root site also owns
+the branch's `404.html`, which Pages uses as the fallback for every path.
+
+**Running it.** There is no host to pull the bundle, so the environment's `deploy-<env>.yml` runs
+it in the job. The workflow needs `contents: write`, and the repository's Pages source must be set
+to the `gh-pages` branch.
+
+```yaml
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: 'Development'
+    steps:
+      - name: Deploy to GitHub Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_ENV_LINES: |
+            ${{ vars.DEPLOY_ENV }}
+            ${{ inputs.deploy_env }}
+        run: |
+          while IFS= read -r line; do
+            case "$line" in ''|'#'*) ;; *=*) export "$line" ;; esac
+          done <<< "$DEPLOY_ENV_LINES"
+          pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+          pnpm config set @cpdevtools:registry https://npm.pkg.github.com
+          pnpm dlx @cpdevtools/git-flow-deploy-cli deploy "$GITHUB_REPOSITORY" \
+            "${{ inputs.release_id }}" --bundle deploy-gh-pages.zip
+```
+
+The full workflow, including tag-to-id resolution for `release_id`, ships in the template
+repository as `deploy-gh-pages.yml.example`.
+
+Retention is the project's concern: nothing removes `env/*` directories when a branch or
+environment goes away.
 
 ## The receiving end
 
