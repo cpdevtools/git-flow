@@ -19,6 +19,11 @@ export default class Fetch extends Command {
   };
 
   static override flags = {
+    force: Flags.boolean({
+      description:
+        'Deploy a release withdrawn with `gitflow withdraw` anyway. Only kinds that allow a rollback (obsolete, superseded, temporary) can be forced.',
+      default: false,
+    }),
     dest: Flags.string({ char: 'd', description: 'Destination directory', required: false }),
     bundle: Flags.string({
       char: 'b',
@@ -42,7 +47,9 @@ export default class Fetch extends Command {
     }
 
     this.log(`\u25b8 Fetching ${bundle} from release ${releaseId}...`);
-    const manifest = await fetchDeployBundle(token, repo, releaseId, dest, bundle);
+    const manifest = await fetchDeployBundle(token, repo, releaseId, dest, bundle, {
+      force: flags.force,
+    });
     this.log(`\u25b8 Extracted to: ${dest}`);
     // Machine-readable line; callers use it to learn the resolved version before the deploy runs.
     process.stdout.write(`DEPLOY_TARGET_VERSION:${manifest.version}\n`);

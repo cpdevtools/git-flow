@@ -119,3 +119,11 @@ environment should run it. This is deliberate — see [Deployment](Deployment).
 
 `latest` resolves to the highest **stable** release, and a development branch cannot produce one.
 Use `next`, which is the highest release including pre-releases.
+
+## A withdrawn release is hidden, not gone
+
+`gitflow withdraw` marks a release so `gitflow deploy` never offers it and the deploy side refuses
+it; the tag, the assets and the registry versions stay unless you chose `delete`. Floating tags
+move off it, so `latest` points at the previous good version. If a direct `pnpm add pkg@1.4.2`
+still installs the withdrawn build, that is expected unless `--registry delete` was chosen; `mark`
+only deprecates it. See [Withdrawing](Withdrawing).

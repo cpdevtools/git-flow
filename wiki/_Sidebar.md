@@ -18,6 +18,7 @@
 **Reference**
 
 - [Deployment](Deployment)
+- [Withdrawing](Withdrawing)
 - [Plugins](Plugins)
 - [CLI](CLI)
 - [Actions and Workflows](Actions)

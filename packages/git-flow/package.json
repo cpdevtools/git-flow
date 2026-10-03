@@ -91,6 +91,11 @@
       "types": "./dist/artifacts/index.d.ts",
       "default": "./dist/artifacts/index.js",
       "source": "./src/artifacts/index.ts"
+    },
+    "./withdraw": {
+      "types": "./dist/withdraw/index.d.ts",
+      "default": "./dist/withdraw/index.js",
+      "source": "./src/withdraw/index.ts"
     }
   },
   "files": [

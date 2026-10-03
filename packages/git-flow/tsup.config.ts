@@ -9,6 +9,7 @@ export default defineConfig({
     'artifacts/index': 'src/artifacts/index.ts',
     'publishing/index': 'src/publishing/index.ts',
     'publish-release/index': 'src/publish-release/index.ts',
+    'withdraw/index': 'src/withdraw/index.ts',
   },
   format: ['cjs'],
   target: 'node24',
@@ -22,4 +23,3 @@ export default defineConfig({
   // Shell assets read verbatim at runtime; see scripts/copy-shell-assets.cjs.
   onSuccess: 'node scripts/copy-shell-assets.cjs',
 });
-
