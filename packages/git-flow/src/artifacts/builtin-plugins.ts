@@ -14,10 +14,11 @@
 import type { Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { $ } from 'zx';
 import { uploadArtifact } from '../build-pack/github.js';
+import { zipDirectory } from '../build-pack/zip.js';
 import {
   floatingTagsFor,
   getToken,
@@ -366,8 +367,7 @@ const staticSite: ArtifactType<StaticSiteArtifact> = {
 
     const zipName = `${safeName(artifact.name)}-site.zip`;
     const zipPath = join(ctx.artifactOutputDir, zipName);
-    await rm(zipPath, { force: true });
-    await $({ cwd: siteDir })`zip -qr ${zipPath} .`;
+    await zipDirectory(siteDir, zipPath);
     artifact.path = zipPath;
     console.log(`  ✓ static-site: ${zipName}`);
   },

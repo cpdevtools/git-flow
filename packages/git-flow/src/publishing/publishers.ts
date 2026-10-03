@@ -1,4 +1,4 @@
-import { writeFile } from 'fs/promises';
+import { rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import * as semver from 'semver';
@@ -231,7 +231,7 @@ export async function publishToNpm(options: NpmPublishOptions): Promise<void> {
     }
   } finally {
     // Clean up .npmrc
-    await $`rm -f ${npmrcPath}`.catch(() => {});
+    await rm(npmrcPath, { force: true }).catch(() => {});
   }
 }
 

@@ -3,6 +3,7 @@
  * Resolve version placeholders based on branch and run number
  */
 
+import '../platform-shell.js';
 export { resolveVersion, versionExists } from './resolve.js';
 export type { VersionResolutionInput, ResolvedVersion } from './types.js';
 export {

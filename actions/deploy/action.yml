@@ -93,9 +93,9 @@ runs:
     - name: Run Deploy Action
       shell: bash
       run: |
-        ${{ github.action_path }}/node_modules/.bin/tsx \
-          --tsconfig ${{ github.action_path }}/tsconfig.json \
-          ${{ github.action_path }}/src/action.ts
+        "${{ github.action_path }}/node_modules/.bin/tsx" \
+          --tsconfig "${{ github.action_path }}/tsconfig.json" \
+          "${{ github.action_path }}/src/action.ts"
       env:
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_RELEASE_ID: ${{ inputs.release_id }}

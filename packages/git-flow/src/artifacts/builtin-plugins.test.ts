@@ -392,7 +392,9 @@ describe('static-site', () => {
 describe('executable', () => {
   async function winBinary(productVersion: string | undefined, file = 'dist/tool.exe') {
     await mkdir(join(root, 'dist'), { recursive: true });
-    const strings = productVersion ? { ProductVersion: productVersion } : {};
+    const strings: Record<string, string> = productVersion
+      ? { ProductVersion: productVersion }
+      : {};
     await writeFile(
       join(root, file),
       buildPe({ versionInfo: buildVersionInfo({ fileVersion: [1, 2, 3, 0], strings }) }),
@@ -531,7 +533,9 @@ describe('executable', () => {
       path: 'dist/tool.exe',
       registries: ['x'],
     } as never;
-    await expect(type().pack(artifact, ctx('1.2.3'))).rejects.toThrow(/produces nothing to publish/);
+    await expect(type().pack(artifact, ctx('1.2.3'))).rejects.toThrow(
+      /produces nothing to publish/,
+    );
   });
 
   it('never asks to publish', () => {

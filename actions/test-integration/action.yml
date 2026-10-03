@@ -103,7 +103,7 @@ runs:
     - name: Run Integration Tests
       id: test-integration
       shell: bash
-      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      run: "${{ github.action_path }}/node_modules/.bin/tsx" "${{ github.action_path }}/src/action.ts"
       env:
         INPUT_FAIL_FAST: ${{ inputs.fail-fast }}
         INPUT_CONCURRENCY: ${{ inputs.concurrency }}

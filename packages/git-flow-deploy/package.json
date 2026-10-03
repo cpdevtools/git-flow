@@ -14,13 +14,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "adm-zip": "^0.5.16",
+    "adm-zip": "^0.5.18",
     "minimatch": "^10.0.1",
     "semver": "^7.6.3",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.5",
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^20.17.11",
     "@types/semver": "^7.5.8",
     "tsup": "^8.5.1",
