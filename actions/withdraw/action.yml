@@ -43,10 +43,10 @@ runs:
       env:
         NODE_AUTH_TOKEN: ${{ inputs.token }}
 
+    # No version here: the consumer's package.json `packageManager` decides, and
+    # pnpm/action-setup refuses when both are given.
     - name: Setup pnpm
       uses: pnpm/action-setup@v6
-      with:
-        version: 11
 
     - name: Configure registry auth
       shell: bash
