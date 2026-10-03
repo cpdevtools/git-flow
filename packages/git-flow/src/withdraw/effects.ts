@@ -314,9 +314,29 @@ async function applyRegistryEffect(
         if (registry.type === 'npm') {
           await npmAuth(registry);
           const message = `WITHDRAWN: see release ${artifact.name}/v${version}`;
-          await $`npm deprecate ${`${artifact.name}@${version}`} ${message} --registry ${registry.url}`;
-          log(`  ⛔ ${label}: deprecated`);
-          upgrade('marked');
+          const r =
+            await $`npm deprecate ${`${artifact.name}@${version}`} ${message} --registry ${registry.url}`.nothrow();
+          if (r.exitCode === 0) {
+            log(`  ⛔ ${label}: deprecated`);
+            upgrade('marked');
+          } else {
+            // GitHub Packages' npm registry does not implement deprecate (it
+            // rejects the packument PUT with E400); npmjs does. Either way the
+            // release marker remains the record.
+            const first =
+              r.stderr
+                .trim()
+                .split('\n')
+                .find((l) => l.includes('npm error')) ?? '';
+            const why =
+              first.includes('E400') || registry.url.includes('npm.pkg.github.com')
+                ? 'this registry does not support npm deprecate'
+                : first.replace(/^npm error\s*/, '') || 'npm deprecate failed';
+            const note = `${label}: ${why}; the release marker is the record`;
+            log(`  ℹ️  ${note}`);
+            notes.push(note);
+            upgrade('unsupported');
+          }
         } else {
           const note = `${label}: ${registry.type} registries cannot mark a version; the release marker is the record`;
           log(`  ℹ️  ${note}`);

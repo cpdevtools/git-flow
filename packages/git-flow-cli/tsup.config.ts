@@ -10,6 +10,7 @@ export default defineConfig({
     'commands/pack': 'src/commands/pack.ts',
     'commands/pack-deploy': 'src/commands/pack-deploy.ts',
     'commands/version': 'src/commands/version.ts',
+    'commands/withdraw': 'src/commands/withdraw.ts',
   },
   format: ['cjs'],
   target: 'node24',
