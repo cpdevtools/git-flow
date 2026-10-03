@@ -31,7 +31,15 @@ export {
   type DeployMethodRegistration,
 } from './plugin.js';
 export { ProviderConflictError, type PluginAnchor } from './provider-registry.js';
-export type { DockerServiceArtifact, DotnetLibArtifact, NgLibArtifact } from './builtin-plugins.js';
+export type {
+  DockerServiceArtifact,
+  DotnetLibArtifact,
+  ExecutableArtifact,
+  NgLibArtifact,
+  StaticSiteArtifact,
+} from './builtin-plugins.js';
+export { executableAssetName, normalizeBinaryVersion } from './builtin-plugins.js';
+export { parsePeVersion, readPeVersion, PeParseError, type PeVersionInfo } from './pe-version.js';
 export {
   loadPlugins,
   findWorkspaceRoot,

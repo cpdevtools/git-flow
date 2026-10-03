@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { existsSync } from 'node:fs';
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { buildPe, buildVersionInfo } from './pe-version.fixture.js';
+import { executableAssetName, normalizeBinaryVersion } from './builtin-plugins.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -56,10 +59,12 @@ describe('first-party types are available without installing anything', () => {
       'docker-image',
       'docker-service',
       'dotnet-lib',
+      'executable',
       'ng-lib',
       'npm',
       'nuget',
       'release-attachment',
+      'static-site',
     ]);
   });
 
@@ -74,6 +79,7 @@ describe('first-party types are available without installing anything', () => {
       'docker-service.swarm',
       'docker-service.swarm-job',
       'npm.node',
+      'static-site.gh-pages',
     ]);
   });
 
@@ -288,6 +294,249 @@ describe('docker-service', () => {
     expect(getDeployMethod('docker-service', 'compose')).toBe(
       getDeployMethod('docker-image', 'compose'),
     );
+  });
+});
+
+describe('static-site', () => {
+  async function buildSite(sub = 'dist'): Promise<string> {
+    const siteDir = join(root, sub);
+    await mkdir(join(siteDir, 'assets'), { recursive: true });
+    await writeFile(join(siteDir, 'index.html'), '<html><head><base href="/"></head></html>');
+    await writeFile(join(siteDir, 'assets', 'main.js'), 'console.log("@{ not a template }")');
+    return siteDir;
+  }
+
+  it('zips the built site from packDir and records the path', async () => {
+    await buildSite();
+    const artifact = { type: 'static-site', name: '@org/site' } as never;
+
+    await getArtifactType('static-site').pack(artifact, ctx());
+
+    const path = (artifact as { path?: string }).path;
+    expect(path).toBe(join(outDir, 'org-site-site.zip'));
+    expect(existsSync(path!)).toBe(true);
+  });
+
+  it('honours directory and packDir', async () => {
+    await buildSite('app/dist/browser');
+    const artifact = {
+      type: 'static-site',
+      name: 'docs',
+      directory: 'app',
+      packDir: 'dist/browser',
+    } as never;
+
+    await getArtifactType('static-site').pack(artifact, ctx());
+    expect((artifact as { path?: string }).path).toBe(join(outDir, 'docs-site.zip'));
+  });
+
+  it('backfills the name from the project', async () => {
+    await buildSite();
+    const artifact = { type: 'static-site' } as never;
+    await getArtifactType('static-site').pack(artifact, ctx());
+    expect((artifact as { name: string }).name).toBe('@org/thing');
+  });
+
+  it('says what to fix when the build output is missing', async () => {
+    const artifact = { type: 'static-site', name: 'site' } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /build output not found/,
+    );
+  });
+
+  it('refuses a packDir that is not the served directory', async () => {
+    await mkdir(join(root, 'dist', 'browser'), { recursive: true });
+    await writeFile(join(root, 'dist', 'browser', 'index.html'), '<html></html>');
+    const artifact = { type: 'static-site', name: 'site' } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /no index\.html/,
+    );
+  });
+
+  it('rejects a registries declaration — there is nothing to publish', async () => {
+    await buildSite();
+    const artifact = { type: 'static-site', name: 'site', registries: ['npm'] } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /produces nothing to publish/,
+    );
+  });
+
+  it('only a singleton can own the Pages root', async () => {
+    await buildSite();
+    const artifact = {
+      type: 'static-site',
+      name: 'site',
+      pagesRoot: true,
+      versioning: 'major',
+    } as never;
+    await expect(getArtifactType('static-site').pack(artifact, ctx())).rejects.toThrow(
+      /pagesRoot with versioning: major/,
+    );
+  });
+
+  it('never asks to publish', () => {
+    const handler = getArtifactType('static-site');
+    expect(handler.getRegistries({ registries: ['npm'] } as never)).toEqual([]);
+    expect(handler.getVersion({} as never, '3.1.0')).toBe('3.1.0');
+  });
+
+  it('deploys through gh-pages, which runs two majors side by side', async () => {
+    const { getDeployMethod } = await import('./deploy-methods.js');
+    const handler = getDeployMethod('static-site', 'gh-pages');
+    expect(handler).toBeDefined();
+    expect(handler?.supportsParallelMajors).toBe(true);
+    expect(handler?.templateIgnore).toEqual(['site/**']);
+  });
+});
+
+describe('executable', () => {
+  async function winBinary(productVersion: string | undefined, file = 'dist/tool.exe') {
+    await mkdir(join(root, 'dist'), { recursive: true });
+    const strings = productVersion ? { ProductVersion: productVersion } : {};
+    await writeFile(
+      join(root, file),
+      buildPe({ versionInfo: buildVersionInfo({ fileVersion: [1, 2, 3, 0], strings }) }),
+    );
+  }
+  async function script(output: string, file = 'dist/tool') {
+    await mkdir(join(root, 'dist'), { recursive: true });
+    await writeFile(join(root, file), `#!/bin/sh\necho "${output}"\n`);
+    await chmod(join(root, file), 0o755);
+  }
+  const type = () => getArtifactType('executable');
+
+  it('verifies a Windows binary by its PE version resource and attaches a checksum', async () => {
+    await winBinary('1.2.3');
+    const artifact = {
+      type: 'executable',
+      name: 'tool',
+      path: 'dist/tool.exe',
+      platform: 'win-x64',
+    } as never as Record<string, unknown>;
+
+    await type().pack(artifact as never, ctx('1.2.3'));
+
+    expect(artifact.assetName).toBe('tool-win-x64.exe');
+    expect(artifact.path).toBe(join(outDir, 'tool-win-x64.exe'));
+    expect(existsSync(artifact.path as string)).toBe(true);
+    expect(artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+    const checksum = await readFile(join(outDir, 'tool-win-x64.exe.sha256'), 'utf-8');
+    expect(checksum).toBe(`${artifact.sha256}  tool-win-x64.exe\n`);
+  });
+
+  it('refuses a stale build', async () => {
+    await winBinary('1.2.2');
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
+    await expect(type().pack(artifact, ctx('1.2.3'))).rejects.toThrow(
+      /reports version '1\.2\.2', but the release is '1\.2\.3'/,
+    );
+  });
+
+  it('accepts a prerelease and ignores build metadata', async () => {
+    await winBinary('v2.0.0-beta.1+abc1234');
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
+    await type().pack(artifact, ctx('2.0.0-beta.1'));
+    expect((artifact as { assetName?: string }).assetName).toBe('tool.exe');
+  });
+
+  it('requires the ProductVersion string, not just the numeric version', async () => {
+    await winBinary(undefined);
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
+    await expect(type().pack(artifact, ctx('1.2.3'))).rejects.toThrow(
+      /no ProductVersion string.*numeric file version is 1\.2\.3\.0/s,
+    );
+  });
+
+  it('says what to do when pe mode meets a non-PE file', async () => {
+    await script('tool 1.2.3', 'dist/tool.exe');
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
+    await expect(type().pack(artifact, ctx('1.2.3'))).rejects.toThrow(/use 'version: exec'/);
+  });
+
+  it('exec mode runs the binary and matches the version in its output', async () => {
+    await script('tool version 1.2.3-rc.2 (linux)');
+    const artifact = {
+      type: 'executable',
+      name: 'tool',
+      path: 'dist/tool',
+      platform: 'linux-x64',
+    } as never as Record<string, unknown>;
+    await type().pack(artifact as never, ctx('1.2.3-rc.2'));
+    expect(artifact.assetName).toBe('tool-linux-x64');
+  });
+
+  it('exec mode honours custom args and pattern, and rejects a mismatch', async () => {
+    await script('build=9.9.9');
+    const artifact = {
+      type: 'executable',
+      name: 'tool',
+      path: 'dist/tool',
+      versionArgs: ['version'],
+      versionPattern: 'build=(\\S+)',
+    } as never;
+    await expect(type().pack(artifact, ctx('1.0.0'))).rejects.toThrow(/reports version '9\.9\.9'/);
+  });
+
+  it('exec mode explains when no version appears in the output', async () => {
+    await script('hello');
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool' } as never;
+    await expect(type().pack(artifact, ctx('1.0.0'))).rejects.toThrow(/no version in the output/);
+  });
+
+  it('none mode skips the check with a warning', async () => {
+    await script('whatever');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const artifact = {
+        type: 'executable',
+        name: 'tool',
+        path: 'dist/tool',
+        version: 'none',
+        checksum: false,
+      } as never as Record<string, unknown>;
+      await type().pack(artifact as never, ctx('1.0.0'));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/version check disabled/));
+      expect(artifact.checksumPath).toBeUndefined();
+      expect(existsSync(join(outDir, 'tool.sha256'))).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('puts the version in the asset name only when asked', () => {
+    const base = { name: '@org/tool', path: 'dist/tool.exe', platform: 'win-x64' };
+    expect(executableAssetName(base, '1.2.3')).toBe('org-tool-win-x64.exe');
+    expect(executableAssetName({ ...base, versionInName: true }, '1.2.3')).toBe(
+      'org-tool-1.2.3-win-x64.exe',
+    );
+    expect(executableAssetName({ name: 'tool', path: 'bin/tool' }, '1.2.3')).toBe('tool');
+  });
+
+  it('normalises what toolchains add', () => {
+    expect(normalizeBinaryVersion('v1.2.3')).toBe('1.2.3');
+    expect(normalizeBinaryVersion('1.2.3-beta.1+sha.abc')).toBe('1.2.3-beta.1');
+    expect(normalizeBinaryVersion(' 1.2.3 ')).toBe('1.2.3');
+  });
+
+  it('fails early when the build output is missing', async () => {
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
+    await expect(type().pack(artifact, ctx())).rejects.toThrow(/not found/);
+  });
+
+  it('rejects registries — the binary is attached to the release', async () => {
+    await winBinary('1.2.3');
+    const artifact = {
+      type: 'executable',
+      name: 'tool',
+      path: 'dist/tool.exe',
+      registries: ['x'],
+    } as never;
+    await expect(type().pack(artifact, ctx('1.2.3'))).rejects.toThrow(/produces nothing to publish/);
+  });
+
+  it('never asks to publish', () => {
+    expect(type().getRegistries({ registries: ['x'] } as never)).toEqual([]);
+    expect(type().getVersion({} as never, '3.1.0')).toBe('3.1.0');
   });
 });
 

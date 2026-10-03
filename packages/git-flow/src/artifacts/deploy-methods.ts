@@ -20,12 +20,13 @@
  *   } satisfies GitFlowPlugin;
  */
 
+import type { Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { existsSync, readFileSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { ProviderRegistry, type PluginAnchor } from './provider-registry.js';
-import { deploymentSlot, type VersioningStrategy } from './slot.js';
+import { deploymentSlot, majorVersion, safeName, type VersioningStrategy } from './slot.js';
 
 /**
  * Upsert variables into the bundle's `.env`.
@@ -82,6 +83,12 @@ export interface DeployMethodContext {
    * own. Set means other services live alongside it and must survive teardown.
    */
   stack?: string;
+  /**
+   * The artifact entry being deployed, as declared in release-artifacts.yml.
+   * A handler reads its type-specific keys from here (where the built site
+   * lives, whether it owns the Pages root, …).
+   */
+  artifact?: Artifact;
 }
 
 export interface DeployMethodHandler {
@@ -114,6 +121,15 @@ export interface DeployMethodHandler {
    * with the major already deployed.
    */
   supportsParallelMajors?: boolean;
+
+  /**
+   * Bundle-relative globs the pack-time template pass must not render.
+   *
+   * For a method that ships payload files alongside its manifest — a built
+   * site, vendored assets — where a stray `@{` in minified code would otherwise
+   * be parsed as a template. Merged with the artifact's own `templateIgnore`.
+   */
+  templateIgnore?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -439,6 +455,117 @@ const npmNode: DeployMethodHandler = {
         // path pm2 recorded at first start (the bundle's ecosystem.config.js only
         // has a relative path). `pm2 delete` breaks that with "Process not found".
         teardownCommand: `pm2 stop ecosystem.config.js`,
+      }),
+    );
+  },
+};
+
+// ── static-site.gh-pages ───────────────────────────────────────────────────
+
+/**
+ * Where a static-site artifact lands on the `gh-pages` branch, relative to the
+ * environment prefix: the deployment slot expressed as a path.
+ *
+ *   singleton → `org-site/`
+ *   major     → `org-site/v2/`
+ *   pagesRoot → `` (the site's files sit directly in the prefix directory)
+ *
+ * Two majors never share a folder, which is what lets the method declare
+ * supportsParallelMajors.
+ */
+export function pagesSlotPath(
+  projectName: string,
+  version: string,
+  versioning: VersioningStrategy | undefined,
+  pagesRoot: boolean,
+): string {
+  if (pagesRoot) return '';
+  const base = safeName(projectName);
+  return versioning === 'major' ? `${base}/v${majorVersion(version)}` : base;
+}
+
+/** Subdirectory of the bundle holding the built site. */
+export const GH_PAGES_SITE_DIR = 'site';
+
+let cachedGhPagesScript: string | undefined;
+function loadGhPagesScript(): string {
+  if (cachedGhPagesScript === undefined) {
+    cachedGhPagesScript = readFileSync(join(__dirname, 'gh-pages-deploy.sh'), 'utf8');
+  }
+  return cachedGhPagesScript;
+}
+
+function staticSiteSourceDir(ctx: DeployMethodContext): string {
+  const artifact = (ctx.artifact ?? {}) as { directory?: unknown; packDir?: unknown };
+  const directory = typeof artifact.directory === 'string' ? artifact.directory : '.';
+  const packDir = typeof artifact.packDir === 'string' ? artifact.packDir : 'dist';
+  return join(ctx.projectCwd, directory, packDir);
+}
+
+async function copySiteIntoBundle(ctx: DeployMethodContext): Promise<void> {
+  const source = staticSiteSourceDir(ctx);
+  if (!existsSync(source)) {
+    throw new Error(
+      `static-site.gh-pages: built site not found at ${source}.\n` +
+        `The project's github.actions.build must produce it before pack runs; ` +
+        `point 'directory' / 'packDir' at where the build emits.`,
+    );
+  }
+  await mkdir(ctx.deployOutputDir, { recursive: true });
+  await cp(source, join(ctx.deployOutputDir, GH_PAGES_SITE_DIR), { recursive: true });
+}
+
+/**
+ * Publishes a static-site artifact to the repo's `gh-pages` branch.
+ *
+ * Unlike the docker/node methods there is no persistent host: the bundle is
+ * meant to be fetched and run inside the dispatched deploy workflow, whose
+ * GITHUB_TOKEN carries the push rights. The environment contributes only a
+ * prefix through the usual KEY=VAL deploy env:
+ *
+ *   GH_PAGES_DEST  — subdirectory for non-production targets (`env/dev`);
+ *                    production sets nothing and lands at the branch root
+ *   PAGES_ROOT     — URL path Pages serves the branch at; defaults to
+ *                    `/<repo>`, set empty for a custom domain or user site
+ *
+ * The site's `<base href>` is rewritten at deploy time from those two plus the
+ * slot path, so the project builds with its default base and never has to know
+ * where it will be served from.
+ */
+export const ghPages: DeployMethodHandler = {
+  supportsParallelMajors: true,
+  // The site is payload, not templates: minified chunks are never rendered.
+  templateIgnore: [`${GH_PAGES_SITE_DIR}/**`],
+  async copyFiles(ctx) {
+    await copySiteIntoBundle(ctx);
+  },
+  async generateDeployYml(ctx) {
+    const { deployOutputDir, projectName, version, versioning } = ctx;
+    const pagesRoot = (ctx.artifact as { pagesRoot?: unknown } | undefined)?.pagesRoot === true;
+    if (pagesRoot && versioning === 'major') {
+      throw new Error(
+        `static-site.gh-pages: '${projectName}' sets pagesRoot with versioning: major.\n` +
+          `A root site has no version folder to live in — only a singleton can own the Pages root.`,
+      );
+    }
+    // An override folder that supplied its own files but no deploy.yml still
+    // needs the site in the bundle.
+    if (!existsSync(join(deployOutputDir, GH_PAGES_SITE_DIR))) {
+      await copySiteIntoBundle(ctx);
+    }
+    const pagesPath = pagesSlotPath(projectName, version, versioning, pagesRoot);
+    await writeFile(join(deployOutputDir, 'gh-pages-deploy.sh'), loadGhPagesScript());
+    await writeFile(
+      join(deployOutputDir, 'deploy.yml'),
+      stringify({
+        method: 'gh-pages',
+        slot: deploymentSlot(projectName, version, versioning),
+        versioning: versioning ?? 'singleton',
+        // Where the site lands under the environment prefix ('' = the prefix
+        // itself, i.e. the branch root in production).
+        pagesPath,
+        pagesRoot,
+        deployCommand: `sh ./gh-pages-deploy.sh '${pagesPath}' '${projectName}' '${version}'`,
       }),
     );
   },

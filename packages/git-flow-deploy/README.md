@@ -39,7 +39,7 @@ import { parseDeployYml, type DeployManifest, type SharedStorageSpec } from '@cp
 ```
 
 Required: `name`, `version`, `repo`, `releaseId` (positive int), `deployCommand`.
-Optional: `stack`, `service`, `swarmService`, `method` (`node|compose|swarm|swarm-job`), `slot`,
+Optional: `stack`, `service`, `swarmService`, `method` (`node|compose|swarm|swarm-job|gh-pages`), `slot`,
 `versioning` (`singleton|major`), `teardownCommand`, `sharedStorage`, `seedStorage`.
 
 ### Bundle and execution

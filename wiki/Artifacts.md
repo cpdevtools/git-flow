@@ -24,6 +24,8 @@ The file is declarative — nothing in it is executed as a command. Building is 
 | `ng-lib`             | Packs an npm package built outside the project directory   | npm registries    |
 | `docker-image`       | Builds, saves and pushes one image                         | Docker registries |
 | `docker-service`     | Nothing — the product is the deploy bundle                 | —                 |
+| `static-site`        | Zips a built site; deploys to GitHub Pages via `gh-pages`  | —                 |
+| `executable`         | Verifies and attaches one built binary, with a checksum    | —                 |
 | `release-attachment` | Attaches an arbitrary file to the GitHub Release           | —                 |
 | `deploy`             | A deploy bundle zip                                        | —                 |
 
@@ -112,6 +114,87 @@ Declaring `registries` on this type is an error rather than a no-op, because a s
 A `docker-service` project has nothing to build, so it needs no `github.actions.build` script —
 `github.actions.pack` alone is what makes a project take part in a release, and `build-pack` packs
 and uploads it whether or not a build script exists.
+
+### `static-site`
+
+A built static site — an Angular, Vite or Astro app, generated docs, anything whose product is a
+directory of files served as-is. The type only needs to know which directory the build emitted;
+what produced it is irrelevant.
+
+| Field       | Notes                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------- |
+| `name`      | Site name — drives the slot, and so the folder it is served from. Defaults to project |
+| `directory` | Where the site's project lives, relative to the project directory. Defaults to `.`    |
+| `packDir`   | Subdirectory the build emits, relative to `directory`. Defaults to `dist`.            |
+| `pagesRoot` | `true` for the one site that owns the Pages root. See [Deployment](Deployment).       |
+| `deploy`    | `[gh-pages]`                                                                          |
+
+```yaml
+artifacts:
+  - type: static-site
+    name: '@org/portal'
+    packDir: dist/portal/browser # what `ng build` emits
+    deploy: [gh-pages]
+```
+
+Like `ng-lib` it **verifies rather than builds**: `github.actions.build` produces the site, pack
+checks that `packDir` exists and holds an `index.html`, zips it onto the release as
+`<name>-site.zip`, and hands it to the `gh-pages` deploy method. `packDir` must be the directory
+that is served — for an Angular app that is `dist/<project>/browser`, not `dist/<project>`.
+
+Build with the default `<base href="/">`. The deploy rewrites it to wherever the site lands, so
+the project never has to know its URL prefix.
+
+Declaring `registries` is an error, as for `docker-service`.
+
+### `executable`
+
+One built binary attached to the release — a PyInstaller one-file, a Go or Rust binary, a .NET
+single-file publish, a Deno or Node SEA bundle. The type never knows what produced it.
+
+| Field            | Notes                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `name`           | Bare base name, e.g. `heroes-capture`. Defaults to the project name.                  |
+| `path`           | The built file, relative to the project directory                                     |
+| `platform`       | e.g. `win-x64`; part of the asset name and the asset label                            |
+| `version`        | `pe` \| `exec` \| `none` — how pack verifies the build. See below.                    |
+| `versionArgs`    | For `exec`. Defaults to `['--version']`.                                              |
+| `versionPattern` | For `exec`. Regex; group 1 or the whole match is the version.                         |
+| `checksum`       | Attach `<asset>.sha256` in `sha256sum -c` format. Defaults to `true`.                 |
+| `versionInName`  | `true` for `name-1.2.3-win-x64.exe`. Off by default — see the note on the asset name. |
+| `contentType`    | Defaults to the PE type for `.exe`, otherwise `application/octet-stream`              |
+
+```yaml
+artifacts:
+  - type: executable
+    name: heroes-capture
+    path: dist/heroes-capture.exe
+    platform: win-x64
+```
+
+The asset is published as `<name>-<platform><ext>`, here `heroes-capture-win-x64.exe`, beside
+`heroes-capture-win-x64.exe.sha256`. The version is **not** in the name by default: the release tag
+already carries it, and a stable name keeps `releases/latest/download/<asset>` working as a permanent
+URL. Set `versionInName: true` if a self-describing filename matters more. Several platforms are
+several entries.
+
+**Verifying the build.** Like `ng-lib`, the type verifies rather than builds: `github.actions.build`
+produces the binary, and pack refuses to ship it unless its version equals the release version.
+A `dist` directory survives between runs, so a build that silently failed would otherwise ship
+yesterday's binary.
+
+| Mode   | How                                                                                                                                                                   | Default for     |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `pe`   | Parses the Windows version resource and reads its `ProductVersion` string. Never executes the file, so it works on any runner, including for cross-compiled binaries. | `.exe`, `.dll`  |
+| `exec` | Runs `<path> <versionArgs>` and matches `versionPattern` against the output. Needs a host that can run the binary.                                                    | everything else |
+| `none` | Skips the check and warns on every pack. Must be explicit.                                                                                                            | never           |
+
+`pe` compares the string, not the four-part numeric version, because the numeric form cannot hold a
+prerelease (`1.2.3-beta.1`). A leading `v` and `+metadata` (as .NET's `InformationalVersion` adds) are
+ignored. The build stamps it from `PROJECT_VERSION`: PyInstaller's version file, .NET's
+`<InformationalVersion>`, Go's `goversioninfo`, Rust's `winres` or `embed-resource`.
+
+Declaring `registries` is an error, as for `docker-service`.
 
 ### `release-attachment`
 

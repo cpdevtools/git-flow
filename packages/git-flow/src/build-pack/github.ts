@@ -378,6 +378,7 @@ export async function uploadArtifact(
   uploadUrl: string,
   filePath: string,
   assetName?: string,
+  options: { label?: string; contentType?: string } = {},
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   // The on-disk name can be unique (to avoid collisions in the shared staging
@@ -400,7 +401,9 @@ export async function uploadArtifact(
   const fileContent = await readFile(filePath);
 
   // Determine content type
-  const contentType = fileName.endsWith('.yml')
+  const contentType =
+    options.contentType ??
+    (fileName.endsWith('.yml')
     ? 'application/x-yaml'
     : fileName.endsWith('.tgz')
       ? 'application/gzip'
@@ -408,7 +411,7 @@ export async function uploadArtifact(
         ? 'application/zip'
         : fileName.endsWith('.nupkg')
           ? 'application/octet-stream'
-          : 'application/octet-stream';
+          : 'application/octet-stream');
 
   console.log(`  ⬆️  Uploading ${fileName}...`);
 
@@ -417,6 +420,7 @@ export async function uploadArtifact(
     repo,
     release_id: releaseId,
     name: fileName,
+    ...(options.label ? { label: options.label } : {}),
     data: fileContent as unknown as string,
     headers: {
       'content-type': contentType,

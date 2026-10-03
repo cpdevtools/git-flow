@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { renderDeployTemplates, deployContext } from './execute.js';
+import {
+  renderDeployTemplates,
+  deployContext,
+  globToRegExp,
+  hasTemplateMarkers,
+} from './execute.js';
 
 let dir: string;
 
@@ -172,5 +177,68 @@ describe('renderDeployTemplates', () => {
     const result = await readFile(join(dir, 'stack.yml'), 'utf-8');
     expect(result).toContain('cfg_dev: {}');
     expect(result).toContain('cfg_prod: {}');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// templateIgnore
+// ---------------------------------------------------------------------------
+
+describe('renderDeployTemplates ignore', () => {
+  it('leaves ignored paths alone even when they look like templates', async () => {
+    await mkdir(join(dir, 'site', 'chunks'), { recursive: true });
+    const chunk = 'x="@{ NOT_A_TOKEN }"';
+    await writeFile(join(dir, 'site', 'chunks', 'a.js'), chunk);
+    await writeFile(join(dir, 'deploy.yml'), 'service: @{ SERVICE }\n');
+
+    await renderDeployTemplates(dir, { SERVICE: 'svc' }, ['site/**']);
+
+    expect(await readFile(join(dir, 'site', 'chunks', 'a.js'), 'utf-8')).toBe(chunk);
+    expect(await readFile(join(dir, 'deploy.yml'), 'utf-8')).toBe('service: svc\n');
+  });
+
+  it('would otherwise fail on the same content', async () => {
+    await mkdir(join(dir, 'site'));
+    await writeFile(join(dir, 'site', 'a.js'), 'x="@{ NOT_A_TOKEN }"');
+    await expect(renderDeployTemplates(dir, {})).rejects.toThrow('site/a.js');
+  });
+
+  it('matches single-segment wildcards within one directory only', async () => {
+    await mkdir(join(dir, 'vendor', 'deep'), { recursive: true });
+    await writeFile(join(dir, 'vendor', 'x.js'), '@{ NOPE }');
+    await writeFile(join(dir, 'vendor', 'deep', 'y.js'), '@{ NOPE }');
+
+    await expect(renderDeployTemplates(dir, {}, ['vendor/*.js'])).rejects.toThrow(
+      'vendor/deep/y.js',
+    );
+  });
+});
+
+describe('globToRegExp', () => {
+  it('** spans directories, * and ? do not', () => {
+    expect(globToRegExp('site/**').test('site/a.js')).toBe(true);
+    expect(globToRegExp('site/**').test('site/deep/er/a.js')).toBe(true);
+    expect(globToRegExp('site/**').test('sites/a.js')).toBe(false);
+    expect(globToRegExp('**/*.min.js').test('a.min.js')).toBe(true);
+    expect(globToRegExp('**/*.min.js').test('x/y/a.min.js')).toBe(true);
+    expect(globToRegExp('*.js').test('a.js')).toBe(true);
+    expect(globToRegExp('*.js').test('x/a.js')).toBe(false);
+    expect(globToRegExp('a?.js').test('ab.js')).toBe(true);
+    expect(globToRegExp('a?.js').test('a/.js')).toBe(false);
+  });
+
+  it('treats regex metacharacters literally', () => {
+    expect(globToRegExp('a.b').test('a.b')).toBe(true);
+    expect(globToRegExp('a.b').test('aXb')).toBe(false);
+    expect(globToRegExp('(x)').test('(x)')).toBe(true);
+  });
+});
+
+describe('hasTemplateMarkers', () => {
+  it('detects each delimiter and nothing else', () => {
+    expect(hasTemplateMarkers('plain ${VAR} {{ jinja }}')).toBe(false);
+    expect(hasTemplateMarkers('a @{ X }')).toBe(true);
+    expect(hasTemplateMarkers('@% if x %@')).toBe(true);
+    expect(hasTemplateMarkers('@# note #@')).toBe(true);
   });
 });

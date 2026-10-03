@@ -21,6 +21,7 @@ export default defineConfig({
   platform: 'node',
   // Ship the shell asset that generateDeployYml reads verbatim at runtime next
   // to the built module so __dirname/import.meta.url resolves it in dist too.
-  onSuccess: 'node -e "require(\'node:fs\').cpSync(\'src/artifacts/restart.sh\',\'dist/artifacts/restart.sh\')"',
+  onSuccess:
+    'node -e "const fs=require(\'node:fs\');for(const f of [\'restart.sh\',\'gh-pages-deploy.sh\'])fs.cpSync(\'src/artifacts/\'+f,\'dist/artifacts/\'+f)"',
 });
 

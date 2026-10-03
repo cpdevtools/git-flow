@@ -72,6 +72,15 @@ It verifies rather than builds. Generating and building the client belongs in
 the release version — a stale `dist` from a previous release would otherwise publish and then fail
 verification at the very end of the run.
 
+## `executable` refuses a binary at the wrong version
+
+Pack reads the version out of the binary — from the PE version resource for `.exe`, by running it
+with `--version` otherwise — and fails unless it equals the release version. A `dist` directory
+survives between runs, so without this a build that silently failed would ship the previous
+release's binary under the new tag. Stamp the version from `PROJECT_VERSION` in
+`github.actions.build`. For a Windows binary the `ProductVersion` **string** is required; the
+four-part numeric version cannot carry a prerelease and is not consulted.
+
 ## A plugin must not import git-flow at runtime
 
 Registries are module state in a bundled CJS build, and the copy a consuming repository resolves is
