@@ -426,6 +426,17 @@ describe('executable', () => {
     expect(checksum).toBe(`${artifact.sha256}  tool-win-x64.exe\n`);
   });
 
+  it('creates the output directory when nothing has made it yet', async () => {
+    // The executable can be a project's only artifact, so it is the first thing
+    // written there on a fresh runner.
+    await winBinary('1.2.3');
+    await rm(outDir, { recursive: true, force: true });
+    const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
+    await type().pack(artifact, ctx('1.2.3'));
+    expect(existsSync(join(outDir, 'tool.exe'))).toBe(true);
+    expect(existsSync(join(outDir, 'tool.exe.sha256'))).toBe(true);
+  });
+
   it('refuses a stale build', async () => {
     await winBinary('1.2.2');
     const artifact = { type: 'executable', name: 'tool', path: 'dist/tool.exe' } as never;
