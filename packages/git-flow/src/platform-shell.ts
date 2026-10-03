@@ -16,7 +16,7 @@
 
 import { existsSync } from 'node:fs';
 import { win32 } from 'node:path';
-import { $, useBash } from 'zx';
+import { $, quote, useBash } from 'zx';
 
 export interface PlatformShellOptions {
   platform?: NodeJS.Platform;
@@ -59,8 +59,11 @@ export function configurePlatformShell(opts: PlatformShellOptions = {}): void {
     useBash();
     return;
   }
-  // Keep zx's bash defaults (prefix/postfix/quote); only the executable changes.
   $.shell = shell;
+  // zx picks PowerShell quoting on win32 regardless of shell. Under bash that
+  // leaves backslashes in Windows paths unescaped, so `dist\tool` arrives as
+  // `dist<TAB>ool`. Use the POSIX quoter, which escapes them.
+  $.quote = quote;
 }
 
 configurePlatformShell();

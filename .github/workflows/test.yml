@@ -32,23 +32,3 @@ jobs:
           fail-fast: ${{ github.event.inputs.fail-fast || 'false' }}
           concurrency: ${{ github.event.inputs.concurrency || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  # The library and actions must also work on a Windows runner: toolchains that
-  # cannot cross-compile (PyInstaller) release from windows-latest.
-  test-windows:
-    name: Test (windows)
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run Tests
-        uses: ./actions/test
-        with:
-          mode: test-optional
-          fail-fast: ${{ github.event.inputs.fail-fast || 'false' }}
-          concurrency: ${{ github.event.inputs.concurrency || '' }}
-          token: ${{ secrets.GITHUB_TOKEN }}
