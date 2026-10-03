@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gitBashCandidates, resolvePlatformShell } from './platform-shell.js';
+import { gitBashCandidates, quoteForMsysBash, resolvePlatformShell } from './platform-shell.js';
 
 describe('resolvePlatformShell', () => {
   it('leaves non-Windows platforms on the zx default', () => {
@@ -25,5 +25,16 @@ describe('resolvePlatformShell', () => {
 
   it('falls back to whatever PATH gives when nothing is found', () => {
     expect(resolvePlatformShell({ platform: 'win32', env: {}, exists: () => false })).toBe('bash');
+  });
+});
+
+describe('quoteForMsysBash', () => {
+  it('leaves safe words alone and never emits a backslash it did not receive', () => {
+    expect(quoteForMsysBash('git')).toBe('git');
+    expect(quoteForMsysBash('--pack-destination')).toBe('--pack-destination');
+    expect(quoteForMsysBash('')).toBe("''");
+    expect(quoteForMsysBash('D:\\a\\test\\t.json')).toBe("'D:\\a\\test\\t.json'");
+    expect(quoteForMsysBash('has space')).toBe("'has space'");
+    expect(quoteForMsysBash("it's")).toBe("'it'\\''s'");
   });
 });

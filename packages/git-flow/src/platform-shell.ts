@@ -16,7 +16,7 @@
 
 import { existsSync } from 'node:fs';
 import { win32 } from 'node:path';
-import { $, quote, useBash } from 'zx';
+import { $, useBash } from 'zx';
 
 export interface PlatformShellOptions {
   platform?: NodeJS.Platform;
@@ -47,6 +47,23 @@ export function resolvePlatformShell(opts: PlatformShellOptions = {}): string | 
   return gitBashCandidates(opts.env ?? process.env).find(exists) ?? 'bash';
 }
 
+/**
+ * Quote an argument for bash on Windows without producing backslashes.
+ *
+ * zx's POSIX quoter emits `$'…'` with doubled-backslash escapes. Node hands the
+ * command to bash.exe as one double-quoted `-c` argument, and the MSYS runtime
+ * that parses bash's command line collapses a doubled backslash to a single one
+ * inside double quotes — so `$'D:\\a\\test'` reaches bash as `$'D:\a\test'`
+ * and `\a`, `\t` are expanded to BEL and TAB. Plain single quotes carry
+ * Windows paths through untouched: MSYS leaves a lone backslash alone and bash
+ * treats single-quoted text literally.
+ */
+export function quoteForMsysBash(arg: string): string {
+  if (arg === '') return "''";
+  if (/^[\w/.\-@:=]+$/.test(arg)) return arg;
+  return "'" + arg.replace(/'/g, "'\\''") + "'";
+}
+
 let configured = false;
 
 export function configurePlatformShell(opts: PlatformShellOptions = {}): void {
@@ -60,10 +77,7 @@ export function configurePlatformShell(opts: PlatformShellOptions = {}): void {
     return;
   }
   $.shell = shell;
-  // zx picks PowerShell quoting on win32 regardless of shell. Under bash that
-  // leaves backslashes in Windows paths unescaped, so `dist\tool` arrives as
-  // `dist<TAB>ool`. Use the POSIX quoter, which escapes them.
-  $.quote = quote;
+  $.quote = quoteForMsysBash;
 }
 
 configurePlatformShell();
