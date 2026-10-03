@@ -20,6 +20,9 @@ describe('restoreProjectFiles', () => {
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'git-restore-'));
     git('init', '-q');
+    // Windows runners default to autocrlf=true, which would rewrite the LF
+    // fixture on checkout and fail the byte-for-byte comparison.
+    git('config', 'core.autocrlf', 'false');
     git('config', 'user.email', 'test@example.com');
     git('config', 'user.name', 'test');
   });
@@ -29,9 +32,7 @@ describe('restoreProjectFiles', () => {
   });
 
   it('restores many projects concurrently without losing the index lock', async () => {
-    const projects = await Promise.all(
-      Array.from({ length: 12 }, (_, i) => project(`p${i}`)),
-    );
+    const projects = await Promise.all(Array.from({ length: 12 }, (_, i) => project(`p${i}`)));
     git('add', '.');
     git('commit', '-qm', 'init');
     for (const cwd of projects) await writeFile(join(cwd, 'package.json'), '{"stamped":true}\n');

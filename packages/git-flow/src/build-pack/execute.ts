@@ -58,8 +58,7 @@ async function applyVersionToPackageJson(cwd: string, version: string): Promise<
 async function applyVersionToCsproj(cwd: string, version: string): Promise<void> {
   // Find all .csproj files
   try {
-    const { stdout } = await $({ cwd })`find . -maxdepth 1 -name "*.csproj"`;
-    const csprojFiles = stdout.trim().split('\n').filter(Boolean);
+    const csprojFiles = (await readdir(cwd)).filter((f) => f.endsWith('.csproj'));
 
     for (const csprojFile of csprojFiles) {
       const csprojPath = join(cwd, csprojFile);

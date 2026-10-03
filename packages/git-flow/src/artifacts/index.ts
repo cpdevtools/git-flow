@@ -12,6 +12,7 @@
 
 // Definitions only — registration happens once, at the bottom of this module,
 // where the built-in manifest is applied through the same path as any plugin.
+import '../platform-shell.js';
 import './deploy-methods.js';
 export {
   registerDeployMethod,
@@ -71,6 +72,7 @@ import { basename, isAbsolute, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { $ } from 'zx';
 import { uploadArtifact } from '../build-pack/github.js';
+import { zipDirectory } from '../build-pack/zip.js';
 import {
   publishToNpm,
   publishToNuget,
@@ -413,7 +415,7 @@ const deploy: ArtifactType<DeployArtifact> = {
     const zipName = `${safeName(artifact.name)}-deploy.zip`;
     await mkdir(ctx.artifactOutputDir, { recursive: true });
     const zipPath = join(ctx.artifactOutputDir, zipName);
-    await $({ cwd: deployOutputDir })`zip -r ${zipPath} .`;
+    await zipDirectory(deployOutputDir, zipPath);
 
     artifact.path = zipPath;
     console.log(`  ✓ deploy: deploy.zip`);

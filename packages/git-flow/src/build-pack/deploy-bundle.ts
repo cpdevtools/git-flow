@@ -2,13 +2,13 @@
  * Zip a project's deploy output dir and upload it to its draft release.
  */
 
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { $ } from 'zx';
 import { safeName } from '../artifacts/slot.js';
 import type { UploadContext } from '../artifacts/index.js';
 import { ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import { uploadArtifact } from './github.js';
+import { zipDirectory } from './zip.js';
 
 /**
  * Zip `deployOutputDir` and upload it as `deploy-<method>.zip`.
@@ -31,10 +31,7 @@ export async function uploadDeployBundle(
   const assetName = `deploy-${method}.zip`;
   const zipPath = join(outputDir, `${safeName(projectName)}-${assetName}`);
   await mkdir(outputDir, { recursive: true });
-  // `zip -r` into an existing archive updates it, keeping entries from an
-  // earlier run that are no longer in the dir — always start from nothing.
-  await rm(zipPath, { force: true });
-  await $({ cwd: deployOutputDir })`zip -r ${zipPath} .`;
+  await zipDirectory(deployOutputDir, zipPath);
 
   await uploadArtifact(
     uploadCtx.githubToken,
