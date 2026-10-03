@@ -17,7 +17,8 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "@cpdevtools/ts-dev-utilities": "^1.1.10",
+    "@cpdevtools/ts-dev-utilities": "^1.2.1",
+    "adm-zip": "^0.5.18",
     "fast-glob": "^3.3.2",
     "nunjucks": "^3.2.4",
     "semver": "^7.6.3",
@@ -25,6 +26,7 @@
     "zx": "^8.2.4"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^20.17.11",
     "@types/nunjucks": "^3.2.6",
     "@types/semver": "^7.5.8",

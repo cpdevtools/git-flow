@@ -62,6 +62,11 @@ runs:
       run: |
         pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
         pnpm config set "verifyDepsBeforeRun" "false"
+        # Project scripts are written for bash (`&&`, `${VAR:-x}`); on Windows pnpm
+        # would otherwise run them through cmd.exe. Git for Windows' bash is on PATH.
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          pnpm config set script-shell "$(cygpath -w "$(command -v bash)")"
+        fi
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
 
@@ -103,7 +108,8 @@ runs:
     - name: Run Integration Tests
       id: test-integration
       shell: bash
-      run: ${{ github.action_path }}/node_modules/.bin/tsx ${{ github.action_path }}/src/action.ts
+      run: |
+        "${{ github.action_path }}/node_modules/.bin/tsx" "${{ github.action_path }}/src/action.ts"
       env:
         INPUT_FAIL_FAST: ${{ inputs.fail-fast }}
         INPUT_CONCURRENCY: ${{ inputs.concurrency }}

@@ -8,6 +8,7 @@
  */
 
 // Main orchestration entry point
+import '../platform-shell.js';
 export { runBuildPack } from './orchestrate.js';
 
 // Types

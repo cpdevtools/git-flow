@@ -69,9 +69,9 @@ runs:
     - name: Cleanup releases, tags and packages
       shell: bash
       run: |
-        ${{ github.action_path }}/node_modules/.bin/tsx \
-          --tsconfig ${{ github.action_path }}/tsconfig.json \
-          ${{ github.action_path }}/src/action.ts
+        "${{ github.action_path }}/node_modules/.bin/tsx" \
+          --tsconfig "${{ github.action_path }}/tsconfig.json" \
+          "${{ github.action_path }}/src/action.ts"
       env:
         GH_TOKEN: ${{ inputs.token }}
         DRY_RUN: ${{ inputs.dry-run }}
