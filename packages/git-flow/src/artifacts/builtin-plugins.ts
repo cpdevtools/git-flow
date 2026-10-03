@@ -12,9 +12,10 @@
  */
 
 import type { Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readdir, readFile, rm } from 'node:fs/promises';
-import { basename, isAbsolute, join } from 'node:path';
+import { copyFile, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { basename, extname, isAbsolute, join } from 'node:path';
 import { $ } from 'zx';
 import { uploadArtifact } from '../build-pack/github.js';
 import {
@@ -26,9 +27,10 @@ import {
   type NugetRegistry,
 } from '../publishing/index.js';
 import { dockerCompose, dockerSwarm, dockerSwarmJob, ghPages } from './deploy-methods.js';
-import { safeName } from './slot.js';
+import { PeParseError, readPeVersion } from './pe-version.js';
 import type { GitFlowPlugin } from './plugin.js';
-import type { ArtifactType } from './types.js';
+import { safeName } from './slot.js';
+import type { ArtifactType, PackContext } from './types.js';
 
 /**
  * A .NET class library published to a NuGet registry.
@@ -388,6 +390,257 @@ const staticSite: ArtifactType<StaticSiteArtifact> = {
   },
 };
 
+/**
+ * A single built binary attached to the release — a PyInstaller one-file, a Go
+ * or Rust binary, a .NET single-file publish, a Deno/Node SEA bundle. The type
+ * never cares what produced it; it only sees the file.
+ *
+ * Like `ng-lib` it **verifies rather than builds**: `github.actions.build`
+ * produces the binary, pack checks it is at the release version (a `dist`
+ * directory survives between runs, and a build that silently failed leaves
+ * yesterday's binary in place — publish would succeed and the release would
+ * lie), copies it under its asset name, and writes a checksum beside it.
+ */
+export interface ExecutableArtifact {
+  type: 'executable';
+  /** Bare base name, e.g. `heroes-capture`. The asset name is composed from it. */
+  name: string;
+  /** The built file, relative to the project directory. */
+  path: string;
+  /** Target platform, e.g. `win-x64`; part of the asset name and label. */
+  platform?: string;
+  /** Attach `<asset>.sha256` (sha256sum format). Defaults to true. */
+  checksum?: boolean;
+  /** Asset content type. Defaults by extension (`.exe` → PE), else octet-stream. */
+  contentType?: string;
+  /**
+   * How pack proves the binary is at the release version:
+   *   pe   — read ProductVersion from the PE version resource, no execution
+   *          (default for .exe / .dll)
+   *   exec — run `<path> <versionArgs>` and match `versionPattern` on its output
+   *          (default otherwise; needs a host that can run the binary)
+   *   none — skip, with a warning (must be explicit)
+   */
+  version?: 'pe' | 'exec' | 'none';
+  /** Arguments for `exec`. Defaults to `['--version']`. */
+  versionArgs?: string[];
+  /** Regex for `exec`; group 1 (or the whole match) is the version. */
+  versionPattern?: string;
+  /**
+   * Put the version in the asset name (`name-1.2.3-win-x64.exe`). Off by
+   * default so `releases/latest/download/<asset>` stays a stable URL.
+   */
+  versionInName?: boolean;
+  /** Populated by pack: the asset name the file is published under. */
+  assetName?: string;
+  /** Populated by pack: sha256 of the binary. */
+  sha256?: string;
+  /** Populated by pack: the checksum file, when `checksum` is on. */
+  checksumPath?: string;
+  /** See DotnetLibArtifact — satisfies the Artifact union via CustomArtifact. */
+  [key: string]: unknown;
+}
+
+const DEFAULT_VERSION_PATTERN = /(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/;
+
+/** Strip what a toolchain adds and a release does not: a leading `v`, `+metadata`. */
+export function normalizeBinaryVersion(v: string): string {
+  return v.trim().replace(/^v/i, '').replace(/\+.*$/, '');
+}
+
+/** The asset name an executable artifact is published under. */
+export function executableAssetName(
+  artifact: Pick<ExecutableArtifact, 'name' | 'path' | 'platform' | 'versionInName'>,
+  version: string,
+): string {
+  const parts = [safeName(artifact.name)];
+  if (artifact.versionInName) parts.push(version);
+  if (artifact.platform) parts.push(artifact.platform);
+  return parts.join('-') + extname(artifact.path);
+}
+
+function defaultVersionMode(path: string): 'pe' | 'exec' {
+  const ext = extname(path).toLowerCase();
+  return ext === '.exe' || ext === '.dll' ? 'pe' : 'exec';
+}
+
+async function verifyExecutableVersion(
+  artifact: ExecutableArtifact,
+  filePath: string,
+  ctx: PackContext,
+): Promise<void> {
+  const mode = artifact.version ?? defaultVersionMode(artifact.path);
+  const label = `executable '${artifact.name}'`;
+  const expected = normalizeBinaryVersion(ctx.version);
+
+  if (mode === 'none') {
+    console.warn(
+      `  ⚠️  ${label}: version check disabled (version: none) — a stale build would ship unnoticed.`,
+    );
+    return;
+  }
+
+  let found: string;
+  if (mode === 'pe') {
+    let info;
+    try {
+      info = await readPeVersion(filePath);
+    } catch (err) {
+      if (err instanceof PeParseError) {
+        throw new Error(
+          `${label}: cannot read a version from ${artifact.path}: ${err.message}.\n` +
+            `'version: pe' expects a Windows PE binary with a VS_VERSIONINFO resource. ` +
+            `For a non-Windows binary use 'version: exec'.`,
+        );
+      }
+      throw err;
+    }
+    if (!info.productVersion) {
+      throw new Error(
+        `${label}: ${artifact.path} has no ProductVersion string in its version resource` +
+          (info.fixedFileVersion ? ` (numeric file version is ${info.fixedFileVersion})` : '') +
+          `.\nThe fixed four-part version cannot carry a prerelease, so the string is required. ` +
+          `Set it from PROJECT_VERSION in the build: PyInstaller --version-file, .NET ` +
+          `<InformationalVersion>, Go goversioninfo, Rust winres/embed-resource.`,
+      );
+    }
+    found = info.productVersion;
+  } else if (mode === 'exec') {
+    const args = artifact.versionArgs ?? ['--version'];
+    const pattern = artifact.versionPattern
+      ? new RegExp(artifact.versionPattern)
+      : DEFAULT_VERSION_PATTERN;
+    let output: string;
+    try {
+      const result = await $({ cwd: ctx.projectCwd, nothrow: true })`${filePath} ${args}`;
+      output = `${result.stdout}\n${result.stderr}`;
+      if (result.exitCode !== 0) {
+        throw new Error(`exited ${result.exitCode}: ${output.trim()}`);
+      }
+    } catch (err) {
+      throw new Error(
+        `${label}: running '${artifact.path} ${args.join(' ')}' failed: ${(err as Error).message}\n` +
+          `'version: exec' needs a host that can run the binary. For a Windows binary on a ` +
+          `non-Windows runner use 'version: pe'.`,
+      );
+    }
+    const match = pattern.exec(output);
+    if (!match) {
+      throw new Error(
+        `${label}: no version in the output of '${artifact.path} ${args.join(' ')}' ` +
+          `(pattern ${pattern}).\nOutput: ${output.trim().slice(0, 200)}`,
+      );
+    }
+    found = match[1] ?? match[0];
+  } else {
+    throw new Error(`${label}: unknown version mode '${String(mode)}' (pe | exec | none)`);
+  }
+
+  if (normalizeBinaryVersion(found) !== expected) {
+    throw new Error(
+      `${label}: ${artifact.path} reports version '${found}', but the release is '${ctx.version}'.\n` +
+        `The binary is stale or mis-stamped: the project's github.actions.build must rebuild it ` +
+        `for every release, stamping its version from PROJECT_VERSION.`,
+    );
+  }
+}
+
+const executable: ArtifactType<ExecutableArtifact> = {
+  async pack(artifact, ctx) {
+    if (!artifact.name) (artifact as { name: string }).name = ctx.projectName;
+    if (!artifact.path || typeof artifact.path !== 'string') {
+      throw new Error(`executable '${artifact.name}' requires 'path'`);
+    }
+    const declared = (artifact as { registries?: unknown }).registries;
+    if (Array.isArray(declared) && declared.length > 0) {
+      throw new Error(
+        `executable '${artifact.name}' declares registries, but this type produces nothing to ` +
+          `publish — the binary is attached to the release.`,
+      );
+    }
+
+    const source = isAbsolute(artifact.path) ? artifact.path : join(ctx.projectCwd, artifact.path);
+    // Building is the project's job: github.actions.build runs before pack and
+    // whatever it produced is what ships. Pack only checks that it happened.
+    if (!existsSync(source)) {
+      throw new Error(
+        `executable: ${artifact.path} not found (resolved to ${source}).\n` +
+          `The project's github.actions.build must produce it before pack runs.`,
+      );
+    }
+
+    await verifyExecutableVersion(artifact, source, ctx);
+
+    const assetName = executableAssetName(artifact, ctx.version);
+    const dest = join(ctx.artifactOutputDir, assetName);
+    // In Node rather than cp/sha256sum: this type has to work on a Windows
+    // runner, where the usual shell tools are not a given.
+    await copyFile(source, dest);
+    const sha256 = createHash('sha256')
+      .update(await readFile(dest))
+      .digest('hex');
+
+    artifact.assetName = assetName;
+    artifact.path = dest;
+    artifact.sha256 = sha256;
+    if (artifact.checksum !== false) {
+      const checksumPath = `${dest}.sha256`;
+      // `sha256sum -c` format: two spaces between hash and name.
+      await writeFile(checksumPath, `${sha256}  ${assetName}\n`);
+      artifact.checksumPath = checksumPath;
+    }
+    console.log(`  ✓ executable: ${assetName} (sha256 ${sha256.slice(0, 12)}…)`);
+  },
+  async packDeploy() {
+    // Not deployable on its own.
+  },
+  async upload(artifact, ctx) {
+    if (!artifact.path || !artifact.assetName) {
+      throw new Error(`executable artifact ${artifact.name} missing path — was pack run?`);
+    }
+    const path = isAbsolute(artifact.path) ? artifact.path : join(ctx.workspaceRoot, artifact.path);
+    const label = [artifact.name, artifact.platform && `(${artifact.platform})`]
+      .filter(Boolean)
+      .join(' ');
+    const contentType =
+      artifact.contentType ??
+      (extname(path).toLowerCase() === '.exe'
+        ? 'application/vnd.microsoft.portable-executable'
+        : 'application/octet-stream');
+    await uploadArtifact(
+      ctx.githubToken,
+      ctx.owner,
+      ctx.repo,
+      ctx.releaseId,
+      ctx.uploadUrl,
+      path,
+      artifact.assetName,
+      { label, contentType },
+    );
+    if (artifact.checksumPath) {
+      await uploadArtifact(
+        ctx.githubToken,
+        ctx.owner,
+        ctx.repo,
+        ctx.releaseId,
+        ctx.uploadUrl,
+        artifact.checksumPath,
+        `${artifact.assetName}.sha256`,
+        { label: `${label} sha256`, contentType: 'text/plain' },
+      );
+    }
+  },
+  async publish() {
+    // Unreachable: getRegistries is always empty.
+  },
+  getRegistries() {
+    return [];
+  },
+  getVersion(_, projectVersion) {
+    return projectVersion;
+  },
+};
+
 /** Shipped with git-flow; registered alongside the other built-ins. */
 export const firstPartyPlugin: GitFlowPlugin = {
   name: '@cpdevtools/git-flow',
@@ -396,6 +649,7 @@ export const firstPartyPlugin: GitFlowPlugin = {
     'ng-lib': ngLib as unknown as ArtifactType<Artifact>,
     'docker-service': dockerService as unknown as ArtifactType<Artifact>,
     'static-site': staticSite as unknown as ArtifactType<Artifact>,
+    executable: executable as unknown as ArtifactType<Artifact>,
   },
   deployMethods: [
     // The same handlers docker-image uses: they copy stack/compose files and

@@ -25,6 +25,7 @@ The file is declarative — nothing in it is executed as a command. Building is 
 | `docker-image`       | Builds, saves and pushes one image                         | Docker registries |
 | `docker-service`     | Nothing — the product is the deploy bundle                 | —                 |
 | `static-site`        | Zips a built site; deploys to GitHub Pages via `gh-pages`  | —                 |
+| `executable`         | Verifies and attaches one built binary, with a checksum    | —                 |
 | `release-attachment` | Attaches an arbitrary file to the GitHub Release           | —                 |
 | `deploy`             | A deploy bundle zip                                        | —                 |
 
@@ -143,6 +144,55 @@ that is served — for an Angular app that is `dist/<project>/browser`, not `dis
 
 Build with the default `<base href="/">`. The deploy rewrites it to wherever the site lands, so
 the project never has to know its URL prefix.
+
+Declaring `registries` is an error, as for `docker-service`.
+
+### `executable`
+
+One built binary attached to the release — a PyInstaller one-file, a Go or Rust binary, a .NET
+single-file publish, a Deno or Node SEA bundle. The type never knows what produced it.
+
+| Field            | Notes                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------- |
+| `name`           | Bare base name, e.g. `heroes-capture`. Defaults to the project name.                  |
+| `path`           | The built file, relative to the project directory                                     |
+| `platform`       | e.g. `win-x64`; part of the asset name and the asset label                            |
+| `version`        | `pe` \| `exec` \| `none` — how pack verifies the build. See below.                    |
+| `versionArgs`    | For `exec`. Defaults to `['--version']`.                                              |
+| `versionPattern` | For `exec`. Regex; group 1 or the whole match is the version.                         |
+| `checksum`       | Attach `<asset>.sha256` in `sha256sum -c` format. Defaults to `true`.                 |
+| `versionInName`  | `true` for `name-1.2.3-win-x64.exe`. Off by default — see the note on the asset name. |
+| `contentType`    | Defaults to the PE type for `.exe`, otherwise `application/octet-stream`              |
+
+```yaml
+artifacts:
+  - type: executable
+    name: heroes-capture
+    path: dist/heroes-capture.exe
+    platform: win-x64
+```
+
+The asset is published as `<name>-<platform><ext>`, here `heroes-capture-win-x64.exe`, beside
+`heroes-capture-win-x64.exe.sha256`. The version is **not** in the name by default: the release tag
+already carries it, and a stable name keeps `releases/latest/download/<asset>` working as a permanent
+URL. Set `versionInName: true` if a self-describing filename matters more. Several platforms are
+several entries.
+
+**Verifying the build.** Like `ng-lib`, the type verifies rather than builds: `github.actions.build`
+produces the binary, and pack refuses to ship it unless its version equals the release version.
+A `dist` directory survives between runs, so a build that silently failed would otherwise ship
+yesterday's binary.
+
+| Mode   | How                                                                                                                                                                   | Default for     |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `pe`   | Parses the Windows version resource and reads its `ProductVersion` string. Never executes the file, so it works on any runner, including for cross-compiled binaries. | `.exe`, `.dll`  |
+| `exec` | Runs `<path> <versionArgs>` and matches `versionPattern` against the output. Needs a host that can run the binary.                                                    | everything else |
+| `none` | Skips the check and warns on every pack. Must be explicit.                                                                                                            | never           |
+
+`pe` compares the string, not the four-part numeric version, because the numeric form cannot hold a
+prerelease (`1.2.3-beta.1`). A leading `v` and `+metadata` (as .NET's `InformationalVersion` adds) are
+ignored. The build stamps it from `PROJECT_VERSION`: PyInstaller's version file, .NET's
+`<InformationalVersion>`, Go's `goversioninfo`, Rust's `winres` or `embed-resource`.
 
 Declaring `registries` is an error, as for `docker-service`.
 
