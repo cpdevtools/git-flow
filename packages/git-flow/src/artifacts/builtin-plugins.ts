@@ -14,7 +14,7 @@
 import type { Artifact } from '@cpdevtools/ts-dev-utilities/artifacts';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, readdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join } from 'node:path';
 import { $ } from 'zx';
 import { uploadArtifact } from '../build-pack/github.js';
@@ -573,6 +573,9 @@ const executable: ArtifactType<ExecutableArtifact> = {
 
     const assetName = executableAssetName(artifact, ctx.version);
     const dest = join(ctx.artifactOutputDir, assetName);
+    // Created here, as every other type does: on a fresh runner nothing has made
+    // it yet when an executable is the project's only artifact.
+    await mkdir(ctx.artifactOutputDir, { recursive: true });
     // In Node rather than cp/sha256sum: this type has to work on a Windows
     // runner, where the usual shell tools are not a given.
     await copyFile(source, dest);
