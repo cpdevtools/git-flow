@@ -10,7 +10,7 @@ import {
   rm,
   stat,
 } from 'node:fs/promises';
-import { isAbsolute, resolve, join, sep, dirname } from 'node:path';
+import { isAbsolute, resolve, join, posix, sep, dirname } from 'node:path';
 import { parse } from 'yaml';
 import { safeName, majorVersion } from './slot.js';
 import type { DeployManifest, SharedStorageSpec } from './types.js';
@@ -55,18 +55,18 @@ function usesStackedLayout(manifest: DeployManifest): boolean {
 export function sharedStorageDir(manifest: DeployManifest, baseDir: string): string {
   const service = manifest.service ?? safeName(manifest.name);
   return usesStackedLayout(manifest)
-    ? join(baseDir, manifest.stack!, service)
-    : join(baseDir, service);
+    ? posix.join(baseDir, manifest.stack!, service)
+    : posix.join(baseDir, service);
 }
 
 /** Unversioned bucket — data that survives major upgrades. Stacked layout only. */
 export function sharedBucketDir(manifest: DeployManifest, baseDir: string): string {
-  return join(sharedStorageDir(manifest, baseDir), 'shared');
+  return posix.join(sharedStorageDir(manifest, baseDir), 'shared');
 }
 
 /** Per-major bucket — isolated between coexisting majors. Stacked layout only. */
 export function versionedBucketDir(manifest: DeployManifest, baseDir: string): string {
-  return join(sharedStorageDir(manifest, baseDir), `v${majorVersion(manifest.version)}`);
+  return posix.join(sharedStorageDir(manifest, baseDir), `v${majorVersion(manifest.version)}`);
 }
 
 function normalizeBuckets(spec: SharedStorageSpec): { shared: string[]; versioned: string[] } {

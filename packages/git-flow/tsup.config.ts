@@ -19,9 +19,7 @@ export default defineConfig({
   bundle: true,
   external: ['@actions/core', '@actions/github', 'globby', 'semver', 'yaml', 'zx'],
   platform: 'node',
-  // Ship the shell asset that generateDeployYml reads verbatim at runtime next
-  // to the built module so __dirname/import.meta.url resolves it in dist too.
-  onSuccess:
-    'node -e "const fs=require(\'node:fs\');for(const f of [\'restart.sh\',\'gh-pages-deploy.sh\'])fs.cpSync(\'src/artifacts/\'+f,\'dist/artifacts/\'+f)"',
+  // Shell assets read verbatim at runtime; see scripts/copy-shell-assets.cjs.
+  onSuccess: 'node scripts/copy-shell-assets.cjs',
 });
 
