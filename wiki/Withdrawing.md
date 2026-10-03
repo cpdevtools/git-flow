@@ -28,9 +28,10 @@ Like `gitflow deploy`, every flag that is not given is prompted for.
      eligible version remains, the tag is removed rather than left on a withdrawn build.
      Publishing applies the same rule, so a later release never resurrects a withdrawn one.
    - **Registry effect**, as chosen: `mark` deprecates the npm version with a pointer to the release
-     (NuGet and Docker registries cannot mark a version; the release marker is the record), `delete`
-     removes the version from GitHub Packages (falling back to mark when that is refused), `none`
-     leaves the registries alone.
+     where the registry supports it — npmjs does, **GitHub Packages does not** (nor can NuGet or
+     Docker registries mark a version), in which case the outcome is recorded as `unsupported` and
+     the release marker is the record; `delete` removes the version from GitHub Packages (falling
+     back to mark when that is refused); `none` leaves the registries alone.
    - **Assets**, as chosen: keep or delete the release's attached files.
      The outcome is written back into the marker (`registry: marked | deleted | unsupported`).
 
