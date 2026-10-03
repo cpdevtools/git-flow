@@ -63,6 +63,15 @@ runs:
         GITHUB_TOKEN: ${{ inputs.token }}
         NODE_AUTH_TOKEN: ${{ inputs.token }}
 
+    # The action imports the library from this checkout, which ships source
+    # only; build the entry points it needs.
+    - name: Build git-flow library
+      shell: bash
+      working-directory: ${{ github.action_path }}/../../packages/git-flow
+      run: pnpm build
+      env:
+        HUSKY: '0'
+
     - name: Apply withdrawal effects
       shell: bash
       run: |
