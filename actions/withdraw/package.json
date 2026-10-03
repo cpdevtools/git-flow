@@ -1,0 +1,14 @@
+{
+  "name": "@cpdevtools/git-flow-action-withdraw",
+  "version": "0.0.0-DEFAULT",
+  "private": true,
+  "description": "GitHub Action: apply the registry side of `gitflow withdraw` — repoint floating tags, mark or delete registry versions, delete assets",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@cpdevtools/git-flow": "workspace:*",
+    "tsx": "^4.19.2"
+  },
+  "author": "CPDevTools",
+  "license": "MIT",
+  "packageManager": "pnpm@11.5.0"
+}

@@ -115,6 +115,12 @@ origin: `3.0.0-alpha.2` runs on `release/main`, `3.0.0-feature.wirecut.alpha.2` 
 
 Dispatching starts one run of the chosen environment's workflow per selected release.
 
+### Withdrawn releases
+
+A release withdrawn with [`gitflow withdraw`](Withdrawing) advertises its methods but is not offered:
+`--include-withdrawn` shows it with its kind and reason. The deploy side refuses it unless the kind
+allows `--force`.
+
 ## The bundle
 
 Each artifact that declares `deploy:` produces one `deploy-<method>.zip` per method, attached to the

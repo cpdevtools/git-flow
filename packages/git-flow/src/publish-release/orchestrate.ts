@@ -27,6 +27,7 @@ import {
   type PublishReleaseResult,
   type ProjectPublishResult,
 } from '../publishing/index.js';
+import { listWithdrawnVersions } from '../withdraw/release.js';
 import {
   finalizeRelease,
   createGitTag,
@@ -228,12 +229,14 @@ export async function runPublishRelease(
         // Which pointers this version earns, judged against every version the
         // project has ever tagged. Computed once here — it is a property of the
         // project, not of any one artifact or registry.
-        const existingVersions = await listProjectVersions(
-          options.githubToken,
-          options.owner,
-          options.repo,
-          project.name,
-        );
+        // Withdrawn versions are not candidates: a withdrawn 1.4.2 must not keep
+        // `latest` away from 1.4.3, nor win it back when 1.4.3 is published.
+        const [taggedVersions, withdrawnVersions] = await Promise.all([
+          listProjectVersions(options.githubToken, options.owner, options.repo, project.name),
+          listWithdrawnVersions(options.githubToken, options.owner, options.repo, project.name),
+        ]);
+        const withdrawnSet = new Set(withdrawnVersions);
+        const existingVersions = taggedVersions.filter((v) => !withdrawnSet.has(v));
         const floatingTags = computeFloatingTags(project.version, existingVersions);
         console.log(
           floatingTags.length > 0

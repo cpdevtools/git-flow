@@ -70,6 +70,17 @@ from a script. See [Deployment](Deployment).
 
 ---
 
+## `gitflow withdraw`
+
+```sh
+gitflow withdraw <package>@<version|all> [--kind k] [--reason r] [--replaced-by v]
+                 [--registry mark|delete|none] [--assets keep|delete] [--undo] [--yes]
+```
+
+Hides a release from `gitflow deploy`, marks it on GitHub, and dispatches the repository's
+`withdraw.yml` to repoint floating tags and mark or delete the registry versions. Flags that are
+not given are prompted for. See [Withdrawing](Withdrawing).
+
 ## `gitflow pack`
 
 Read `release-artifacts.yml`, run each artifact's pack handler, and write the `.artifact.yml`

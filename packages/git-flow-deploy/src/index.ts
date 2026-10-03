@@ -1,7 +1,14 @@
 export type { DeployManifest, DeployRequest, SharedStorageSpec } from './types.js';
 export { signRequest, validateHmac, validateTimestamp } from './hmac.js';
 export { SIGNATURE_HEADER, TIMESTAMP_HEADER, DEFAULT_TIMESTAMP_WINDOW_SECONDS } from './hmac.js';
-export { fetchDeployBundle } from './fetch-bundle.js';
+export {
+  fetchDeployBundle,
+  readReleaseWithdrawal,
+  WithdrawnReleaseError,
+  FORCEABLE_WITHDRAW_KINDS,
+  type FetchDeployBundleOptions,
+  type ReleaseWithdrawal,
+} from './fetch-bundle.js';
 export { parseDeployYml } from './parse-manifest.js';
 export { runDeploy } from './run-deploy.js';
 export {

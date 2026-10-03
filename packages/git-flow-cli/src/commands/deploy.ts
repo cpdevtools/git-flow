@@ -22,7 +22,6 @@
  */
 
 import { Command, Flags } from '@oclif/core';
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import prompts from 'prompts';
 import {
@@ -34,6 +33,11 @@ import {
   LOAD_MORE,
   isDeployable,
   isGitflowTag,
+  releaseWithdrawal,
+  gh,
+  getCurrentBranch,
+  getRepoFromRemote,
+  fetchDefaultBranch,
   releaseDeployMethods,
   defaultMethod,
   parseWorkflowEnvironment,
@@ -57,43 +61,7 @@ interface DeployTarget {
 
 // ─── GitHub API helper ────────────────────────────────────────────────────────
 
-async function gh<T = unknown>(
-  token: string,
-  path: string,
-  options?: RequestInit,
-): Promise<T | null> {
-  const res = await fetch(`https://api.github.com${path}`, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      ...((options?.headers ?? {}) as Record<string, string>),
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub API ${res.status}: ${await res.text().catch(() => '')}`);
-  }
-  if (res.status === 204) return null;
-  return res.json() as Promise<T>;
-}
-
 // ─── git helpers ──────────────────────────────────────────────────────────────
-
-function getCurrentBranch(): string {
-  return execSync('git branch --show-current', {
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-  }).trim();
-}
-
-function getRepoFromRemote(): string {
-  const url = execSync('git remote get-url origin', {
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe'],
-  }).trim();
-  return parseRepoFromUrl(url);
-}
 
 // ─── version helpers ──────────────────────────────────────────────────────────
 // (All pure helpers live in deploy-helpers.ts and are imported above.)
@@ -154,11 +122,6 @@ async function listRemoteBranches(token: string, owner: string, repo: string): P
     page++;
   }
   return names;
-}
-
-async function fetchDefaultBranch(token: string, owner: string, repo: string): Promise<string> {
-  const res = await gh<{ default_branch?: string }>(token, `/repos/${owner}/${repo}`);
-  return res?.default_branch ?? 'main';
 }
 
 /**
@@ -258,6 +221,7 @@ async function listDeployableReleases(
   token: string,
   owner: string,
   repo: string,
+  includeWithdrawn = false,
 ): Promise<GHRelease[]> {
   const results: GHRelease[] = [];
   let page = 1;
@@ -269,7 +233,11 @@ async function listDeployableReleases(
     if (!batch || batch.length === 0) break;
     for (const r of batch) {
       if (r.draft) continue;
-      if (isGitflowTag(r.tag_name) && isDeployable(r)) results.push(r);
+      if (!isGitflowTag(r.tag_name)) continue;
+      // Withdrawn releases are hidden unless asked for; they still need a method.
+      if (isDeployable(r) || (includeWithdrawn && releaseDeployMethods(r).length > 0)) {
+        results.push(r);
+      }
     }
     if (batch.length < 100) break;
     page++;
@@ -321,6 +289,11 @@ export default class Deploy extends Command {
   ];
 
   static override flags = {
+    'include-withdrawn': Flags.boolean({
+      description:
+        'Also list releases withdrawn with `gitflow withdraw` (shown with their kind and reason).',
+      default: false,
+    }),
     repo: Flags.string({
       char: 'r',
       description: 'GitHub repo (owner/repo). Defaults to the current git remote origin.',
@@ -387,7 +360,7 @@ export default class Deploy extends Command {
     // Every later selection only filters this list down.
     this.log('Fetching releases...');
     const [allReleases, remoteBranches, defaultBranch] = await Promise.all([
-      listDeployableReleases(token, owner, repoName),
+      listDeployableReleases(token, owner, repoName, flags['include-withdrawn']),
       listRemoteBranches(token, owner, repoName),
       fetchDefaultBranch(token, owner, repoName),
     ]);
@@ -639,6 +612,16 @@ export default class Deploy extends Command {
       if (!r.ok) {
         this.log('Cancelled.');
         process.exit(0);
+      }
+    }
+
+    for (const d of dispatches) {
+      const w = releaseWithdrawal(d.release);
+      if (w) {
+        this.warn(
+          `${d.pkg} ${versionFromTag(d.release.tag_name)} is WITHDRAWN (${w.kind}): ${w.reason}. ` +
+            `The deploy side refuses it unless the kind allows --force.`,
+        );
       }
     }
 

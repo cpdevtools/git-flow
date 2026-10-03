@@ -10,6 +10,8 @@ import {
   extractArtifactMetadata,
   releaseDeployMethods,
   isDeployable,
+  releaseWithdrawal,
+  withdrawnLabel,
   defaultMethod,
   parseWorkflowEnvironment,
   majorFromVersionBranch,
@@ -651,5 +653,52 @@ describe('isGitflowTag', () => {
     expect(isGitflowTag('v0.4.0-feature.deploy-flow.dev.10/@org/svc')).toBe(false);
     expect(isGitflowTag('v1.2.3')).toBe(false);
     expect(isGitflowTag('@org/svc/vnext')).toBe(false);
+  });
+});
+
+// ─── withdrawn releases ───────────────────────────────────────────────────────
+
+const WITHDRAWN_BODY = `## Artifact Metadata
+\`\`\`yaml
+project: "@org/svc"
+withdrawn:
+  kind: broken
+  reason: double-charges discounted orders
+  at: 2026-10-03T19:12:00Z
+  by: erd
+artifacts:
+  - type: npm
+    name: "@org/svc"
+    deploy:
+      - node
+    published: true
+\`\`\``;
+
+describe('withdrawn releases', () => {
+  it('still advertise their methods but are not deployable', () => {
+    const r = release(1, '@org/svc/v1.4.2', { body: WITHDRAWN_BODY });
+    expect(releaseDeployMethods(r)).toEqual(['node']);
+    expect(isDeployable(r)).toBe(false);
+    expect(releaseWithdrawal(r)).toEqual({
+      kind: 'broken',
+      reason: 'double-charges discounted orders',
+      replacedBy: undefined,
+    });
+  });
+
+  it('label carries kind, reason and the replacement when given', () => {
+    const r = release(1, '@org/svc/v1.4.2', {
+      body: WITHDRAWN_BODY.replace('  by: erd', '  by: erd\n  replacedBy: 1.4.3'),
+    });
+    expect(withdrawnLabel(r)).toBe(
+      '  ⛔ withdrawn (broken): double-charges discounted orders → use 1.4.3',
+    );
+    expect(withdrawnLabel(release(2, '@org/svc/v1.4.3'))).toBe('');
+  });
+
+  it('ordinary releases are unaffected', () => {
+    const r = release(3, '@org/svc/v1.4.3');
+    expect(releaseWithdrawal(r)).toBeUndefined();
+    expect(isDeployable(r)).toBe(true);
   });
 });

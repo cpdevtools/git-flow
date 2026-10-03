@@ -1,0 +1,85 @@
+name: 'git-flow: Withdraw'
+description: >-
+  Applies the registry side of `gitflow withdraw` for one or more releases:
+  repoints floating tags (latest/next/channel) away from — or, on undo, back
+  to — the release, marks or deletes the package versions in their registries,
+  and deletes release assets when asked. The release marker itself is written
+  by the CLI before this runs.
+
+inputs:
+  release_ids:
+    description: 'Comma-separated GitHub release ids (set by `gitflow withdraw`)'
+    required: true
+  registry:
+    description: 'mark | delete | none — what to do to the package versions in their registries'
+    required: false
+    default: 'none'
+  assets:
+    description: 'keep | delete — what to do with the release assets'
+    required: false
+    default: 'keep'
+  undo:
+    description: 'true to restore: floating tags go back to the release, reversible marks are cleared'
+    required: false
+    default: 'false'
+  workspace-root:
+    description: 'Checkout of the repository (for .publish/registries.yml)'
+    required: false
+    default: ${{ github.workspace }}
+  token:
+    description: 'GitHub token with contents:write and packages:write (defaults to GITHUB_TOKEN)'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@cpdevtools'
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    # No version here: the consumer's package.json `packageManager` decides, and
+    # pnpm/action-setup refuses when both are given.
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Configure registry auth
+      shell: bash
+      run: pnpm config set "//npm.pkg.github.com/:_authToken" "$GITHUB_TOKEN"
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: pnpm i --no-frozen-lockfile --filter @cpdevtools/git-flow-action-withdraw...
+      env:
+        HUSKY: '0'
+        GITHUB_TOKEN: ${{ inputs.token }}
+        NODE_AUTH_TOKEN: ${{ inputs.token }}
+
+    # The action imports the library from this checkout, which ships source
+    # only; build the entry points it needs.
+    - name: Build git-flow library
+      shell: bash
+      working-directory: ${{ github.action_path }}/../../packages/git-flow
+      run: pnpm build
+      env:
+        HUSKY: '0'
+
+    - name: Apply withdrawal effects
+      shell: bash
+      run: |
+        "${{ github.action_path }}/node_modules/.bin/tsx" --tsconfig "${{ github.action_path }}/tsconfig.json" "${{ github.action_path }}/src/action.ts"
+      env:
+        INPUT_RELEASE_IDS: ${{ inputs.release_ids }}
+        INPUT_REGISTRY: ${{ inputs.registry }}
+        INPUT_ASSETS: ${{ inputs.assets }}
+        INPUT_UNDO: ${{ inputs.undo }}
+        INPUT_WORKSPACE_ROOT: ${{ inputs.workspace-root }}
+        GITHUB_TOKEN: ${{ inputs.token }}

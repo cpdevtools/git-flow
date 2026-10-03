@@ -29,6 +29,11 @@ export default class Deploy extends Command {
   };
 
   static override flags = {
+    force: Flags.boolean({
+      description:
+        'Deploy a release withdrawn with `gitflow withdraw` anyway. Only kinds that allow a rollback (obsolete, superseded, temporary) can be forced.',
+      default: false,
+    }),
     dest: Flags.string({
       char: 'd',
       description: 'Working directory for extraction (default: temp dir)',
@@ -62,7 +67,9 @@ export default class Deploy extends Command {
     }
 
     this.log(`▸ Fetching ${bundle} from release ${releaseId}...`);
-    const manifest = await fetchDeployBundle(token, repo, releaseId, dest, bundle);
+    const manifest = await fetchDeployBundle(token, repo, releaseId, dest, bundle, {
+      force: flags.force,
+    });
 
     if (sharedStorageBase && declaresSharedStorage(manifest)) {
       this.log(`▸ Preparing shared storage: ${sharedStorageDir(manifest, sharedStorageBase)}/`);

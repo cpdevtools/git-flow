@@ -3,6 +3,8 @@
  * Extracted here so they can be imported and unit-tested independently.
  */
 
+import { execSync } from 'node:child_process';
+
 import { CHANNEL_ORDER, sanitizeBranchName } from '@cpdevtools/git-flow/version';
 import type prompts from 'prompts';
 import * as semver from 'semver';
@@ -33,6 +35,8 @@ interface MetadataArtifact {
 /** Minimal shape of the release-body Artifact Metadata descriptor. */
 interface MetadataDescriptor {
   project?: string;
+  /** Present when the release was withdrawn with `gitflow withdraw`. */
+  withdrawn?: { kind?: string; reason?: string; replacedBy?: string };
   /** Source branch the release was cut from (written by build-pack; absent on older releases). */
   branch?: string;
   /** Release PR number (written by build-pack; absent on older releases). */
@@ -361,12 +365,15 @@ export function buildVersionChoices(releases: GHRelease[], showAll = false): pro
   const latest = releases.find((r) => !isPrerelease(r));
 
   if (next) {
-    const label = `next   — ${versionFromTag(next.tag_name)}${isPrerelease(next) ? ' (pre-release)' : ''}`;
+    const label = `next   — ${versionFromTag(next.tag_name)}${isPrerelease(next) ? ' (pre-release)' : ''}${withdrawnLabel(next)}`;
     choices.push({ title: label, value: next });
     seen.add(next.id);
   }
   if (latest && !seen.has(latest.id)) {
-    choices.push({ title: `latest — ${versionFromTag(latest.tag_name)}`, value: latest });
+    choices.push({
+      title: `latest — ${versionFromTag(latest.tag_name)}${withdrawnLabel(latest)}`,
+      value: latest,
+    });
     seen.add(latest.id);
   }
 
@@ -375,7 +382,10 @@ export function buildVersionChoices(releases: GHRelease[], showAll = false): pro
     if (seen.has(r.id)) continue;
     if (!showAll && shown >= VISIBLE) break;
     const ver = versionFromTag(r.tag_name);
-    choices.push({ title: `${ver}${isPrerelease(r) ? ' (pre-release)' : ''}`, value: r });
+    choices.push({
+      title: `${ver}${isPrerelease(r) ? ' (pre-release)' : ''}${withdrawnLabel(r)}`,
+      value: r,
+    });
     seen.add(r.id);
     shown++;
   }
@@ -440,9 +450,76 @@ export function releaseDeployMethods(release: GHRelease): string[] {
   return methods.filter((m) => assetNames.has(`deploy-${m}.zip`));
 }
 
-/** A release is deployable when its Artifact Metadata advertises ≥1 deploy method. */
+/** The withdrawal marker, when the release was withdrawn with `gitflow withdraw`. */
+export function releaseWithdrawal(
+  release: GHRelease,
+): { kind: string; reason: string; replacedBy?: string } | undefined {
+  const w = extractArtifactMetadata(release.body)?.withdrawn;
+  if (!w || typeof w.kind !== 'string') return undefined;
+  return { kind: w.kind, reason: w.reason ?? '', replacedBy: w.replacedBy };
+}
+
+/** `⛔ withdrawn (kind): reason` for labels, or '' for an ordinary release. */
+export function withdrawnLabel(release: GHRelease): string {
+  const w = releaseWithdrawal(release);
+  if (!w) return '';
+  const hint = w.replacedBy ? ` → use ${w.replacedBy}` : '';
+  return `  ⛔ withdrawn (${w.kind}): ${w.reason}${hint}`;
+}
+
+/**
+ * A release is deployable when its Artifact Metadata advertises ≥1 deploy
+ * method and it has not been withdrawn.
+ */
 export function isDeployable(release: GHRelease): boolean {
-  return releaseDeployMethods(release).length > 0;
+  return releaseDeployMethods(release).length > 0 && !releaseWithdrawal(release);
+}
+
+// ─── GitHub / git access shared by the deploy and withdraw commands ──────────
+
+export async function gh<T = unknown>(
+  token: string,
+  path: string,
+  options?: RequestInit,
+): Promise<T | null> {
+  const res = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...((options?.headers ?? {}) as Record<string, string>),
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`GitHub API ${res.status}: ${await res.text().catch(() => '')}`);
+  }
+  if (res.status === 204) return null;
+  return res.json() as Promise<T>;
+}
+
+export function getCurrentBranch(): string {
+  return execSync('git branch --show-current', {
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim();
+}
+
+export function getRepoFromRemote(): string {
+  const url = execSync('git remote get-url origin', {
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe'],
+  }).trim();
+  return parseRepoFromUrl(url);
+}
+
+export async function fetchDefaultBranch(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<string> {
+  const res = await gh<{ default_branch?: string }>(token, `/repos/${owner}/${repo}`);
+  return res?.default_branch ?? 'main';
 }
 
 /** The default deploy method to pre-select: the first advertised in declaration order. */
