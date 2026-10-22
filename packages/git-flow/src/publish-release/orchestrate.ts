@@ -6,7 +6,6 @@ import type { ProjectArtifactDescriptor } from '@cpdevtools/ts-dev-utilities/art
 import { parseDocument } from 'yaml';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
-import { getOctokit as getActionsOctokit } from '@actions/github';
 import { discoverProjects } from '../lib/project.js';
 import {
   getArtifactType,
@@ -28,72 +27,37 @@ import {
   type ProjectPublishResult,
 } from '../publishing/index.js';
 import {
-  finalizeRelease,
+  finalizeReleaseById,
   createGitTag,
   getReleaseTag,
   getReleaseUrl,
   listProjectVersions,
-  parseReleaseTag,
-  getDraftReleaseMetadata,
-  isReleasePublished,
+  resolveRelease,
+  extractArtifactMetadataYaml,
+  downloadReleaseAsset,
   updateDraftReleaseBody,
-  findDraftReleaseByTag,
   postPRReleaseComment,
   buildReleaseComment,
+  type ReleaseInfo,
 } from '../build-pack/github.js';
 
 /**
- * Download release assets to local directory
+ * Download a release's assets to a local directory.
  */
 async function downloadReleaseAssets(
   githubToken: string,
   owner: string,
   repo: string,
-  tag: string,
+  release: ReleaseInfo,
   outputDir: string,
 ): Promise<void> {
-  const octokit = getActionsOctokit(githubToken);
-
-  // Find the release
-  const { data: releases } = await octokit.rest.repos.listReleases({
-    owner,
-    repo,
-    per_page: 100,
-  });
-
-  // Parse tag to get expected release name
-  // Tag format: @scope/name/vX.Y.Z -> name: "@scope/name X.Y.Z"
-  // GitHub stores tags containing @ or / as untagged-<hash>, so we fall back to name match.
-  const parsed = parseReleaseTag(tag);
-  const expectedName = parsed ? `${parsed.name} ${parsed.version}` : null;
-
-  // First try exact tag match, then fall back to name match for untagged releases
-  const release =
-    releases.find((r) => r.tag_name === tag) ||
-    (expectedName ? releases.find((r) => r.draft && r.name === expectedName) : null);
-
-  if (!release) {
-    throw new Error(`Release not found for tag: ${tag}`);
-  }
-
-  // Create output directory
   await mkdir(outputDir, { recursive: true });
 
-  // Download each asset
   for (const asset of release.assets) {
     console.log(`  ⬇️  Downloading ${asset.name}...`);
-
-    const response = await octokit.rest.repos.getReleaseAsset({
-      owner,
-      repo,
-      asset_id: asset.id,
-      headers: {
-        accept: 'application/octet-stream',
-      },
-    });
-
+    const bytes = await downloadReleaseAsset(githubToken, owner, repo, asset.id);
     const assetPath = join(outputDir, asset.name);
-    await writeFile(assetPath, Buffer.from(response.data as unknown as ArrayBuffer));
+    await writeFile(assetPath, bytes);
     console.log(`  ✓ Downloaded to ${assetPath}`);
   }
 }
@@ -105,7 +69,7 @@ async function updateReleaseBodyPublishedFlags(
   githubToken: string,
   owner: string,
   repo: string,
-  tag: string,
+  release: ReleaseInfo,
   artifactYml: string,
 ): Promise<void> {
   // Parse YAML and update published flags
@@ -120,12 +84,6 @@ async function updateReleaseBodyPublishedFlags(
         artifactNode.set('published', true);
       }
     }
-  }
-
-  // Get the draft release
-  const release = await findDraftReleaseByTag(githubToken, owner, repo, tag);
-  if (!release) {
-    throw new Error(`Draft release not found for tag: ${tag}`);
   }
 
   // Parse existing body to preserve PR link and tags sections
@@ -182,32 +140,41 @@ export async function runPublishRelease(
       try {
         console.log(`📦 Publishing ${project.name}...`);
 
-        // Get artifact metadata from draft release body
+        // The release build-pack created: by the id it recorded in the release
+        // PR, else by list scan (PRs built before ids were recorded). Fetched
+        // once; every later step works from this object and its id, never
+        // from another list scan.
         const tag = getReleaseTag(project.name, project.version);
-        const artifactYml = await getDraftReleaseMetadata(
+        const release = await resolveRelease(
           options.githubToken,
           options.owner,
           options.repo,
-          tag,
+          { tag, releaseId: project.releaseId },
         );
 
-        if (!artifactYml) {
-          // No draft found. If a finalized release already exists for this tag,
-          // the project was published on a previous run — skip it (idempotent
-          // re-run) instead of failing the whole release.
-          const alreadyPublished = await isReleasePublished(
-            options.githubToken,
-            options.owner,
-            options.repo,
-            tag,
-          );
-          if (alreadyPublished) {
-            console.log(`  ⏭️  ${project.name} already released (${tag}) — skipping`);
-            continue;
-          }
+        if (!release) {
           throw new Error(
-            `No artifact metadata found in draft release ${tag}. ` +
+            `Release not found for ${tag}` +
+              (project.releaseId !== undefined ? ` (id ${project.releaseId} returned 404)` : '') +
+              `. Make sure the build-pack phase completed successfully.`,
+          );
+        }
+
+        const artifactYml = extractArtifactMetadataYaml(release.body);
+        if (!artifactYml) {
+          throw new Error(
+            `No artifact metadata found in release ${tag} (id ${release.id}). ` +
               `Make sure the build-pack phase completed successfully.`,
+          );
+        }
+
+        // A published release here means a previous run got past finalize and
+        // failed later (or was re-run after success). Every remaining step is
+        // idempotent, so resume rather than skip: the registry promotion and
+        // the extra tags may still be missing.
+        if (!release.draft) {
+          console.log(
+            `  ℹ️  ${tag} is already published (id ${release.id}) — resuming registries, body and tags`,
           );
         }
 
@@ -221,7 +188,7 @@ export async function runPublishRelease(
           options.githubToken,
           options.owner,
           options.repo,
-          tag,
+          release,
           artifactsDir,
         );
 
@@ -260,12 +227,31 @@ export async function runPublishRelease(
           options.githubToken,
           options.owner,
           options.repo,
-          tag,
+          release,
           artifactYml,
         );
 
-        // Create git tag BEFORE finalizing release (required for GitHub to use the tag)
-        console.log(`  🏷️  Creating git tag...`);
+        // Finalize (draft → published) BEFORE creating any git tags. Setting
+        // tag_name on publish makes GitHub create the package tag itself, so a
+        // failure up to here leaves a clean draft and no orphan tags. This
+        // stays after the registry push: the deploy service treats any
+        // non-draft release as deployable.
+        if (release.draft) {
+          console.log(`  ✅ Finalizing GitHub Release...`);
+          await finalizeReleaseById(
+            options.githubToken,
+            options.owner,
+            options.repo,
+            release.id,
+            tag,
+            options.sha,
+            project.prerelease,
+          );
+        }
+
+        // Group and simple version tags (the package tag already exists;
+        // createGitTag tolerates that).
+        console.log(`  🏷️  Creating git tags...`);
         await createGitTag(
           options.githubToken,
           options.owner,
@@ -274,17 +260,6 @@ export async function runPublishRelease(
           project.version,
           options.sha,
           project.placeholder,
-        );
-
-        // Finalize GitHub Release (draft → published)
-        console.log(`  ✅ Finalizing GitHub Release...`);
-        await finalizeRelease(
-          options.githubToken,
-          options.owner,
-          options.repo,
-          project.name,
-          project.version,
-          project.prerelease,
         );
 
         result.published.push(project.name);

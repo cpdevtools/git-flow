@@ -101,14 +101,33 @@ Composite GitHub Action at `actions/publish-release/`:
 Phase 3: Publish Release
 ├─ Load .github/registries.yml
 ├─ For each project (in dependency order):
-│  ├─ Download artifact.yml from GitHub Release
+│  ├─ Fetch the release once: by the id build-pack recorded in the release PR
+│  │  (GET /releases/{id}), else by list scan (PRs built before ids were recorded)
+│  ├─ Read artifact metadata from the release body, download its assets
 │  ├─ For each artifact:
 │  │  ├─ Check if already published (skip if yes)
 │  │  ├─ Publish to configured registries
 │  │  └─ Verify publication
-│  ├─ Finalize GitHub Release (draft → published)
-│  └─ Create git tag (project/vX.Y.Z)
+│  ├─ Mark artifacts published:true in the release body
+│  ├─ Finalize GitHub Release (draft → published; GitHub creates project/vX.Y.Z)
+│  └─ Create the group and simple git tags (MAIN/vX.Y.Z, vX.Y.Z)
 └─ Done
+```
+
+Order matters:
+
+- The registry push comes before finalize because `git-flow-deploy-service`
+  treats any non-draft release as deployable.
+- Finalize comes before any git tag is created, so a failure up to that point
+  leaves a clean draft and no orphan tags. Setting `tag_name` on publish makes
+  GitHub create the package tag itself.
+- A release that is already published (a rerun after a failure past finalize)
+  is resumed, not skipped: every remaining step is idempotent.
+- Nothing after the first fetch scans the release list. The list endpoint has
+  returned inconsistent results for a draft once the tag it is named after
+  exists (cpdevtools/git-flow#223).
+
+```
 ```
 
 ## Error Handling

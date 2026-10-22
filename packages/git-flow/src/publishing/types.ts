@@ -114,6 +114,12 @@ export interface PublishProjectInfo {
   releaseTag: string;
   prerelease: boolean;
   placeholder: string;
+  /**
+   * GitHub release id recorded in the release PR by build-pack. When present
+   * the release is fetched by id; otherwise it is found by scanning the
+   * release list (PRs built before ids were recorded).
+   */
+  releaseId?: number;
 }
 
 /**
