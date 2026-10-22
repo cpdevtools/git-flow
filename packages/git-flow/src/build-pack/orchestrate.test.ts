@@ -58,7 +58,8 @@ vi.mock('../lib/project', () => ({ discoverProjects: vi.fn(async () => discovere
 
 vi.mock('./github.js', () => ({
   deleteDraftRelease: vi.fn(async () => {}),
-  findDraftReleaseByTag: vi.fn(async () => null),
+  resolveRelease: vi.fn(async () => null),
+  recordReleaseIds: vi.fn(async () => {}),
   getReleaseTag: vi.fn((name: string, version: string) => `${name}/v${version}`),
   isArtifactUploaded: vi.fn(async () => false),
 }));
@@ -71,10 +72,12 @@ vi.mock('./execute.js', () => ({
     success: true,
     releaseUrl: `https://example.test/releases/tag/${project.name}/v${project.version}`,
     draftUrl: `https://example.test/releases/tag/untagged-abc123`,
+    releaseId: 1000 + project.name.length,
   })),
 }));
 
 const { applyVersion, executePack, executeUpload } = await import('./execute.js');
+const { isArtifactUploaded, recordReleaseIds, resolveRelease } = await import('./github.js');
 const { runBuildPack } = await import('./orchestrate.js');
 
 let discovered: Project[] = [];
@@ -135,9 +138,45 @@ describe('runBuildPack', () => {
         version: '2.0.1-alpha.0',
         url: 'https://example.test/releases/tag/@idealsupply/swarmpit/v2.0.1-alpha.0',
         draftUrl: 'https://example.test/releases/tag/untagged-abc123',
+        releaseId: 1000 + '@idealsupply/swarmpit'.length,
       },
     ]);
+    expect(result.releaseIds).toEqual({
+      '@idealsupply/swarmpit': 1000 + '@idealsupply/swarmpit'.length,
+    });
     expect(result.failed).toEqual([]);
+  });
+
+  it('records the draft release ids in the release PR after upload', async () => {
+    process.env.GITHUB_REPOSITORY = 'acme/app';
+    process.env.GITHUB_REPOSITORY_OWNER = 'acme';
+    discovered = [project('@idealsupply/swarmpit', { 'github.actions.pack': 'gitflow pack' })];
+    schedulerStates.set('@idealsupply/swarmpit', 'no-script');
+
+    await runBuildPack(context, prBody({ name: '@idealsupply/swarmpit', version: '2.0.1' }));
+
+    expect(recordReleaseIds).toHaveBeenCalledWith('token', 'acme', 'app', 7, {
+      '@idealsupply/swarmpit': 1000 + '@idealsupply/swarmpit'.length,
+    });
+  });
+
+  it('records the ids of projects found complete from an earlier run', async () => {
+    process.env.GITHUB_REPOSITORY = 'acme/app';
+    process.env.GITHUB_REPOSITORY_OWNER = 'acme';
+    discovered = [project('@idealsupply/swarmpit', { 'github.actions.pack': 'gitflow pack' })];
+    vi.mocked(resolveRelease).mockResolvedValueOnce({ id: 55, draft: true } as any);
+    vi.mocked(isArtifactUploaded).mockResolvedValueOnce(true);
+
+    const result = await runBuildPack(
+      context,
+      prBody({ name: '@idealsupply/swarmpit', version: '2.0.1' }),
+    );
+
+    expect(result.skipped).toEqual(['@idealsupply/swarmpit']);
+    expect(executeUpload).not.toHaveBeenCalled();
+    expect(recordReleaseIds).toHaveBeenCalledWith('token', 'acme', 'app', 7, {
+      '@idealsupply/swarmpit': 55,
+    });
   });
 
   it('still packs release projects that do have a build script', async () => {
