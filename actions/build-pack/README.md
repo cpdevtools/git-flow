@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: read
+      pull-requests: write # records each draft's release id in the release PR
       packages: read
 
     steps:
@@ -54,7 +54,7 @@ itself, so no setup steps are needed before it.
 | Input            | Required | Default                   | Description                                                      |
 | ---------------- | -------- | ------------------------- | ---------------------------------------------------------------- |
 | `pr-number`      | No       | `0`                       | The merged release pull request, whose body carries the metadata |
-| `token`          | No       | `${{ github.token }}`     | Needs `contents: write`, `pull-requests: read`, `packages: read` |
+| `token`          | No       | `${{ github.token }}`     | Needs `contents: write`, `pull-requests: write` (records release ids in the release PR), `packages: write` (pack pushes docker temp tags) |
 | `workspace-root` | No       | `${{ github.workspace }}` | Workspace root directory                                         |
 
 ## Outputs
