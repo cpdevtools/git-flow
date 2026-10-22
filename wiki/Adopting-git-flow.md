@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: read
+      pull-requests: write # build-pack records each draft's release id in the release PR
       packages: write # docker-image pack pushes a temp tag
     steps:
       - uses: actions/checkout@v7
