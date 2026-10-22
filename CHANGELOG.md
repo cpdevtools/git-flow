@@ -20,6 +20,8 @@ Package set since 2026-07-09: `git-flow`, `git-flow-cli`, `git-flow-deploy`, `gi
   → group and simple tags, so a failure never leaves orphan tags, and a rerun on an already-published
   release resumes instead of skipping. 404s keep the call, status and release id. Force Rebuild and
   empty-draft cleanup now actually find drafts (the by-tag endpoint never returned them).
+  **Consumers:** the `build-pack` job now needs `permissions: pull-requests: write`; without it
+  build-pack logs a warning and publish falls back to the list scan.
 - **Docker transport is the registry again** (restores Phase 6 Decision #5). `gitflow pack` pushes
   the image to every destination registry under `temp-<sha7>`; publish pulls that tag, verifies the
   image id against the digest captured at pack, and pushes the release tag plus floating pointers.
