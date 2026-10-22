@@ -39,6 +39,10 @@ export {
   getGroupTag,
   parseReleaseTag,
   findDraftReleaseByTag,
+  getReleaseById,
+  resolveRelease,
+  extractArtifactMetadataYaml,
+  recordReleaseIds,
   createDraftRelease,
   updateDraftReleaseBody,
   findOrCreateDraftRelease,
@@ -54,7 +58,7 @@ export {
 } from './github.js';
 
 // Options parsing
-export { extractPRMetadata } from './options.js';
+export { extractPRMetadata, setReleaseIdsInPRBody } from './options.js';
 
 // Artifact generation
 export {

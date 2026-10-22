@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { parseDocument } from 'yaml';
 import type { BuildPackContext, ProjectConfig } from './types.js';
+import { setReleaseIdsInPRBody } from './options.js';
 
 /**
  * Add published:false to all artifacts in YAML metadata
@@ -177,6 +178,171 @@ export async function findDraftReleaseByTag(
 }
 
 /**
+ * The subset of a GitHub release the release phases work with.
+ */
+export interface ReleaseInfo {
+  id: number;
+  draft: boolean;
+  tag_name: string;
+  name: string | null;
+  body: string | null | undefined;
+  html_url: string;
+  upload_url: string;
+  assets: Array<{ id: number; name: string; size: number }>;
+}
+
+function toReleaseInfo(r: {
+  id: number;
+  draft: boolean;
+  tag_name: string;
+  name: string | null;
+  body?: string | null;
+  html_url: string;
+  upload_url: string;
+  assets: Array<{ id: number; name: string; size: number }>;
+}): ReleaseInfo {
+  return {
+    id: r.id,
+    draft: r.draft,
+    tag_name: r.tag_name,
+    name: r.name,
+    body: r.body,
+    html_url: r.html_url,
+    upload_url: r.upload_url,
+    assets: r.assets.map((a) => ({ id: a.id, name: a.name, size: a.size })),
+  };
+}
+
+/**
+ * Fetch one release by id. Works for drafts (the by-tag endpoint does not) and
+ * is the only lookup that does not depend on the release list, which has been
+ * seen to omit a draft once the tag it is named after exists. Returns null on
+ * 404; any other error propagates with its status.
+ */
+export async function getReleaseById(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  releaseId: number,
+): Promise<ReleaseInfo | null> {
+  const octokit = getOctokit(githubToken);
+  try {
+    const { data } = await octokit.rest.repos.getRelease({ owner, repo, release_id: releaseId });
+    return toReleaseInfo(data);
+  } catch (error: any) {
+    if (error?.status === 404) return null;
+    throw new Error(
+      `GET /releases/${releaseId} failed (${error?.status ?? 'no status'}): ${error?.message ?? error}`,
+    );
+  }
+}
+
+/**
+ * Find the release for a tag — draft or published — by id when one is known,
+ * else by scanning the release list.
+ *
+ * The id comes from the release PR (build-pack records it after upload). The
+ * list scan is the fallback for PRs built before ids were recorded and for a
+ * stale id (the draft was deleted and recreated); it matches the exact tag
+ * first, then the release name, because GitHub rewrites a draft's `tag_name`
+ * to `untagged-<hash>` in some cases.
+ */
+export async function resolveRelease(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  lookup: { tag: string; releaseId?: number },
+): Promise<ReleaseInfo | null> {
+  const { tag, releaseId } = lookup;
+
+  if (releaseId !== undefined) {
+    const byId = await getReleaseById(githubToken, owner, repo, releaseId);
+    if (byId) {
+      console.log(`  🔎 Release ${tag}: id ${releaseId} (${byId.draft ? 'draft' : 'published'})`);
+      return byId;
+    }
+    console.log(`  ⚠️  Release id ${releaseId} for ${tag} returned 404; falling back to list scan`);
+  }
+
+  const octokit = getOctokit(githubToken);
+  const releases = await octokit.paginate(octokit.rest.repos.listReleases, {
+    owner,
+    repo,
+    per_page: 100,
+  });
+
+  const parsed = parseReleaseTag(tag);
+  const expectedName = parsed ? `${parsed.name} ${parsed.version}` : null;
+
+  const match =
+    releases.find((r) => r.tag_name === tag) ??
+    (expectedName ? releases.find((r) => r.name === expectedName) : undefined);
+
+  if (!match) return null;
+  console.log(
+    `  🔎 Release ${tag}: id ${match.id} (${match.draft ? 'draft' : 'published'}, found by list scan)`,
+  );
+  return toReleaseInfo(match);
+}
+
+/**
+ * The YAML inside the release body's `## Artifact Metadata` block, or null.
+ */
+export function extractArtifactMetadataYaml(body: string | null | undefined): string | null {
+  if (!body) return null;
+  const yamlMatch = body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
+  return yamlMatch ? yamlMatch[1] : null;
+}
+
+/**
+ * Download one release asset's bytes.
+ */
+export async function downloadReleaseAsset(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  assetId: number,
+): Promise<Buffer> {
+  const octokit = getOctokit(githubToken);
+  const response = await octokit.rest.repos.getReleaseAsset({
+    owner,
+    repo,
+    asset_id: assetId,
+    headers: { accept: 'application/octet-stream' },
+  });
+  return Buffer.from(response.data as unknown as ArrayBuffer);
+}
+
+/**
+ * Record each project's draft release id in the release PR body so
+ * publish-release can fetch the release directly. Reads the body fresh and
+ * rewrites only the `releaseId:` lines (see setReleaseIdsInPRBody).
+ */
+export async function recordReleaseIds(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  ids: Record<string, number>,
+): Promise<void> {
+  if (Object.keys(ids).length === 0) return;
+  const octokit = getOctokit(githubToken);
+  const { data: pr } = await octokit.rest.pulls.get({ owner, repo, pull_number: prNumber });
+  const body = pr.body ?? '';
+  const updated = setReleaseIdsInPRBody(body, ids);
+  if (updated === body) {
+    console.log(`  ℹ️  PR #${prNumber} body already carries the release ids`);
+    return;
+  }
+  await octokit.rest.pulls.update({ owner, repo, pull_number: prNumber, body: updated });
+  console.log(
+    `  📝 Recorded release ids in PR #${prNumber}: ${Object.entries(ids)
+      .map(([n, id]) => `${n}=${id}`)
+      .join(', ')}`,
+  );
+}
+
+/**
  * Create a new draft release
  */
 export async function createDraftRelease(
@@ -302,11 +468,24 @@ export async function findOrCreateDraftRelease(
     : '';
   const body = `${prLink}${tagsSection}${artifactSection}`;
 
-  // Try to find existing draft release
-  const existing = await findDraftReleaseByTag(context.githubToken, owner, repo, tag);
+  // Try to find the existing draft: by the id the release PR records, else by
+  // scanning the list. A published release under this tag means the version
+  // already shipped; refuse rather than silently create a duplicate draft.
+  const resolved = await resolveRelease(context.githubToken, owner, repo, {
+    tag,
+    releaseId: project.releaseId,
+  });
+  if (resolved && !resolved.draft) {
+    throw new Error(
+      `Release ${tag} is already published (id ${resolved.id}); cannot rebuild a released version`,
+    );
+  }
+  const existing = resolved
+    ? { id: resolved.id, upload_url: resolved.upload_url, html_url: resolved.html_url }
+    : null;
 
   if (existing) {
-    console.log(`  ✓ Found existing draft release: ${tag}`);
+    console.log(`  ✓ Found existing draft release: ${tag} (id ${existing.id})`);
 
     // Always update release body with PR link, tags, and artifact metadata
     await updateDraftReleaseBody(context.githubToken, owner, repo, existing.id, body);
@@ -440,35 +619,21 @@ export async function deleteDraftRelease(
   repo: string,
   projectName: string,
   version: string,
+  releaseId?: number,
 ): Promise<void> {
   const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
 
-  try {
-    // Find release by tag
-    const { data: release } = await octokit.rest.repos.getReleaseByTag({
-      owner,
-      repo,
-      tag,
-    });
-
-    if (release && release.draft) {
-      // Delete draft release (published releases are protected)
-      await octokit.rest.repos.deleteRelease({
-        owner,
-        repo,
-        release_id: release.id,
-      });
-
-      console.log(`  🗑️  Deleted draft release: ${tag}`);
-    }
-  } catch (error: any) {
-    if (error.status === 404) {
-      // Release doesn't exist, that's fine
-      return;
-    }
-    throw error;
+  // Drafts are invisible to the by-tag endpoint, so resolve by id or list scan.
+  const release = await resolveRelease(githubToken, owner, repo, { tag, releaseId });
+  if (!release) return;
+  if (!release.draft) {
+    console.log(`  ⏭️  ${tag} is already published (id ${release.id}); not deleting`);
+    return;
   }
+
+  await octokit.rest.repos.deleteRelease({ owner, repo, release_id: release.id });
+  console.log(`  🗑️  Deleted draft release: ${tag} (id ${release.id})`);
 }
 
 /**
@@ -480,33 +645,57 @@ export async function detectDraftReleases(
   repo: string,
   projects: Array<{ name: string; version: string }>,
 ): Promise<boolean> {
-  const octokit = getOctokit(githubToken);
-
   for (const project of projects) {
     const tag = getReleaseTag(project.name, project.version);
-
-    try {
-      const { data: release } = await octokit.rest.repos.getReleaseByTag({
-        owner,
-        repo,
-        tag,
-      });
-
-      if (release && release.draft) {
-        return true; // Found at least one draft
-      }
-    } catch (error: any) {
-      if (error.status !== 404) {
-        throw error;
-      }
-    }
+    // The by-tag endpoint never returns drafts; scan the list instead.
+    const draft = await findDraftReleaseByTag(githubToken, owner, repo, tag);
+    if (draft) return true;
   }
 
   return false; // No drafts found
 }
 
 /**
- * Finalize release (convert draft to published)
+ * Publish a draft release: set the final tag (GitHub creates the git tag at
+ * `sha` if it does not exist yet) and clear the draft flag. Errors keep the
+ * call, status and release id so the log says which request failed.
+ */
+export async function finalizeReleaseById(
+  githubToken: string,
+  owner: string,
+  repo: string,
+  releaseId: number,
+  tag: string,
+  sha: string | undefined,
+  prerelease: boolean,
+): Promise<void> {
+  const octokit = getOctokit(githubToken);
+  try {
+    await octokit.rest.repos.updateRelease({
+      owner,
+      repo,
+      release_id: releaseId,
+      tag_name: tag,
+      // Where GitHub creates the tag when it does not exist yet. Ignored when
+      // the tag already exists (a rerun after an old-style failure).
+      ...(sha ? { target_commitish: sha } : {}),
+      draft: false,
+      prerelease,
+    });
+    console.log(`  ✅ Published release: ${tag} (id ${releaseId})`);
+  } catch (error: any) {
+    throw new Error(
+      `PATCH /releases/${releaseId} (tag ${tag}, draft → published) failed ` +
+        `(${error?.status ?? 'no status'}): ${error?.message ?? error}`,
+    );
+  }
+}
+
+/**
+ * Finalize release (convert draft to published), found by list scan.
+ *
+ * Kept for callers without a release id; the publish phase uses
+ * resolveRelease + finalizeReleaseById.
  */
 export async function finalizeRelease(
   githubToken: string,
@@ -515,58 +704,18 @@ export async function finalizeRelease(
   projectName: string,
   version: string,
   prerelease: boolean,
+  sha?: string,
 ): Promise<void> {
-  const octokit = getOctokit(githubToken);
   const tag = getReleaseTag(projectName, version);
-
-  try {
-    // Find draft release by listing all releases
-    const { data: releases } = await octokit.rest.repos.listReleases({
-      owner,
-      repo,
-      per_page: 100,
-    });
-
-    // Parse tag to get name for fallback search
-    const expectedName = `${projectName} ${version}`;
-
-    // Check if a published release with this tag already exists
-    const existingPublished = releases.find((r) => r.tag_name === tag && !r.draft);
-    if (existingPublished) {
-      console.log(`  ℹ️  Release already published: ${tag} (ID: ${existingPublished.id})`);
-      return;
-    }
-
-    // First try to find by exact tag match
-    let release = releases.find((r) => r.tag_name === tag && r.draft);
-
-    // Fallback: find by release name (handles GitHub's untagged- behavior)
-    if (!release) {
-      release = releases.find((r) => r.name === expectedName && r.draft);
-    }
-
-    if (!release) {
-      throw new Error(`Release not found: ${tag}`);
-    }
-
-    // Update to published (using prerelease flag from PR metadata)
-    // IMPORTANT: Also update tag_name to the final tag
-    await octokit.rest.repos.updateRelease({
-      owner,
-      repo,
-      release_id: release.id,
-      tag_name: tag, // Update from untagged-XXX to final tag
-      draft: false,
-      prerelease,
-    });
-
-    console.log(`  ✅ Published release: ${tag}`);
-  } catch (error: any) {
-    if (error.status === 404) {
-      throw new Error(`Release not found: ${tag}`);
-    }
-    throw error;
+  const release = await resolveRelease(githubToken, owner, repo, { tag });
+  if (!release) {
+    throw new Error(`Release not found by list scan: ${tag}`);
   }
+  if (!release.draft) {
+    console.log(`  ℹ️  Release already published: ${tag} (id ${release.id})`);
+    return;
+  }
+  await finalizeReleaseById(githubToken, owner, repo, release.id, tag, sha, prerelease);
 }
 
 /**
@@ -652,13 +801,7 @@ export async function getDraftReleaseMetadata(
       release = releases.find((r) => r.name === expectedName && r.draft);
     }
 
-    if (!release || !release.body) {
-      return null;
-    }
-
-    // Extract YAML from markdown code block
-    const yamlMatch = release.body.match(/```yaml\s*\n([\s\S]*?)\n\s*```/);
-    return yamlMatch ? yamlMatch[1] : null;
+    return release ? extractArtifactMetadataYaml(release.body) : null;
   } catch (error: any) {
     console.error(`Error getting draft release metadata ${tag}:`, error);
     return null;
@@ -735,7 +878,11 @@ export async function cleanupEmptyDraftReleases(
 
     for (const release of releases) {
       if (!release.draft) continue;
-      if (!release.tag_name.includes(buildSuffix)) continue;
+      // GitHub rewrites a draft's tag_name to `untagged-<hash>` in some cases;
+      // the release name (`<project> <version>`) still carries the build suffix.
+      if (!release.tag_name.includes(buildSuffix) && !(release.name ?? '').includes(buildSuffix)) {
+        continue;
+      }
 
       if (release.assets.length === 0) {
         try {

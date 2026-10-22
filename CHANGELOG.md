@@ -13,6 +13,13 @@ Package set since 2026-07-09: `git-flow`, `git-flow-cli`, `git-flow-deploy`, `gi
 
 ### Unreleased
 
+- **Releases are fetched by id, finalized before tagging** (#223). build-pack records each draft's
+  release id in the release PR (`releaseId:` per project); publish-release and build-pack's resume
+  check fetch it with `GET /releases/{id}` and fall back to the list scan only when the field is
+  absent. Publish order is now: registries → body flags → finalize (GitHub creates the package tag)
+  → group and simple tags, so a failure never leaves orphan tags, and a rerun on an already-published
+  release resumes instead of skipping. 404s keep the call, status and release id. Force Rebuild and
+  empty-draft cleanup now actually find drafts (the by-tag endpoint never returned them).
 - **Docker transport is the registry again** (restores Phase 6 Decision #5). `gitflow pack` pushes
   the image to every destination registry under `temp-<sha7>`; publish pulls that tag, verifies the
   image id against the digest captured at pack, and pushes the release tag plus floating pointers.

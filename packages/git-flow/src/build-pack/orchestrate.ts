@@ -12,7 +12,8 @@ import { applyVersion, executePack, executeUpload } from './execute.js';
 import { ARTIFACT_OUTPUT_DIR } from './generate-artifact.js';
 import {
   deleteDraftRelease,
-  findDraftReleaseByTag,
+  recordReleaseIds,
+  resolveRelease,
   getReleaseTag,
   isArtifactUploaded,
 } from './github.js';
@@ -61,7 +62,14 @@ export async function runBuildPack(
     const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'unknown';
 
     for (const project of allProjects) {
-      await deleteDraftRelease(context.githubToken, owner, repo, project.name, project.version);
+      await deleteDraftRelease(
+        context.githubToken,
+        owner,
+        repo,
+        project.name,
+        project.version,
+        project.releaseId,
+      );
     }
     console.log('   ✓ Draft releases deleted');
   }
@@ -98,6 +106,8 @@ export async function runBuildPack(
 
   if (projectsToProcess.length === 0) {
     console.log('✅ All projects already have artifacts uploaded. Nothing to do.');
+    const releaseIds = collectReleaseIds(projectsToSkip);
+    await recordReleaseIdsInPR(context, releaseIds);
     return {
       built: [],
       packed: [],
@@ -106,6 +116,7 @@ export async function runBuildPack(
       failed: [],
       cancelled: [],
       releases: [],
+      releaseIds,
     };
   }
 
@@ -146,7 +157,10 @@ export async function runBuildPack(
   // project name → { permanent tag URL, draft URL }. Both are reported: the
   // draft URL is the only way to open the release before publish-release tags
   // it, and the only one that is dead afterwards.
-  const releaseLinkMap = new Map<string, { url: string; draftUrl?: string }>();
+  const releaseLinkMap = new Map<
+    string,
+    { url: string; draftUrl?: string; releaseId?: number }
+  >();
   const packedSet = new Set<string>(); // release projects that produced an artifact
 
   /**
@@ -169,6 +183,7 @@ export async function runBuildPack(
         releaseLinkMap.set(name, {
           url: uploadResult.releaseUrl,
           draftUrl: uploadResult.draftUrl,
+          releaseId: uploadResult.releaseId,
         });
       }
     }
@@ -231,8 +246,21 @@ export async function runBuildPack(
     .map((name) => {
       const config = projectConfigMap.get(name)!;
       const links = releaseLinkMap.get(name)!;
-      return { name, version: config.version, url: links.url, draftUrl: links.draftUrl };
+      return {
+        name,
+        version: config.version,
+        url: links.url,
+        draftUrl: links.draftUrl,
+        releaseId: links.releaseId,
+      };
     });
+
+  // Every release this PR will publish: the ones uploaded now and the ones
+  // found complete from an earlier run. Written to the PR so publish-release
+  // fetches each by id instead of scanning the release list.
+  const releaseIds = collectReleaseIds(projectsToSkip);
+  for (const r of releases) if (r.releaseId !== undefined) releaseIds[r.name] = r.releaseId;
+  await recordReleaseIdsInPR(context, releaseIds);
 
   // Only genuine failures go in `failed`; siblings/dependents the scheduler
   // cancelled via fail-fast are reported separately so one real error does not
@@ -289,6 +317,7 @@ export async function runBuildPack(
     failed: failedResults,
     cancelled: cancelledProjects,
     releases,
+    releaseIds,
   };
 }
 
@@ -323,6 +352,7 @@ function buildProjectConfigs(
       version: prProject.version,
       prerelease: prProject.prerelease,
       placeholder: prProject.placeholder,
+      releaseId: prProject.releaseId,
     });
   }
 
@@ -352,9 +382,15 @@ async function findCompletedProjects(
     const tag = getReleaseTag(project.name, project.version);
 
     try {
-      const release = await findDraftReleaseByTag(context.githubToken, owner, repo, tag);
+      // By the id the release PR records when there is one; the list scan is
+      // the fallback for PRs built before ids were recorded.
+      const release = await resolveRelease(context.githubToken, owner, repo, {
+        tag,
+        releaseId: project.releaseId,
+      });
 
       if (release) {
+        project.releaseId = release.id;
         const artifactFileName = `${project.name}.artifact.yml`;
         const hasArtifact = await isArtifactUploaded(
           context.githubToken,
@@ -478,4 +514,36 @@ function displayFailures(failures: ExecutionResult[]): void {
   }
 
   console.error();
+}
+
+/** Project name → release id for the projects whose draft is already known. */
+function collectReleaseIds(projects: ProjectConfig[]): Record<string, number> {
+  const ids: Record<string, number> = {};
+  for (const p of projects) if (p.releaseId !== undefined) ids[p.name] = p.releaseId;
+  return ids;
+}
+
+/**
+ * Write the release ids into the release PR. Skipped on manual dispatch (no
+ * PR) and when nothing was uploaded. Never fails the run: the ids are an
+ * optimisation for publish-release, which falls back to a list scan without
+ * them.
+ */
+async function recordReleaseIdsInPR(
+  context: BuildPackContext,
+  ids: Record<string, number>,
+): Promise<void> {
+  if (context.prNumber <= 0 || context.skipUpload || Object.keys(ids).length === 0) return;
+  const owner = process.env.GITHUB_REPOSITORY_OWNER || 'cpdevtools';
+  const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || '';
+  if (!repo) return;
+  try {
+    await recordReleaseIds(context.githubToken, owner, repo, context.prNumber, ids);
+  } catch (error) {
+    console.warn(
+      `  ⚠️  Could not record release ids in PR #${context.prNumber}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }

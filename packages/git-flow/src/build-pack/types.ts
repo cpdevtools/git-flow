@@ -18,6 +18,12 @@ export interface ProjectConfig extends Project {
   prerelease: boolean;
   /** Version placeholder from package.json (e.g., '0.0.0-MAIN') */
   placeholder: string;
+  /**
+   * GitHub release id of the project's draft, when a previous build-pack run
+   * recorded it in the release PR. Lets later phases fetch the release
+   * directly instead of scanning the release list.
+   */
+  releaseId?: number;
 }
 
 /**
@@ -44,6 +50,8 @@ export interface ExecutionResult {
    * never instead of it.
    */
   draftUrl?: string;
+  /** GitHub release id of the draft the artifacts were uploaded to (upload phase only) */
+  releaseId?: number;
 }
 
 /**
@@ -92,6 +100,8 @@ export interface PRProjectMetadata {
   prerelease: boolean;
   /** Project working directory relative to workspace root */
   cwd: string;
+  /** GitHub release id of the project's draft, recorded by build-pack after upload */
+  releaseId?: number;
 }
 
 /**
@@ -106,6 +116,8 @@ export interface BuildPackRelease {
   url: string;
   /** The draft's URL — live only until publish-release tags the release */
   draftUrl?: string;
+  /** GitHub release id of the draft */
+  releaseId?: number;
 }
 
 /**
@@ -126,4 +138,11 @@ export interface BuildPackResult {
   cancelled: string[];
   /** Draft releases created/updated during this run */
   releases: BuildPackRelease[];
+  /**
+   * Project name → GitHub release id for every project this PR releases,
+   * whether uploaded in this run or found complete from an earlier one.
+   * Written back into the release PR so publish-release can fetch each
+   * release by id.
+   */
+  releaseIds: Record<string, number>;
 }
