@@ -303,7 +303,7 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  pull-requests: write
   packages: read
 
 jobs:
@@ -332,7 +332,7 @@ workflow with `packages: write`.
 
 The workflow requires:
 - `contents: write` - Create draft releases and upload assets
-- `pull-requests: read` - Read PR description
+- `pull-requests: write` - Read PR description, record each draft's release id in it
 - `packages: read` - Install workspace packages from GitHub Packages. Nothing is pushed at pack time;
   registry pushes happen in `publish-release`
 
